@@ -1,0 +1,43 @@
+import Foundation
+
+public struct MarkdownEditableSourceSpan: Equatable {
+    public enum Kind: Equatable {
+        case link
+    }
+
+    public let range: NSRange
+    public let source: String
+    public let kind: Kind
+}
+
+public enum MarkdownSourceSpanParser {
+    public static func editableSpan(containing location: Int, in markdown: String) -> MarkdownEditableSourceSpan? {
+        linkSpan(containing: location, in: markdown)
+    }
+
+    public static func linkSpan(containing location: Int, in markdown: String) -> MarkdownEditableSourceSpan? {
+        let nsString = markdown as NSString
+        guard nsString.length > 0 else { return nil }
+
+        let safeLocation = min(max(0, location), nsString.length - 1)
+        let lineRange = nsString.lineRange(for: NSRange(location: safeLocation, length: 0))
+        let line = nsString.substring(with: lineRange)
+        guard let regex = try? NSRegularExpression(pattern: MarkdownPatterns.link) else {
+            return nil
+        }
+
+        let matches = regex.matches(in: line, range: NSRange(location: 0, length: (line as NSString).length))
+        for match in matches {
+            let globalRange = NSRange(location: lineRange.location + match.range.location, length: match.range.length)
+            if NSLocationInRange(location, globalRange) || location == NSMaxRange(globalRange) {
+                return MarkdownEditableSourceSpan(
+                    range: globalRange,
+                    source: nsString.substring(with: globalRange),
+                    kind: .link
+                )
+            }
+        }
+
+        return nil
+    }
+}

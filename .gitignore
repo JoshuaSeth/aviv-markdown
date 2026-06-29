@@ -1,0 +1,17 @@
+.DS_Store
+.build/
+.swiftpm/
+DerivedData/
+dist/
+
+# App/package artifacts
+*.app
+*.dSYM
+*.zip
+
+# Local editor and environment files
+.env
+.env.*
+*.xcuserstate
+*.xcworkspace/xcuserdata/
+*.xcodeproj/xcuserdata/

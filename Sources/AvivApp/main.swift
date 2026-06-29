@@ -1,0 +1,84 @@
+import AppKit
+import AvivCore
+import Foundation
+
+let arguments = CommandLine.arguments
+
+if arguments.contains("--verify-layout") {
+    exit(MarkdownLayoutVerifier.runCLI())
+}
+
+if arguments.contains("--verify-minimap") {
+    exit(MarkdownMinimapVerifier.runCLI())
+}
+
+if arguments.contains("--verify-commands") {
+    exit(AppCommandVerifier.runCLI())
+}
+
+if arguments.contains("--verify-tabs") {
+    exit(AppTabVerifier.runCLI())
+}
+
+if let snapshotIndex = arguments.firstIndex(of: "--snapshot"), arguments.indices.contains(snapshotIndex + 1) {
+    let path = arguments[snapshotIndex + 1]
+    let cursorNeedle: String?
+    if let cursorIndex = arguments.firstIndex(of: "--cursor"), arguments.indices.contains(cursorIndex + 1) {
+        cursorNeedle = arguments[cursorIndex + 1]
+    } else {
+        cursorNeedle = nil
+    }
+    let viewScale: CGFloat?
+    if let zoomIndex = arguments.firstIndex(of: "--zoom"), arguments.indices.contains(zoomIndex + 1) {
+        viewScale = Double(arguments[zoomIndex + 1]).map { CGFloat($0) }
+    } else {
+        viewScale = nil
+    }
+    let scrollRatio: CGFloat?
+    if let scrollIndex = arguments.firstIndex(of: "--scroll"), arguments.indices.contains(scrollIndex + 1) {
+        scrollRatio = Double(arguments[scrollIndex + 1]).map { CGFloat($0) }
+    } else {
+        scrollRatio = nil
+    }
+
+    do {
+        try MarkdownSnapshotRenderer.renderSample(to: URL(fileURLWithPath: path), cursorNeedle: cursorNeedle, viewScale: viewScale, scrollRatio: scrollRatio)
+        print("snapshot: \(path)")
+        exit(0)
+    } catch {
+        fputs("snapshot failed: \(error)\n", stderr)
+        exit(1)
+    }
+}
+
+if let minimapSnapshotIndex = arguments.firstIndex(of: "--snapshot-minimap"), arguments.indices.contains(minimapSnapshotIndex + 1) {
+    let path = arguments[minimapSnapshotIndex + 1]
+    let scrollRatio: CGFloat
+    if let scrollIndex = arguments.firstIndex(of: "--scroll"), arguments.indices.contains(scrollIndex + 1),
+       let parsed = Double(arguments[scrollIndex + 1]) {
+        scrollRatio = CGFloat(parsed)
+    } else {
+        scrollRatio = 0
+    }
+    let viewScale: CGFloat?
+    if let zoomIndex = arguments.firstIndex(of: "--zoom"), arguments.indices.contains(zoomIndex + 1) {
+        viewScale = Double(arguments[zoomIndex + 1]).map { CGFloat($0) }
+    } else {
+        viewScale = nil
+    }
+
+    do {
+        try MarkdownSnapshotRenderer.renderMinimapFixture(to: URL(fileURLWithPath: path), scrollRatio: scrollRatio, viewScale: viewScale)
+        print("snapshot: \(path)")
+        exit(0)
+    } catch {
+        fputs("snapshot failed: \(error)\n", stderr)
+        exit(1)
+    }
+}
+
+let app = NSApplication.shared
+let delegate = AppDelegate()
+app.delegate = delegate
+app.setActivationPolicy(.regular)
+app.run()
