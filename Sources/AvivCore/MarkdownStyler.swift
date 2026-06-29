@@ -195,7 +195,7 @@ public final class MarkdownStyler {
             }
         }
         if !row.isSeparator {
-            applyInlineStyles(to: attributed, searchRange: contentRange, lineActive: lineActive)
+            applyInlineStyles(to: attributed, searchRange: contentRange, lineActive: lineActive, renderImages: false)
         }
     }
 
@@ -207,10 +207,22 @@ public final class MarkdownStyler {
         ], range: range)
     }
 
-    private func applyInlineStyles(to attributed: NSMutableAttributedString, searchRange: NSRange, lineActive: Bool) {
+    private func applyInlineStyles(
+        to attributed: NSMutableAttributedString,
+        searchRange: NSRange,
+        lineActive: Bool,
+        renderImages: Bool = true
+    ) {
         guard searchRange.length > 0 else { return }
 
         var protectedRanges: [NSRange] = []
+
+        if renderImages {
+            applyMatches(pattern: MarkdownPatterns.image, to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+                self.applyImageSourceStyle(match.range, to: attributed)
+                return [match.range]
+            }
+        }
 
         applyMatches(pattern: "`([^`\\n]+)`", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
             let content = match.range(at: 1)
@@ -274,6 +286,25 @@ public final class MarkdownStyler {
             self.applySyntax(NSRange(location: NSMaxRange(match.range) - 1, length: 1), active: lineActive, to: attributed)
             return [match.range]
         }
+    }
+
+    private func applyImageSourceStyle(_ range: NSRange, to attributed: NSMutableAttributedString) {
+        guard range.location != NSNotFound, range.length > 0 else { return }
+        let nsString = attributed.string as NSString
+        let lineRange = nsString.lineRange(for: range)
+        let paragraph = NSMutableParagraphStyle()
+        paragraph.lineBreakMode = .byWordWrapping
+        paragraph.minimumLineHeight = theme.scaledMetric(324, minimum: 208)
+        paragraph.maximumLineHeight = theme.scaledMetric(324, minimum: 208)
+        paragraph.paragraphSpacing = theme.scaledMetric(14, minimum: 9)
+        paragraph.paragraphSpacingBefore = theme.scaledMetric(4, minimum: 2)
+
+        attributed.addAttribute(.paragraphStyle, value: paragraph.copy() as! NSParagraphStyle, range: lineRange)
+        attributed.addAttributes([
+            .foregroundColor: theme.syntaxHiddenColor,
+            .font: NSFont.systemFont(ofSize: 0.01),
+            .kern: 0
+        ], range: range)
     }
 
     private func applyMatches(

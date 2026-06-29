@@ -9,9 +9,11 @@ public enum MarkdownSnapshotRenderer {
         cursorNeedle: String? = nil,
         viewScale: CGFloat? = nil,
         markdown: String = MarkdownSamples.starter,
+        baseURL: URL? = nil,
         scrollRatio: CGFloat? = nil
     ) throws {
         let workspace = EditorWorkspaceView(frame: NSRect(x: 0, y: 0, width: width, height: height))
+        workspace.setDocumentURL(baseURL?.appendingPathComponent("Snapshot.md"))
         if let viewScale {
             workspace.textView.setViewScale(viewScale)
         }
@@ -68,6 +70,7 @@ public enum MarkdownSnapshotRenderer {
             cursorNeedle: nil,
             viewScale: viewScale,
             markdown: MarkdownSamples.minimapFixture,
+            baseURL: nil,
             scrollRatio: scrollRatio
         )
     }

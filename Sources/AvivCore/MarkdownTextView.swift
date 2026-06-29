@@ -5,11 +5,18 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     public var onContentChange: ((String) -> Void)?
     public var onSelectionChange: (() -> Void)?
     public var onViewScaleChange: (() -> Void)?
+    public var markdownImageBaseURL: URL? {
+        didSet {
+            imageCache.removeAll()
+            needsDisplay = true
+        }
+    }
 
     private let localUndoManager = UndoManager()
     private var isApplyingMarkdownStyle = false
     private var activeEditableSourceRange: NSRange?
     private var isUpdatingSourceEditor = false
+    private var imageCache: [String: MarkdownResolvedImage] = [:]
     private lazy var sourceEditor: NSTextField = {
         let field = NSTextField(frame: .zero)
         field.isHidden = true
@@ -176,6 +183,25 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         needsLayout = true
         needsDisplay = true
         onViewScaleChange?()
+    }
+
+    public func resolvedMarkdownImage(for reference: MarkdownImageReference) -> MarkdownResolvedImage {
+        let cacheKey = "\(markdownImageBaseURL?.path ?? "")|\(reference.target)"
+        if let cached = imageCache[cacheKey] {
+            return cached
+        }
+
+        let displayName = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL)?.lastPathComponent
+            ?? reference.target
+        let resolved: MarkdownResolvedImage
+        if let url = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL),
+           let image = NSImage(contentsOf: url) {
+            resolved = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
+        } else {
+            resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: nil)
+        }
+        imageCache[cacheKey] = resolved
+        return resolved
     }
 
     private func configure() {

@@ -101,6 +101,18 @@ final class MarkdownEdgeCaseTests: XCTestCase {
         XCTAssertEqual(span?.kind, .link)
     }
 
+    func testEditableImageSourceSpanTargetsWholeMarkdownImage() {
+        let markdown = "Look ![diagram](Images/flow.png) here and [not image](https://example.com)."
+        let ns = markdown as NSString
+        let cursor = ns.range(of: "diagram").location
+        let span = MarkdownSourceSpanParser.editableSpan(containing: cursor, in: markdown)
+
+        XCTAssertEqual(span?.source, "![diagram](Images/flow.png)")
+        XCTAssertEqual(span?.range, ns.range(of: "![diagram](Images/flow.png)"))
+        XCTAssertEqual(span?.kind, .image)
+        XCTAssertNil(MarkdownSourceSpanParser.linkSpan(containing: cursor, in: markdown))
+    }
+
     func testFencedPipesAreNotTables() {
         let markdown = """
         ```markdown

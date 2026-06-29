@@ -53,6 +53,11 @@ public final class EditorWorkspaceView: NSView {
         updateMetrics()
     }
 
+    public func setDocumentURL(_ url: URL?) {
+        textView.markdownImageBaseURL = url?.deletingLastPathComponent()
+        annotationOverlay.needsDisplay = true
+    }
+
     public func updateDocumentTitle(url: URL?, isEdited: Bool) {
         let base = url?.lastPathComponent ?? "Untitled"
         titleLabel.stringValue = isEdited ? "\(base) *" : base

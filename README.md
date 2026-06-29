@@ -20,7 +20,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 
 - Live rendered Markdown in one editable surface.
 - Smart syntax reveal on the active line.
-- Headings, bold, italic, code, links, blockquotes, rules, tables, task lists, and fenced code.
+- Headings, bold, italic, code, links, local image attachments, blockquotes, rules, tables, task lists, and fenced code.
 - Native open/save panels for `.md` files.
 - Multiple windows and native macOS document tabs.
 - `Cmd-T` for a new tab, `Cmd-W` to close the active tab/window.
@@ -96,4 +96,3 @@ The editor should feel:
 ## Status 🌱
 
 This is an early but functional macOS Markdown editor prototype. It already opens, edits, saves, tabs, windows, renders, prints, verifies, and installs locally as a Markdown handler.
-

@@ -58,6 +58,51 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(linkTokens.map(\.label), ["[link](https://example.com)"])
     }
 
+    func testImageSyntaxIsParsedHiddenAndReservedForRenderedImage() {
+        let markdown = "Before\n![Alt text](photo.png)\nAfter"
+        let ns = markdown as NSString
+        let imageRange = ns.range(of: "![Alt text](photo.png)")
+
+        let images = MarkdownImageParser.images(in: markdown)
+        XCTAssertEqual(images.count, 1)
+        XCTAssertEqual(images.first?.altText, "Alt text")
+        XCTAssertEqual(images.first?.target, "photo.png")
+
+        let attributed = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 0, length: 0)])
+        XCTAssertEqual(attributed.string, markdown)
+        XCTAssertEqual(alpha(attributed, at: imageRange.location), 0, accuracy: 0.001)
+        XCTAssertEqual(alpha(attributed, at: ns.range(of: "Alt text").location), 0, accuracy: 0.001)
+
+        let paragraph = attributed.attribute(.paragraphStyle, at: imageRange.location, effectiveRange: nil) as? NSParagraphStyle
+        XCTAssertGreaterThan(paragraph?.minimumLineHeight ?? 0, 120)
+    }
+
+    func testInlineImageHidesOnlyImageSourceSpan() {
+        let markdown = "Before ![Alt text](photo.png) after"
+        let ns = markdown as NSString
+        let attributed = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 0, length: 0)])
+
+        XCTAssertGreaterThan(alpha(attributed, at: ns.range(of: "Before").location), 0.9)
+        XCTAssertEqual(alpha(attributed, at: ns.range(of: "![Alt text](photo.png)").location), 0, accuracy: 0.001)
+        XCTAssertGreaterThan(alpha(attributed, at: ns.range(of: "after").location), 0.9)
+    }
+
+    func testLocalImageResolutionLoadsRelativeImageFromDocumentFolder() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let imageURL = directory.appendingPathComponent("photo.png")
+        try writeTestPNG(to: imageURL)
+
+        let reference = try XCTUnwrap(MarkdownImageParser.images(in: "![Alt](photo.png)").first)
+        let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
+        textView.markdownImageBaseURL = directory
+
+        let resolved = textView.resolvedMarkdownImage(for: reference)
+        XCTAssertNotNil(resolved.image)
+        XCTAssertEqual(resolved.sourceURL?.standardizedFileURL, imageURL.standardizedFileURL)
+        XCTAssertEqual(resolved.displayName, "photo.png")
+    }
+
     func testUndoRevertsTextChangeWithoutStyleUndoStep() {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.loadMarkdown("Hello **world**")
@@ -120,5 +165,24 @@ final class MarkdownStylerTests: XCTestCase {
     private func colorKey(_ attributed: NSAttributedString, at index: Int) -> String {
         let color = (attributed.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor)?.usingColorSpace(.deviceRGB)
         return String(format: "%.3f-%.3f-%.3f-%.3f", color?.redComponent ?? 0, color?.greenComponent ?? 0, color?.blueComponent ?? 0, color?.alphaComponent ?? 0)
+    }
+
+    private func writeTestPNG(to url: URL) throws {
+        let image = NSImage(size: NSSize(width: 18, height: 12))
+        image.lockFocus()
+        NSColor(calibratedRed: 0.06, green: 0.39, blue: 0.68, alpha: 1).setFill()
+        NSBezierPath(rect: NSRect(x: 0, y: 0, width: 18, height: 12)).fill()
+        NSColor(calibratedRed: 0.98, green: 0.84, blue: 0.18, alpha: 1).setFill()
+        NSBezierPath(ovalIn: NSRect(x: 5, y: 3, width: 8, height: 6)).fill()
+        image.unlockFocus()
+
+        guard let tiff = image.tiffRepresentation,
+              let bitmap = NSBitmapImageRep(data: tiff),
+              let png = bitmap.representation(using: .png, properties: [:])
+        else {
+            XCTFail("Could not create test PNG")
+            return
+        }
+        try png.write(to: url)
     }
 }

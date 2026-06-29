@@ -73,6 +73,17 @@ public enum MarkdownAnnotationParser {
             protectedRanges.append(match.range)
         }
 
+        collect(pattern: MarkdownPatterns.image, in: line, range: fullLocalRange, protectedRanges: protectedRanges) { match in
+            if shouldReveal(match.range, focusedRanges: focusedRanges) {
+                tokens.append(MarkdownAnnotationToken(
+                    range: NSRange(location: contentRange.location + match.range.location, length: match.range.length),
+                    label: nsLine.substring(with: match.range),
+                    role: .linkSource
+                ))
+            }
+            protectedRanges.append(match.range)
+        }
+
         collect(pattern: MarkdownPatterns.link, in: line, range: fullLocalRange, protectedRanges: protectedRanges) { match in
             if shouldReveal(match.range, focusedRanges: focusedRanges) {
                 tokens.append(MarkdownAnnotationToken(

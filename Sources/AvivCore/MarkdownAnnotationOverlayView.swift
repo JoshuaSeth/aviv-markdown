@@ -33,6 +33,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
         let ranges = textView.selectedRanges.compactMap { $0.rangeValue }
         drawTables(in: textView, layoutManager: layoutManager, textContainer: textContainer, selectedRanges: ranges)
+        drawImages(in: textView, layoutManager: layoutManager, textContainer: textContainer)
 
         let tokens = MarkdownAnnotationParser.tokens(in: textView.string, selectedRanges: ranges)
         guard !tokens.isEmpty else { return }
@@ -52,6 +53,147 @@ public final class MarkdownAnnotationOverlayView: NSView {
             occupiedRects.append(drawRect.insetBy(dx: -4, dy: -2))
             draw(token: token, in: drawRect)
         }
+    }
+
+    private func drawImages(
+        in textView: MarkdownTextView,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) {
+        let markdown = textView.string
+        let excludedRanges = imageOverlayExcludedRanges(in: markdown)
+        let images = MarkdownImageParser.images(in: markdown).filter { image in
+            !excludedRanges.contains { NSIntersectionRange($0, image.range).length > 0 }
+        }
+        guard !images.isEmpty else { return }
+
+        layoutManager.ensureLayout(for: textContainer)
+        for image in images {
+            let lineRange = (textView.string as NSString).lineRange(for: image.range)
+            let frame = imageFrame(
+                for: lineRange,
+                image: image,
+                textView: textView,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
+            let resolved = textView.resolvedMarkdownImage(for: image)
+            drawImageReference(image, resolved: resolved, in: frame)
+        }
+    }
+
+    private func imageFrame(
+        for lineRange: NSRange,
+        image: MarkdownImageReference,
+        textView: MarkdownTextView,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer
+    ) -> NSRect {
+        let theme = currentTheme
+        let safeRange = NSRange(location: lineRange.location, length: max(1, min(lineRange.length, max(1, textView.string.utf16.count - lineRange.location))))
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: safeRange, actualCharacterRange: nil)
+        let glyphIndex = min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1))
+        var effectiveRange = NSRange(location: 0, length: 0)
+        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &effectiveRange)
+        lineRect.origin.x += textView.textContainerOrigin.x
+        lineRect.origin.y += textView.textContainerOrigin.y
+        lineRect = textView.convert(lineRect, to: self)
+
+        let sourceRect = rect(for: image.range, textView: textView, layoutManager: layoutManager, textContainer: textContainer)
+        let maxWidth = min(theme.scaledMetric(540, minimum: 360), max(120, textContainer.containerSize.width))
+        let maxHeight = theme.scaledMetric(300, minimum: 192)
+        let resolved = textView.resolvedMarkdownImage(for: image)
+        let imageSize = resolved.image?.size ?? NSSize(width: maxWidth, height: maxHeight * 0.62)
+        let fitted = fittedSize(imageSize, within: NSSize(width: maxWidth, height: maxHeight))
+
+        return NSRect(
+            x: sourceRect.minX,
+            y: lineRect.minY + theme.scaledMetric(10, minimum: 7),
+            width: fitted.width,
+            height: fitted.height
+        )
+    }
+
+    private func drawImageReference(
+        _ reference: MarkdownImageReference,
+        resolved: MarkdownResolvedImage,
+        in frame: NSRect
+    ) {
+        let theme = currentTheme
+        let radius = theme.scaledMetric(7, minimum: 5)
+        let path = NSBezierPath(roundedRect: frame, xRadius: radius, yRadius: radius)
+        NSGraphicsContext.saveGraphicsState()
+        path.addClip()
+
+        if let image = resolved.image {
+            image.draw(
+                in: frame,
+                from: NSRect(origin: .zero, size: image.size),
+                operation: .sourceOver,
+                fraction: 1.0,
+                respectFlipped: true,
+                hints: nil
+            )
+        } else {
+            NSColor(calibratedRed: 0.956, green: 0.962, blue: 0.966, alpha: 0.92).setFill()
+            frame.fill()
+            let label = reference.altText.isEmpty ? resolved.displayName : reference.altText
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: theme.smallFont,
+                .foregroundColor: theme.secondaryTextColor,
+                .kern: 0
+            ]
+            let textRect = frame.insetBy(dx: theme.scaledMetric(13, minimum: 9), dy: theme.scaledMetric(11, minimum: 8))
+            (label as NSString).draw(in: textRect, withAttributes: attributes)
+        }
+
+        NSGraphicsContext.restoreGraphicsState()
+        theme.secondaryTextColor.withAlphaComponent(0.20).setStroke()
+        path.lineWidth = 1
+        path.stroke()
+    }
+
+    private func fittedSize(_ source: NSSize, within maximum: NSSize) -> NSSize {
+        guard source.width > 0, source.height > 0 else {
+            return maximum
+        }
+        let scale = min(maximum.width / source.width, maximum.height / source.height, 1)
+        return NSSize(width: max(24, floor(source.width * scale)), height: max(24, floor(source.height * scale)))
+    }
+
+    private func imageOverlayExcludedRanges(in markdown: String) -> [NSRange] {
+        var ranges: [NSRange] = []
+        let nsString = markdown as NSString
+        var index = 0
+        var fenceStart: Int?
+
+        while index < nsString.length {
+            let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
+            let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                if let start = fenceStart {
+                    ranges.append(NSRange(location: start, length: NSMaxRange(lineRange) - start))
+                    fenceStart = nil
+                } else {
+                    fenceStart = lineRange.location
+                }
+            }
+            index = NSMaxRange(lineRange)
+        }
+
+        if let start = fenceStart {
+            ranges.append(NSRange(location: start, length: nsString.length - start))
+        }
+
+        for block in MarkdownTableParser.blocks(in: markdown) {
+            guard let first = block.rows.first?.lineRange,
+                  let last = block.rows.last?.lineRange
+            else { continue }
+            ranges.append(NSRange(location: first.location, length: NSMaxRange(last) - first.location))
+        }
+
+        return ranges
     }
 
     private func drawTables(
@@ -288,6 +430,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
     private func renderedCellText(_ text: String) -> String {
         var output = text
         let replacements: [(String, String)] = [
+            (MarkdownPatterns.image, "$1"),
             (MarkdownPatterns.link, "$1"),
             (#"`([^`\n]+)`"#, "$1"),
             (#"(\*\*|__)(?=\S)(.+?)(?<=\S)\1"#, "$2"),
@@ -303,5 +446,18 @@ public final class MarkdownAnnotationOverlayView: NSView {
         }
 
         return output.replacingOccurrences(of: #"\\|"#, with: "|")
+    }
+
+    private func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {
+        var length = lineRange.length
+        while length > 0 {
+            let character = nsString.character(at: lineRange.location + length - 1)
+            if character == 10 || character == 13 {
+                length -= 1
+            } else {
+                break
+            }
+        }
+        return NSRange(location: lineRange.location, length: length)
     }
 }

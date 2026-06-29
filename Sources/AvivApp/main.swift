@@ -40,9 +40,19 @@ if let snapshotIndex = arguments.firstIndex(of: "--snapshot"), arguments.indices
     } else {
         scrollRatio = nil
     }
+    let markdown: String
+    let baseURL: URL?
+    if let markdownIndex = arguments.firstIndex(of: "--markdown"), arguments.indices.contains(markdownIndex + 1) {
+        let markdownURL = URL(fileURLWithPath: arguments[markdownIndex + 1])
+        markdown = (try? String(contentsOf: markdownURL, encoding: .utf8)) ?? MarkdownSamples.starter
+        baseURL = markdownURL.deletingLastPathComponent()
+    } else {
+        markdown = MarkdownSamples.starter
+        baseURL = nil
+    }
 
     do {
-        try MarkdownSnapshotRenderer.renderSample(to: URL(fileURLWithPath: path), cursorNeedle: cursorNeedle, viewScale: viewScale, scrollRatio: scrollRatio)
+        try MarkdownSnapshotRenderer.renderSample(to: URL(fileURLWithPath: path), cursorNeedle: cursorNeedle, viewScale: viewScale, markdown: markdown, baseURL: baseURL, scrollRatio: scrollRatio)
         print("snapshot: \(path)")
         exit(0)
     } catch {

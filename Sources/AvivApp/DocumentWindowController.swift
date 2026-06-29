@@ -52,6 +52,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window.delegate = self
         window.contentView = workspace
         configureToolbar()
+        workspace.setDocumentURL(nil)
         workspace.loadMarkdown(MarkdownSamples.starter)
         workspace.updateDocumentTitle(url: nil, isEdited: false)
         updateWindowTitle()
@@ -83,6 +84,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         if confirmDiscardIfNeeded() {
             documentURL = nil
             savedText = ""
+            workspace.setDocumentURL(nil)
             workspace.loadMarkdown("")
             isEdited = false
             window?.representedURL = nil
@@ -108,6 +110,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             let text = try MarkdownDocumentIO.read(from: url)
             documentURL = url
             savedText = text
+            workspace.setDocumentURL(url)
             workspace.loadMarkdown(text)
             isEdited = false
             window?.representedURL = url
@@ -142,6 +145,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             try MarkdownDocumentIO.write(text, to: url)
             documentURL = url
             savedText = text
+            workspace.setDocumentURL(url)
             window?.representedURL = url
             isEdited = false
             updateWindowTitle()
