@@ -51,6 +51,14 @@ Scripts/install_default_markdown_handler.sh
 
 That builds `dist/Aviv.app`, installs it to `/Applications` when possible, signs it ad hoc, registers it with LaunchServices, and makes it the default app for Markdown files.
 
+To build a downloadable macOS disk image:
+
+```bash
+Scripts/package_dmg.sh
+```
+
+That creates `dist/Aviv-Editor-macOS.dmg` plus a SHA-256 checksum file.
+
 ## Verification ✅
 
 Run the complete verification suite:
@@ -96,3 +104,7 @@ The editor should feel:
 ## Status 🌱
 
 This is an early but functional macOS Markdown editor prototype. It already opens, edits, saves, tabs, windows, renders, prints, verifies, and installs locally as a Markdown handler.
+
+## License
+
+Aviv is open source under the MIT license.
