@@ -22,5 +22,5 @@ hdiutil create \
     -format UDZO \
     "$DMG_PATH" >/dev/null
 
-shasum -a 256 "$DMG_PATH" > "$DMG_PATH.sha256"
+(cd "$(dirname "$DMG_PATH")" && shasum -a 256 "$(basename "$DMG_PATH")") > "$DMG_PATH.sha256"
 echo "$DMG_PATH"
