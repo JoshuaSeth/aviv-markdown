@@ -9,6 +9,7 @@ namespace Aviv.Windows.App;
 
 public sealed partial class MainWindow : Window
 {
+    private const VirtualKey BacktickKey = (VirtualKey)192;
     private readonly EditorDocumentViewModel viewModel;
     private bool syncingFromViewModel;
 
@@ -62,7 +63,7 @@ public sealed partial class MainWindow : Window
         AddAccelerator(VirtualKey.Subtract, VirtualKeyModifiers.Control, () => viewModel.DecreaseTextSizeCommand.Execute(null));
         AddAccelerator(VirtualKey.B, VirtualKeyModifiers.Control, () => viewModel.ToggleBoldCommand.Execute(null));
         AddAccelerator(VirtualKey.I, VirtualKeyModifiers.Control, () => viewModel.ToggleItalicCommand.Execute(null));
-        AddAccelerator(VirtualKey.Oem3, VirtualKeyModifiers.Control, () => viewModel.ToggleCodeCommand.Execute(null));
+        AddAccelerator(BacktickKey, VirtualKeyModifiers.Control, () => viewModel.ToggleCodeCommand.Execute(null));
         AddAccelerator(VirtualKey.Number1, VirtualKeyModifiers.Control, () => viewModel.Heading1Command.Execute(null));
         AddAccelerator(VirtualKey.Number2, VirtualKeyModifiers.Control, () => viewModel.Heading2Command.Execute(null));
         AddAccelerator(VirtualKey.Tab, VirtualKeyModifiers.Control | VirtualKeyModifiers.Shift, () => viewModel.ShowPreviousTabCommand.Execute(null));

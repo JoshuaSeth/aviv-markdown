@@ -153,7 +153,7 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void OnSourceEditorKeyDown(object sender, KeyRoutedEventArgs args)
     {
-        if (args.Key != Windows.System.VirtualKey.Enter || activeSourceSpan is null)
+        if (args.Key != global::Windows.System.VirtualKey.Enter || activeSourceSpan is null)
         {
             return;
         }
