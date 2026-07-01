@@ -72,6 +72,7 @@ native windows verifier
 '@
 
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
+$env:AVIV_UI_VERIFY = "1"
 $process = Start-Process -FilePath $Exe -PassThru
 try {
   $handle = [IntPtr]::Zero

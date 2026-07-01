@@ -1,5 +1,7 @@
 using Aviv.Windows.App.Services;
 using Microsoft.UI.Xaml;
+using System.Runtime.InteropServices;
+using WinRT.Interop;
 
 namespace Aviv.Windows.App;
 
@@ -42,11 +44,43 @@ public partial class App : Application
             DiagnosticLog.Write("MainWindow created.");
             window.Activate();
             DiagnosticLog.Write("MainWindow activated.");
+            NativeWindowPlacement.PlaceForVerificationIfRequested(window);
         }
         catch (Exception exception)
         {
             DiagnosticLog.WriteException("OnLaunched failed", exception);
             throw;
         }
+    }
+
+    private static class NativeWindowPlacement
+    {
+        private static readonly IntPtr HwndTopmost = new(-1);
+
+        public static void PlaceForVerificationIfRequested(Window window)
+        {
+            if (!string.Equals(Environment.GetEnvironmentVariable("AVIV_UI_VERIFY"), "1", StringComparison.Ordinal))
+            {
+                return;
+            }
+
+            var hwnd = WindowNative.GetWindowHandle(window);
+            var showResult = ShowWindow(hwnd, 9);
+            var positionResult = SetWindowPos(hwnd, HwndTopmost, 96, 72, 1160, 760, 0x0040);
+            var foregroundResult = SetForegroundWindow(hwnd);
+            DiagnosticLog.Write($"Verification placement hwnd={hwnd} ShowWindow={showResult} SetWindowPos={positionResult} SetForegroundWindow={foregroundResult}.");
+        }
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool SetForegroundWindow(IntPtr hWnd);
     }
 }
