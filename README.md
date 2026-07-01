@@ -105,10 +105,6 @@ The editor should feel:
 - **stable**
 - **beautifully boring when you are focused**
 
-## Status 🌱
-
-This is an early but functional macOS Markdown editor prototype. It already opens, edits, saves, tabs, windows, renders, prints, verifies, and installs locally as a Markdown handler.
-
 ## License
 
 Aviv is open source under the MIT license.
