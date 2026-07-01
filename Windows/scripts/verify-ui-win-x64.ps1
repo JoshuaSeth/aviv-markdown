@@ -51,17 +51,34 @@ native windows verifier
 $process = Start-Process -FilePath $Exe -PassThru
 try {
   $handle = [IntPtr]::Zero
-  for ($attempt = 0; $attempt -lt 30; $attempt++) {
+  for ($attempt = 0; $attempt -lt 120; $attempt++) {
     Start-Sleep -Milliseconds 500
     $process.Refresh()
+    if ($process.HasExited) {
+      throw "Aviv exited before exposing a window. ExitCode=$($process.ExitCode)"
+    }
+
     if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
       $handle = $process.MainWindowHandle
+      break
+    }
+
+    $matchingProcess = Get-Process -Name "Aviv.Windows.App" -ErrorAction SilentlyContinue |
+      Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero } |
+      Select-Object -First 1
+    if ($matchingProcess) {
+      $handle = $matchingProcess.MainWindowHandle
       break
     }
   }
 
   if ($handle -eq [IntPtr]::Zero) {
-    throw "Aviv window handle was not available after launch."
+    $process.Refresh()
+    $knownProcesses = Get-Process -Name "Aviv.Windows.App" -ErrorAction SilentlyContinue |
+      Select-Object Id, ProcessName, HasExited, MainWindowHandle, StartTime |
+      Format-Table -AutoSize |
+      Out-String
+    throw "Aviv window handle was not available after launch. Main process HasExited=$($process.HasExited). Matching processes:`n$knownProcesses"
   }
 
   [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
