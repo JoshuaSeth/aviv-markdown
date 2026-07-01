@@ -19,6 +19,7 @@ Add-Type -AssemblyName Microsoft.VisualBasic
 Add-Type @"
 using System;
 using System.Runtime.InteropServices;
+using System.Text;
 
 public static class AvivNativeWindow {
   public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
@@ -31,6 +32,12 @@ public static class AvivNativeWindow {
 
   [DllImport("user32.dll")]
   public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
+
+  [DllImport("user32.dll")]
+  public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint nFlags);
 }
 "@
 
@@ -101,6 +108,9 @@ try {
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 500
+  $titleBuilder = [System.Text.StringBuilder]::new(256)
+  [AvivNativeWindow]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity) | Out-Null
+  Write-Host "Using Aviv window handle $handle with title '$($titleBuilder.ToString())'"
 
   Set-Clipboard -Value $fixture
   [System.Windows.Forms.SendKeys]::SendWait("^a")
@@ -117,7 +127,19 @@ try {
   $height = 760
   $bitmap = [System.Drawing.Bitmap]::new($width, $height)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-  $graphics.CopyFromScreen([System.Drawing.Point]::new($left, $top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
+  $hdc = $graphics.GetHdc()
+  try {
+    $printed = [AvivNativeWindow]::PrintWindow($handle, $hdc, 2)
+  }
+  finally {
+    $graphics.ReleaseHdc($hdc)
+  }
+
+  if (!$printed) {
+    Write-Host "PrintWindow returned false; falling back to fixed screen crop."
+    $graphics.CopyFromScreen([System.Drawing.Point]::new($left, $top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
+  }
+
   $bitmap.Save($Screenshot, [System.Drawing.Imaging.ImageFormat]::Png)
   $graphics.Dispose()
   $bitmap.Dispose()

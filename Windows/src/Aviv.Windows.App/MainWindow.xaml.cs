@@ -22,6 +22,7 @@ public sealed partial class MainWindow : Window
     {
         DiagnosticLog.Write("MainWindow constructor starting.");
         Content = rootGrid;
+        Title = "Aviv";
         rootGrid.Background = ResourceBrush("AvivBackgroundBrush");
         DiagnosticLog.Write("MainWindow root grid created.");
 
