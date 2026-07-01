@@ -151,6 +151,7 @@ public sealed partial class MarkdownEditorView : UserControl
         Editor.Document.SetText(TextSetOptions.None, markdown);
         applying = false;
         ApplyMarkdownStyle();
+        Editor.Focus(FocusState.Programmatic);
     }
 
     public void SetViewScale(double scale)

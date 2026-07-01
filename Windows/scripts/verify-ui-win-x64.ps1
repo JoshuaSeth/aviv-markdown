@@ -21,11 +21,27 @@ using System;
 using System.Runtime.InteropServices;
 
 public static class AvivNativeWindow {
+  public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+  }
+
   [DllImport("user32.dll")]
   public static extern bool SetForegroundWindow(IntPtr hWnd);
 
   [DllImport("user32.dll")]
   public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+
+  [DllImport("user32.dll")]
+  public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+  [DllImport("user32.dll")]
+  public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 }
 "@
 
@@ -93,6 +109,7 @@ try {
   }
 
   [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
+  [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 500
 
@@ -101,11 +118,20 @@ try {
   Start-Sleep -Milliseconds 250
   [System.Windows.Forms.SendKeys]::SendWait("^v")
   Start-Sleep -Seconds 2
+  [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
+  [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
+  Start-Sleep -Milliseconds 300
 
-  $bounds = [System.Windows.Forms.Screen]::PrimaryScreen.Bounds
-  $bitmap = New-Object System.Drawing.Bitmap $bounds.Width, $bounds.Height
+  $rect = [AvivNativeWindow+RECT]::new()
+  if (![AvivNativeWindow]::GetWindowRect($handle, [ref]$rect)) {
+    throw "Could not read Aviv window bounds for screenshot."
+  }
+
+  $width = [Math]::Max(1, $rect.Right - $rect.Left)
+  $height = [Math]::Max(1, $rect.Bottom - $rect.Top)
+  $bitmap = [System.Drawing.Bitmap]::new($width, $height)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-  $graphics.CopyFromScreen($bounds.Location, [System.Drawing.Point]::Empty, $bounds.Size)
+  $graphics.CopyFromScreen([System.Drawing.Point]::new($rect.Left, $rect.Top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
   $bitmap.Save($Screenshot, [System.Drawing.Imaging.ImageFormat]::Png)
   $graphics.Dispose()
   $bitmap.Dispose()

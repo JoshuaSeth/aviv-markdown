@@ -16,23 +16,66 @@ public sealed partial class EditorDocumentViewModel : ObservableObject
     public event Action<EditorCommandKind>? EditorCommandRequested;
     public event Action<double>? ViewScaleChanged;
 
-    [ObservableProperty]
     private string markdown = MarkdownSamples.Starter;
-
-    [ObservableProperty]
     private string documentTitle = "Untitled";
-
-    [ObservableProperty]
     private string? documentPath;
-
-    [ObservableProperty]
     private bool isEdited;
-
-    [ObservableProperty]
     private string statusText = DocumentMetrics.For(MarkdownSamples.Starter).DisplayText;
-
-    [ObservableProperty]
     private double viewScale = DefaultViewScale;
+
+    public string Markdown
+    {
+        get => markdown;
+        set
+        {
+            if (SetProperty(ref markdown, value))
+            {
+                StatusText = DocumentMetrics.For(value).DisplayText;
+            }
+        }
+    }
+
+    public string DocumentTitle
+    {
+        get => documentTitle;
+        set => SetProperty(ref documentTitle, value);
+    }
+
+    public string? DocumentPath
+    {
+        get => documentPath;
+        set
+        {
+            if (SetProperty(ref documentPath, value))
+            {
+                UpdateDocumentTitle();
+            }
+        }
+    }
+
+    public bool IsEdited
+    {
+        get => isEdited;
+        set
+        {
+            if (SetProperty(ref isEdited, value))
+            {
+                UpdateDocumentTitle();
+            }
+        }
+    }
+
+    public string StatusText
+    {
+        get => statusText;
+        set => SetProperty(ref statusText, value);
+    }
+
+    public double ViewScale
+    {
+        get => viewScale;
+        set => SetProperty(ref viewScale, value);
+    }
 
     public EditorDocumentViewModel(IMarkdownFileService fileService)
     {
@@ -48,21 +91,6 @@ public sealed partial class EditorDocumentViewModel : ObservableObject
 
         Markdown = nextMarkdown;
         IsEdited = Markdown != lastSavedMarkdown;
-        UpdateDocumentTitle();
-    }
-
-    partial void OnMarkdownChanged(string value)
-    {
-        StatusText = DocumentMetrics.For(value).DisplayText;
-    }
-
-    partial void OnDocumentPathChanged(string? value)
-    {
-        UpdateDocumentTitle();
-    }
-
-    partial void OnIsEditedChanged(bool value)
-    {
         UpdateDocumentTitle();
     }
 
