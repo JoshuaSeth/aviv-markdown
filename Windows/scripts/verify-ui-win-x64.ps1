@@ -241,12 +241,7 @@ function Write-AvivProcesses {
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $env:AVIV_UI_VERIFY = "1"
 Move-BlockingWindowsOutOfCapture "before app launch"
-$startInfo = [System.Diagnostics.ProcessStartInfo]::new($Exe)
-$startInfo.UseShellExecute = $false
-$process = [System.Diagnostics.Process]::Start($startInfo)
-if ($null -eq $process) {
-  throw "Aviv process did not start."
-}
+$process = Start-Process -FilePath $Exe -PassThru
 try {
   $handle = [IntPtr]::Zero
   for ($attempt = 0; $attempt -lt 120; $attempt++) {

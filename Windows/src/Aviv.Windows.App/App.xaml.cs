@@ -60,8 +60,6 @@ public partial class App : Application
 
     private static class NativeWindowPlacement
     {
-        private static readonly IntPtr HwndTopmost = new(-1);
-
         public static void PlaceForVerificationIfRequested(Window window)
         {
             if (!string.Equals(Environment.GetEnvironmentVariable("AVIV_UI_VERIFY"), "1", StringComparison.Ordinal))
@@ -77,7 +75,6 @@ public partial class App : Application
                 var appWindow = AppWindow.GetFromWindowId(windowId);
                 appWindow.Title = "Aviv";
                 appWindow.MoveAndResize(new RectInt32(96, 72, 1160, 760));
-                appWindow.Show();
                 DiagnosticLog.Write($"Verification AppWindow placement succeeded for hwnd={hwnd}: {DescribeWindow(hwnd)}.");
             }
             catch (Exception exception)
@@ -85,10 +82,7 @@ public partial class App : Application
                 DiagnosticLog.WriteException("Verification AppWindow placement failed", exception);
             }
 
-            var showResult = ShowWindow(hwnd, 9);
-            var positionResult = SetWindowPos(hwnd, HwndTopmost, 96, 72, 1160, 760, 0x0040);
-            var foregroundResult = SetForegroundWindow(hwnd);
-            DiagnosticLog.Write($"Verification placement hwnd={hwnd} ShowWindow={showResult} SetWindowPos={positionResult} SetForegroundWindow={foregroundResult}: {DescribeWindow(hwnd)}.");
+            DiagnosticLog.Write($"Verification placement completed for hwnd={hwnd}: {DescribeWindow(hwnd)}.");
         }
 
         private static string DescribeWindow(IntPtr hwnd)
@@ -98,18 +92,6 @@ public partial class App : Application
                 : "unavailable";
             return $"visible={IsWindowVisible(hwnd)} iconic={IsIconic(hwnd)} rect={rectText}";
         }
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int x, int y, int cx, int cy, uint flags);
-
-        [DllImport("user32.dll")]
-        [return: MarshalAs(UnmanagedType.Bool)]
-        private static extern bool SetForegroundWindow(IntPtr hWnd);
 
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
