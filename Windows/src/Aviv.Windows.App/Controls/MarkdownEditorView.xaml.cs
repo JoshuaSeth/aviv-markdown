@@ -22,12 +22,15 @@ public sealed partial class MarkdownEditorView : UserControl
 
     public MarkdownEditorView()
     {
+        DiagnosticLog.Write("MarkdownEditorView constructor starting.");
         InitializeComponent();
         Minimap.ScrollRatioRequested += ScrollToRatio;
+        DiagnosticLog.Write("MarkdownEditorView constructor completed.");
     }
 
     public void LoadMarkdown(string markdown)
     {
+        DiagnosticLog.Write($"MarkdownEditorView.LoadMarkdown length={markdown.Length}.");
         applying = true;
         Markdown = markdown;
         Editor.Document.SetText(TextSetOptions.None, markdown);

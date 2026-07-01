@@ -15,11 +15,15 @@ public sealed partial class MainWindow : Window
 
     public MainWindow()
     {
+        DiagnosticLog.Write("MainWindow constructor starting.");
         InitializeComponent();
+        DiagnosticLog.Write("MainWindow InitializeComponent completed.");
 
         viewModel = new EditorDocumentViewModel(new MarkdownFileService(this));
         RootGrid.DataContext = viewModel;
+        DiagnosticLog.Write("MainWindow DataContext assigned.");
         EditorView.LoadMarkdown(viewModel.Markdown);
+        DiagnosticLog.Write("Initial Markdown loaded into editor.");
 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
         viewModel.EditRequested += action => EditorView.ApplyEditAction(action);
@@ -35,6 +39,7 @@ public sealed partial class MainWindow : Window
 
             viewModel.UpdateFromEditor(markdown);
         };
+        DiagnosticLog.Write("MainWindow constructor completed.");
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)

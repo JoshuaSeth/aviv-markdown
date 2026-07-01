@@ -4,12 +4,14 @@ $Root = Resolve-Path "$PSScriptRoot/.."
 $Exe = Join-Path $Root "dist/win-x64/Aviv.Windows.App.exe"
 $ScreenshotDir = Join-Path $Root "dist/screenshots"
 $Screenshot = Join-Path $ScreenshotDir "windows-ui-verification.png"
+$DiagnosticLog = Join-Path $ScreenshotDir "windows-ui-verification.log"
 
 if (!(Test-Path $Exe)) {
   throw "Published executable not found: $Exe"
 }
 
 New-Item -ItemType Directory -Force -Path $ScreenshotDir | Out-Null
+Remove-Item -Force -ErrorAction SilentlyContinue $DiagnosticLog
 
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
@@ -48,6 +50,7 @@ native windows verifier
 ```
 '@
 
+$env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $process = Start-Process -FilePath $Exe -PassThru
 try {
   $handle = [IntPtr]::Zero
@@ -55,6 +58,10 @@ try {
     Start-Sleep -Milliseconds 500
     $process.Refresh()
     if ($process.HasExited) {
+      if (Test-Path $DiagnosticLog) {
+        Write-Host "Aviv diagnostic log:"
+        Get-Content $DiagnosticLog | ForEach-Object { Write-Host $_ }
+      }
       throw "Aviv exited before exposing a window. ExitCode=$($process.ExitCode)"
     }
 
@@ -74,6 +81,10 @@ try {
 
   if ($handle -eq [IntPtr]::Zero) {
     $process.Refresh()
+    if (Test-Path $DiagnosticLog) {
+      Write-Host "Aviv diagnostic log:"
+      Get-Content $DiagnosticLog | ForEach-Object { Write-Host $_ }
+    }
     $knownProcesses = Get-Process -Name "Aviv.Windows.App" -ErrorAction SilentlyContinue |
       Select-Object Id, ProcessName, HasExited, MainWindowHandle, StartTime |
       Format-Table -AutoSize |
@@ -107,6 +118,10 @@ try {
   Write-Host "Captured UI verification screenshot: $Screenshot ($($file.Length) bytes)"
 }
 finally {
+  if (Test-Path $DiagnosticLog) {
+    Write-Host "Aviv diagnostic log:"
+    Get-Content $DiagnosticLog | ForEach-Object { Write-Host $_ }
+  }
   if (!$process.HasExited) {
     Stop-Process -Id $process.Id -Force
   }
