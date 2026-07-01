@@ -154,7 +154,17 @@ public sealed partial class MainWindow : Window
 
     private static Microsoft.UI.Xaml.Media.Brush ResourceBrush(string key)
     {
-        return (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
+        return key switch
+        {
+            "AvivChromeBrush" => SolidBrush(0xDD, 0xFD, 0xFE, 0xFF),
+            "AvivChromeStrokeBrush" => SolidBrush(0x1F, 0x6B, 0x72, 0x80),
+            _ => SolidBrush(0xFF, 0xFB, 0xFC, 0xFD)
+        };
+    }
+
+    private static Microsoft.UI.Xaml.Media.SolidColorBrush SolidBrush(byte a, byte r, byte g, byte b)
+    {
+        return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(a, r, g, b));
     }
 
     private void InstallKeyboardAccelerators()
