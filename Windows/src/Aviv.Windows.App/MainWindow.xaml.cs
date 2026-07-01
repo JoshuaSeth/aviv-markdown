@@ -24,6 +24,7 @@ public sealed partial class MainWindow : Window
         Content = rootGrid;
         Title = "Aviv";
         rootGrid.Background = ResourceBrush("AvivBackgroundBrush");
+        rootGrid.Loaded += (_, _) => DiagnosticLog.Write("MainWindow root grid loaded.");
         DiagnosticLog.Write("MainWindow root grid created.");
 
         viewModel = new EditorDocumentViewModel(new MarkdownFileService(this));

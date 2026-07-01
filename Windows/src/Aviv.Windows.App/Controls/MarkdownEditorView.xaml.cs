@@ -39,9 +39,13 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void OnLoaded(object sender, RoutedEventArgs args)
     {
+        DiagnosticLog.Write("MarkdownEditorView loaded.");
         isLoaded = true;
+        DiagnosticLog.Write("MarkdownEditorView initial style starting.");
         ApplyMarkdownStyle();
+        DiagnosticLog.Write("MarkdownEditorView initial style completed.");
         Editor.Focus(FocusState.Programmatic);
+        DiagnosticLog.Write("MarkdownEditorView initial focus completed.");
     }
 
     private (RichEditBox Editor, MarkdownMinimapView Minimap, Popup SourcePopup, TextBox SourceEditor) BuildLayout()
@@ -245,17 +249,19 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void ApplyMarkdownStyle()
     {
-        if (applying)
+        if (applying || !isLoaded)
         {
             return;
         }
 
+        DiagnosticLog.Write($"MarkdownEditorView.ApplyMarkdownStyle starting length={Markdown.Length}.");
         applying = true;
         Markdown = ReadEditorText();
         var snapshot = styler.Snapshot(Markdown, [CurrentSelection()]);
         formatter.Apply(Editor, snapshot, viewScale);
         RenderMinimap();
         applying = false;
+        DiagnosticLog.Write("MarkdownEditorView.ApplyMarkdownStyle completed.");
     }
 
     private void UpdateSourceEditor()
