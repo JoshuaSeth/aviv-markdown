@@ -1,7 +1,10 @@
 using System.ComponentModel;
+using System.Windows.Input;
+using Aviv.Windows.App.Controls;
 using Aviv.Windows.App.Services;
 using Aviv.Windows.App.ViewModels;
 using Microsoft.UI.Xaml;
+using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Input;
 using Windows.System;
 
@@ -11,6 +14,7 @@ public sealed partial class MainWindow : Window
 {
     private const VirtualKey BacktickKey = (VirtualKey)192;
     private readonly EditorDocumentViewModel viewModel;
+    private readonly MarkdownEditorView editorView;
     private bool syncingFromViewModel;
 
     public MainWindow()
@@ -22,15 +26,20 @@ public sealed partial class MainWindow : Window
         viewModel = new EditorDocumentViewModel(new MarkdownFileService(this));
         RootGrid.DataContext = viewModel;
         DiagnosticLog.Write("MainWindow DataContext assigned.");
-        EditorView.LoadMarkdown(viewModel.Markdown);
+
+        editorView = new MarkdownEditorView();
+        BuildLayout();
+        DiagnosticLog.Write("MainWindow layout built.");
+
+        editorView.LoadMarkdown(viewModel.Markdown);
         DiagnosticLog.Write("Initial Markdown loaded into editor.");
 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        viewModel.EditRequested += action => EditorView.ApplyEditAction(action);
-        viewModel.EditorCommandRequested += command => EditorView.PerformEditorCommand(command);
-        viewModel.ViewScaleChanged += scale => EditorView.SetViewScale(scale);
+        viewModel.EditRequested += action => editorView.ApplyEditAction(action);
+        viewModel.EditorCommandRequested += command => editorView.PerformEditorCommand(command);
+        viewModel.ViewScaleChanged += scale => editorView.SetViewScale(scale);
         InstallKeyboardAccelerators();
-        EditorView.MarkdownChanged += markdown =>
+        editorView.MarkdownChanged += markdown =>
         {
             if (syncingFromViewModel)
             {
@@ -44,14 +53,106 @@ public sealed partial class MainWindow : Window
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName != nameof(EditorDocumentViewModel.Markdown) || EditorView.Markdown == viewModel.Markdown)
+        if (args.PropertyName != nameof(EditorDocumentViewModel.Markdown) || editorView.Markdown == viewModel.Markdown)
         {
             return;
         }
 
         syncingFromViewModel = true;
-        EditorView.LoadMarkdown(viewModel.Markdown);
+        editorView.LoadMarkdown(viewModel.Markdown);
         syncingFromViewModel = false;
+    }
+
+    private void BuildLayout()
+    {
+        RootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+
+        var menuBar = new MenuBar
+        {
+            Background = ResourceBrush("AvivChromeBrush")
+        };
+        Grid.SetRow(menuBar, 0);
+        RootGrid.Children.Add(menuBar);
+
+        menuBar.Items.Add(Menu("File",
+            Item("New", viewModel.NewDocumentCommand),
+            Item("New Tab", viewModel.NewTabCommand),
+            Item("Open...", viewModel.OpenDocumentCommand),
+            Separator(),
+            Item("Close", viewModel.CloseDocumentCommand),
+            Separator(),
+            Item("Save", viewModel.SaveDocumentCommand),
+            Item("Save As...", viewModel.SaveDocumentAsCommand),
+            Item("Revert to Saved", viewModel.RevertDocumentCommand),
+            Separator(),
+            Item("Page Setup...", viewModel.PageSetupCommand),
+            Item("Print...", viewModel.PrintDocumentCommand)));
+
+        menuBar.Items.Add(Menu("Edit",
+            Item("Undo", viewModel.UndoCommand),
+            Item("Redo", viewModel.RedoCommand),
+            Separator(),
+            Item("Cut", viewModel.CutCommand),
+            Item("Copy", viewModel.CopyCommand),
+            Item("Paste", viewModel.PasteCommand),
+            Item("Paste and Match Style", viewModel.PastePlainTextCommand),
+            Separator(),
+            Item("Select All", viewModel.SelectAllCommand),
+            Separator(),
+            Item("Find...", viewModel.FindCommand),
+            Item("Find and Replace...", viewModel.FindAndReplaceCommand),
+            Item("Find Next", viewModel.FindNextCommand),
+            Item("Find Previous", viewModel.FindPreviousCommand)));
+
+        menuBar.Items.Add(Menu("View",
+            Item("Actual Size", viewModel.ResetTextSizeCommand),
+            Item("Zoom In", viewModel.IncreaseTextSizeCommand),
+            Item("Zoom Out", viewModel.DecreaseTextSizeCommand)));
+
+        menuBar.Items.Add(Menu("Format",
+            Item("Bold", viewModel.ToggleBoldCommand),
+            Item("Italic", viewModel.ToggleItalicCommand),
+            Item("Code", viewModel.ToggleCodeCommand),
+            Separator(),
+            Item("Heading 1", viewModel.Heading1Command),
+            Item("Heading 2", viewModel.Heading2Command)));
+
+        menuBar.Items.Add(Menu("Window",
+            Item("Show Previous Tab", viewModel.ShowPreviousTabCommand),
+            Item("Show Next Tab", viewModel.ShowNextTabCommand),
+            Item("Move Tab to New Window", viewModel.MoveTabToNewWindowCommand),
+            Item("Merge All Windows", viewModel.MergeAllWindowsCommand)));
+
+        Grid.SetRow(editorView, 1);
+        RootGrid.Children.Add(editorView);
+    }
+
+    private static MenuBarItem Menu(string title, params MenuFlyoutItemBase[] items)
+    {
+        var menu = new MenuBarItem { Title = title };
+        foreach (var item in items)
+        {
+            menu.Items.Add(item);
+        }
+
+        return menu;
+    }
+
+    private static MenuFlyoutItem Item(string text, ICommand command)
+    {
+        return new MenuFlyoutItem
+        {
+            Text = text,
+            Command = command
+        };
+    }
+
+    private static MenuFlyoutSeparator Separator() => new();
+
+    private static Microsoft.UI.Xaml.Media.Brush ResourceBrush(string key)
+    {
+        return (Microsoft.UI.Xaml.Media.Brush)Application.Current.Resources[key];
     }
 
     private void InstallKeyboardAccelerators()
