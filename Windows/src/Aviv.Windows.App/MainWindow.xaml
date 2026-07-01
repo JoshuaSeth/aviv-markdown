@@ -3,7 +3,7 @@
     xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
     xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
     xmlns:controls="using:Aviv.Windows.App.Controls">
-    <Grid Background="{ThemeResource AvivBackgroundBrush}">
+    <Grid x:Name="RootGrid" Background="{ThemeResource AvivBackgroundBrush}">
         <Grid.RowDefinitions>
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
@@ -11,55 +11,55 @@
 
         <MenuBar Grid.Row="0" Background="{ThemeResource AvivChromeBrush}">
             <MenuBarItem Title="File">
-                <MenuFlyoutItem Text="New" Command="{Binding NewDocumentCommand}" InputGestureText="Ctrl+N" />
-                <MenuFlyoutItem Text="New Tab" Command="{Binding NewTabCommand}" InputGestureText="Ctrl+T" />
-                <MenuFlyoutItem Text="Open..." Command="{Binding OpenDocumentCommand}" InputGestureText="Ctrl+O" />
+                <MenuFlyoutItem Text="New" Command="{Binding NewDocumentCommand}" />
+                <MenuFlyoutItem Text="New Tab" Command="{Binding NewTabCommand}" />
+                <MenuFlyoutItem Text="Open..." Command="{Binding OpenDocumentCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Close" Command="{Binding CloseDocumentCommand}" InputGestureText="Ctrl+W" />
+                <MenuFlyoutItem Text="Close" Command="{Binding CloseDocumentCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Save" Command="{Binding SaveDocumentCommand}" InputGestureText="Ctrl+S" />
-                <MenuFlyoutItem Text="Save As..." Command="{Binding SaveDocumentAsCommand}" InputGestureText="Ctrl+Shift+S" />
+                <MenuFlyoutItem Text="Save" Command="{Binding SaveDocumentCommand}" />
+                <MenuFlyoutItem Text="Save As..." Command="{Binding SaveDocumentAsCommand}" />
                 <MenuFlyoutItem Text="Revert to Saved" Command="{Binding RevertDocumentCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Page Setup..." Command="{Binding PageSetupCommand}" InputGestureText="Ctrl+Shift+P" />
-                <MenuFlyoutItem Text="Print..." Command="{Binding PrintDocumentCommand}" InputGestureText="Ctrl+P" />
+                <MenuFlyoutItem Text="Page Setup..." Command="{Binding PageSetupCommand}" />
+                <MenuFlyoutItem Text="Print..." Command="{Binding PrintDocumentCommand}" />
             </MenuBarItem>
 
             <MenuBarItem Title="Edit">
-                <MenuFlyoutItem Text="Undo" Command="{Binding UndoCommand}" InputGestureText="Ctrl+Z" />
-                <MenuFlyoutItem Text="Redo" Command="{Binding RedoCommand}" InputGestureText="Ctrl+Shift+Z" />
+                <MenuFlyoutItem Text="Undo" Command="{Binding UndoCommand}" />
+                <MenuFlyoutItem Text="Redo" Command="{Binding RedoCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Cut" Command="{Binding CutCommand}" InputGestureText="Ctrl+X" />
-                <MenuFlyoutItem Text="Copy" Command="{Binding CopyCommand}" InputGestureText="Ctrl+C" />
-                <MenuFlyoutItem Text="Paste" Command="{Binding PasteCommand}" InputGestureText="Ctrl+V" />
-                <MenuFlyoutItem Text="Paste and Match Style" Command="{Binding PastePlainTextCommand}" InputGestureText="Ctrl+Alt+Shift+V" />
+                <MenuFlyoutItem Text="Cut" Command="{Binding CutCommand}" />
+                <MenuFlyoutItem Text="Copy" Command="{Binding CopyCommand}" />
+                <MenuFlyoutItem Text="Paste" Command="{Binding PasteCommand}" />
+                <MenuFlyoutItem Text="Paste and Match Style" Command="{Binding PastePlainTextCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Select All" Command="{Binding SelectAllCommand}" InputGestureText="Ctrl+A" />
+                <MenuFlyoutItem Text="Select All" Command="{Binding SelectAllCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Find..." Command="{Binding FindCommand}" InputGestureText="Ctrl+F" />
-                <MenuFlyoutItem Text="Find and Replace..." Command="{Binding FindAndReplaceCommand}" InputGestureText="Ctrl+Alt+F" />
-                <MenuFlyoutItem Text="Find Next" Command="{Binding FindNextCommand}" InputGestureText="Ctrl+G" />
-                <MenuFlyoutItem Text="Find Previous" Command="{Binding FindPreviousCommand}" InputGestureText="Ctrl+Shift+G" />
+                <MenuFlyoutItem Text="Find..." Command="{Binding FindCommand}" />
+                <MenuFlyoutItem Text="Find and Replace..." Command="{Binding FindAndReplaceCommand}" />
+                <MenuFlyoutItem Text="Find Next" Command="{Binding FindNextCommand}" />
+                <MenuFlyoutItem Text="Find Previous" Command="{Binding FindPreviousCommand}" />
             </MenuBarItem>
 
             <MenuBarItem Title="View">
-                <MenuFlyoutItem Text="Actual Size" Command="{Binding ResetTextSizeCommand}" InputGestureText="Ctrl+0" />
-                <MenuFlyoutItem Text="Zoom In" Command="{Binding IncreaseTextSizeCommand}" InputGestureText="Ctrl++" />
-                <MenuFlyoutItem Text="Zoom Out" Command="{Binding DecreaseTextSizeCommand}" InputGestureText="Ctrl+-" />
+                <MenuFlyoutItem Text="Actual Size" Command="{Binding ResetTextSizeCommand}" />
+                <MenuFlyoutItem Text="Zoom In" Command="{Binding IncreaseTextSizeCommand}" />
+                <MenuFlyoutItem Text="Zoom Out" Command="{Binding DecreaseTextSizeCommand}" />
             </MenuBarItem>
 
             <MenuBarItem Title="Format">
-                <MenuFlyoutItem Text="Bold" Command="{Binding ToggleBoldCommand}" InputGestureText="Ctrl+B" />
-                <MenuFlyoutItem Text="Italic" Command="{Binding ToggleItalicCommand}" InputGestureText="Ctrl+I" />
-                <MenuFlyoutItem Text="Code" Command="{Binding ToggleCodeCommand}" InputGestureText="Ctrl+`" />
+                <MenuFlyoutItem Text="Bold" Command="{Binding ToggleBoldCommand}" />
+                <MenuFlyoutItem Text="Italic" Command="{Binding ToggleItalicCommand}" />
+                <MenuFlyoutItem Text="Code" Command="{Binding ToggleCodeCommand}" />
                 <MenuFlyoutSeparator />
-                <MenuFlyoutItem Text="Heading 1" Command="{Binding Heading1Command}" InputGestureText="Ctrl+1" />
-                <MenuFlyoutItem Text="Heading 2" Command="{Binding Heading2Command}" InputGestureText="Ctrl+2" />
+                <MenuFlyoutItem Text="Heading 1" Command="{Binding Heading1Command}" />
+                <MenuFlyoutItem Text="Heading 2" Command="{Binding Heading2Command}" />
             </MenuBarItem>
 
             <MenuBarItem Title="Window">
-                <MenuFlyoutItem Text="Show Previous Tab" Command="{Binding ShowPreviousTabCommand}" InputGestureText="Ctrl+Shift+Tab" />
-                <MenuFlyoutItem Text="Show Next Tab" Command="{Binding ShowNextTabCommand}" InputGestureText="Ctrl+Tab" />
+                <MenuFlyoutItem Text="Show Previous Tab" Command="{Binding ShowPreviousTabCommand}" />
+                <MenuFlyoutItem Text="Show Next Tab" Command="{Binding ShowNextTabCommand}" />
                 <MenuFlyoutItem Text="Move Tab to New Window" Command="{Binding MoveTabToNewWindowCommand}" />
                 <MenuFlyoutItem Text="Merge All Windows" Command="{Binding MergeAllWindowsCommand}" />
             </MenuBarItem>
