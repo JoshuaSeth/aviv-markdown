@@ -4,6 +4,10 @@
 
 It is built for people who want Markdown files, native speed, and a focused document feel without the usual split preview/source editor clutter. You write real `.md` files, but Aviv renders them inline so the page feels quiet, minimal, and direct.
 
+This is the source code repo. For a convenient macOS DMG install download, use the Aviv download page:
+
+**Download Aviv for macOS:** https://pitchai.net/aviv-editor/
+
 ![Aviv editor screenshot](Docs/assets/aviv-editor.png)
 
 ## Why Aviv? 🌿
