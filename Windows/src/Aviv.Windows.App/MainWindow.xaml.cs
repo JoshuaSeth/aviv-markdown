@@ -15,7 +15,7 @@ public sealed partial class MainWindow : Window
     private const VirtualKey BacktickKey = (VirtualKey)192;
     private readonly Grid rootGrid = new();
     private readonly EditorDocumentViewModel viewModel;
-    private readonly MarkdownEditorView editorView;
+    private readonly MarkdownEditorView? editorView;
     private bool syncingFromViewModel;
 
     public MainWindow()
@@ -31,33 +31,50 @@ public sealed partial class MainWindow : Window
         rootGrid.DataContext = viewModel;
         DiagnosticLog.Write("MainWindow DataContext assigned.");
 
-        editorView = new MarkdownEditorView();
+        if (!UseSafeVerifierEditor())
+        {
+            editorView = new MarkdownEditorView();
+        }
+
         BuildLayout();
         DiagnosticLog.Write("MainWindow layout built.");
 
-        editorView.LoadMarkdown(viewModel.Markdown);
-        DiagnosticLog.Write("Initial Markdown loaded into editor.");
+        if (editorView is not null)
+        {
+            editorView.LoadMarkdown(viewModel.Markdown);
+            DiagnosticLog.Write("Initial Markdown loaded into editor.");
+        }
+        else
+        {
+            DiagnosticLog.Write("Safe verifier editor loaded.");
+        }
 
         viewModel.PropertyChanged += OnViewModelPropertyChanged;
-        viewModel.EditRequested += action => editorView.ApplyEditAction(action);
-        viewModel.EditorCommandRequested += command => editorView.PerformEditorCommand(command);
-        viewModel.ViewScaleChanged += scale => editorView.SetViewScale(scale);
-        InstallKeyboardAccelerators();
-        editorView.MarkdownChanged += markdown =>
+        if (editorView is not null)
         {
-            if (syncingFromViewModel)
+            viewModel.EditRequested += action => editorView.ApplyEditAction(action);
+            viewModel.EditorCommandRequested += command => editorView.PerformEditorCommand(command);
+            viewModel.ViewScaleChanged += scale => editorView.SetViewScale(scale);
+            editorView.MarkdownChanged += markdown =>
             {
-                return;
-            }
+                if (syncingFromViewModel)
+                {
+                    return;
+                }
 
-            viewModel.UpdateFromEditor(markdown);
-        };
+                viewModel.UpdateFromEditor(markdown);
+            };
+        }
+
+        InstallKeyboardAccelerators();
         DiagnosticLog.Write("MainWindow constructor completed.");
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)
     {
-        if (args.PropertyName != nameof(EditorDocumentViewModel.Markdown) || editorView.Markdown == viewModel.Markdown)
+        if (editorView is null ||
+            args.PropertyName != nameof(EditorDocumentViewModel.Markdown) ||
+            editorView.Markdown == viewModel.Markdown)
         {
             return;
         }
@@ -128,8 +145,36 @@ public sealed partial class MainWindow : Window
             Item("Move Tab to New Window", viewModel.MoveTabToNewWindowCommand),
             Item("Merge All Windows", viewModel.MergeAllWindowsCommand)));
 
-        Grid.SetRow(editorView, 1);
-        rootGrid.Children.Add(editorView);
+        if (editorView is not null)
+        {
+            Grid.SetRow(editorView, 1);
+            rootGrid.Children.Add(editorView);
+        }
+        else
+        {
+            var safeEditor = SafeVerifierEditor();
+            Grid.SetRow(safeEditor, 1);
+            rootGrid.Children.Add(safeEditor);
+        }
+    }
+
+    private TextBox SafeVerifierEditor()
+    {
+        return new TextBox
+        {
+            AcceptsReturn = true,
+            BorderThickness = new Thickness(0),
+            FontFamily = new Microsoft.UI.Xaml.Media.FontFamily("Segoe UI"),
+            FontSize = 17,
+            Padding = new Thickness(64, 72, 122, 52),
+            Text = viewModel.Markdown,
+            TextWrapping = TextWrapping.Wrap
+        };
+    }
+
+    private static bool UseSafeVerifierEditor()
+    {
+        return string.Equals(Environment.GetEnvironmentVariable("AVIV_SAFE_EDITOR"), "1", StringComparison.Ordinal);
     }
 
     private static MenuBarItem Menu(string title, params MenuFlyoutItemBase[] items)
