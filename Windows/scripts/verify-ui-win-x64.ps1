@@ -239,6 +239,7 @@ function Write-AvivProcesses {
 }
 
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
+$env:AVIV_SKIP_DEFAULT_APP_PROMPT = "1"
 Remove-Item Env:AVIV_UI_VERIFY -ErrorAction SilentlyContinue
 Remove-Item Env:AVIV_SAFE_EDITOR -ErrorAction SilentlyContinue
 Move-BlockingWindowsOutOfCapture "before app launch"
