@@ -4,6 +4,8 @@
 
 It is built for people who want Markdown files, native speed, and a focused document feel without the usual split preview/source editor clutter. You write real `.md` files, but Aviv renders them inline so the page feels quiet, minimal, and direct.
 
+Aviv is deliberately lightweight: the full native app can sit around **80 MB of RAM** while working on a document, and it scales CPU back to **0% when idle or in the background**. That means it has essentially no ongoing laptop-battery tax while you keep it open beside browsers, IDEs, terminals, chat, and research tools.
+
 This is the source code repo. For convenient installer downloads, use the Aviv download page:
 
 **Download Aviv installers:** https://pitchai.net/aviv-editor/
@@ -22,6 +24,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - **Stable layout while editing** so content does not jump when the cursor moves.
 - **Native AppKit macOS app** and **native WinUI 3 Windows app** instead of Electron.
 - **Minimal, glassy, readable UI** with subtle frosted top and minimap surfaces.
+- **Hyper-lightweight runtime** around 80 MB RAM in normal document work, with idle/background CPU returning to 0%.
 
 ## Features 🚀
 
@@ -34,8 +37,11 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Drag tabs out into new windows and merge windows back together.
 - Clean minimap/sidebar that follows the actual rendered viewport.
 - Top bar and sidebar use subtle blur/tint so overlays stay readable.
+- A native bottom-left format selector for a focused blog-width view or wider A4 document view.
+- A4-aware printing that avoids double-padding the editor and the paper margins.
 - Zoom controls that change view size without changing Markdown source.
 - Native print and page setup support.
+- Optional native prompt to make Aviv the default app for opening Markdown files, with a never-show-again choice.
 - Command, tab, layout, and minimap verifiers for regression testing.
 
 ## Screenshots 🖼️

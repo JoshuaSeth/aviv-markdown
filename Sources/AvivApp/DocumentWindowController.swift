@@ -176,7 +176,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     @objc func printDocument(_ sender: Any?) {
         let title = documentURL?.lastPathComponent ?? "Untitled"
-        printService.print(view: workspace.textView, title: title, window: window)
+        printService.print(
+            markdown: workspace.textView.string,
+            title: title,
+            format: workspace.documentFormat,
+            baseURL: documentURL?.deletingLastPathComponent(),
+            window: window
+        )
     }
 
     @objc func increaseTextSize(_ sender: Any?) {

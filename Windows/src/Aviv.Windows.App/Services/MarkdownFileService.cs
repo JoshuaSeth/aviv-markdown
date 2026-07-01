@@ -40,14 +40,12 @@ public sealed class MarkdownFileService(Window owner) : IMarkdownFileService
 
     public async Task<string> ReadMarkdownAsync(string path)
     {
-        var file = await StorageFile.GetFileFromPathAsync(path);
-        return await FileIO.ReadTextAsync(file);
+        return await File.ReadAllTextAsync(path);
     }
 
     public async Task SaveMarkdownAsync(string path, string markdown)
     {
-        var file = await StorageFile.GetFileFromPathAsync(path);
-        await FileIO.WriteTextAsync(file, markdown);
+        await File.WriteAllTextAsync(path, markdown);
     }
 
     public async Task<SavedMarkdownDocument?> SaveMarkdownAsAsync(string markdown, string? suggestedPath)

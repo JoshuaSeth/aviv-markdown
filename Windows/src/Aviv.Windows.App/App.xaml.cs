@@ -2,6 +2,7 @@ using Aviv.Windows.App.Services;
 using Microsoft.UI;
 using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
+using System.Text.RegularExpressions;
 using System.Runtime.InteropServices;
 using Windows.Graphics;
 using WinRT.Interop;
@@ -44,7 +45,7 @@ public partial class App : Application
         try
         {
             DiagnosticLog.Write("OnLaunched starting.");
-            window = new MainWindow();
+            window = new MainWindow(LaunchArgumentParser.FirstFilePath(args.Arguments));
             window.Closed += (_, _) => DiagnosticLog.Write("MainWindow closed.");
             DiagnosticLog.Write("MainWindow created.");
             window.Activate();
@@ -113,5 +114,32 @@ public partial class App : Application
             public int Right;
             public int Bottom;
         }
+    }
+
+    private static partial class LaunchArgumentParser
+    {
+        public static string? FirstFilePath(string arguments)
+        {
+            if (string.IsNullOrWhiteSpace(arguments))
+            {
+                return null;
+            }
+
+            foreach (Match match in TokenRegex().Matches(arguments))
+            {
+                var token = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                if (string.IsNullOrWhiteSpace(token) || token.StartsWith("--", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return token;
+            }
+
+            return null;
+        }
+
+        [GeneratedRegex("\"([^\"]+)\"|(\\S+)")]
+        private static partial Regex TokenRegex();
     }
 }

@@ -192,7 +192,7 @@ private final class RecordingPrintService: DocumentPrintService {
         pageSetupCount += 1
     }
 
-    func print(view: NSView, title: String, window: NSWindow?) {
+    func print(markdown: String, title: String, format: MarkdownDocumentFormat, baseURL: URL?, window: NSWindow?) {
         printCount += 1
     }
 }

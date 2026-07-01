@@ -17,14 +17,15 @@ public sealed partial class MainWindow : Window
     private readonly EditorDocumentViewModel viewModel;
     private readonly MarkdownEditorView? editorView;
     private bool syncingFromViewModel;
+    private bool defaultAppPromptShown;
 
-    public MainWindow()
+    public MainWindow(string? initialDocumentPath = null)
     {
         DiagnosticLog.Write("MainWindow constructor starting.");
         Content = rootGrid;
         Title = "Aviv";
         rootGrid.Background = ResourceBrush("AvivBackgroundBrush");
-        rootGrid.Loaded += (_, _) => DiagnosticLog.Write("MainWindow root grid loaded.");
+        rootGrid.Loaded += OnRootGridLoaded;
         DiagnosticLog.Write("MainWindow root grid created.");
 
         viewModel = new EditorDocumentViewModel(new MarkdownFileService(this));
@@ -67,7 +68,59 @@ public sealed partial class MainWindow : Window
         }
 
         InstallKeyboardAccelerators();
+        if (!string.IsNullOrWhiteSpace(initialDocumentPath))
+        {
+            _ = LoadInitialDocumentAsync(initialDocumentPath);
+        }
         DiagnosticLog.Write("MainWindow constructor completed.");
+    }
+
+    private async void OnRootGridLoaded(object sender, RoutedEventArgs args)
+    {
+        DiagnosticLog.Write("MainWindow root grid loaded.");
+        await ShowDefaultMarkdownAppPromptIfNeededAsync();
+    }
+
+    private async Task LoadInitialDocumentAsync(string path)
+    {
+        try
+        {
+            await viewModel.OpenPathAsync(path);
+        }
+        catch (Exception exception)
+        {
+            DiagnosticLog.WriteException($"Failed to open launch document '{path}'", exception);
+        }
+    }
+
+    private async Task ShowDefaultMarkdownAppPromptIfNeededAsync()
+    {
+        if (defaultAppPromptShown || !DefaultMarkdownAppService.ShouldPrompt())
+        {
+            return;
+        }
+
+        defaultAppPromptShown = true;
+        var dialog = new ContentDialog
+        {
+            XamlRoot = rootGrid.XamlRoot,
+            Title = "Open Markdown files with Aviv?",
+            Content = "Aviv can register as a Markdown editor for .md and .markdown files. Windows will open Default Apps so you can confirm the file association.",
+            PrimaryButtonText = "Open Default Apps",
+            SecondaryButtonText = "Not Now",
+            CloseButtonText = "Never Show Again",
+            DefaultButton = ContentDialogButton.Primary
+        };
+
+        var result = await dialog.ShowAsync();
+        if (result == ContentDialogResult.Primary)
+        {
+            DefaultMarkdownAppService.OpenDefaultAppsSettings();
+        }
+        else if (result == ContentDialogResult.None)
+        {
+            DefaultMarkdownAppService.NeverAskAgain = true;
+        }
     }
 
     private void OnViewModelPropertyChanged(object? sender, PropertyChangedEventArgs args)

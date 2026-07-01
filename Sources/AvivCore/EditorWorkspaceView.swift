@@ -3,6 +3,18 @@ import AppKit
 public final class EditorWorkspaceView: NSView {
     public let textView: MarkdownTextView
     public let scrollView: NSScrollView
+    public var documentFormat: MarkdownDocumentFormat {
+        didSet {
+            guard oldValue != documentFormat else { return }
+            documentFormat.store()
+            syncFormatControl()
+            updateTextInsets()
+            needsLayout = true
+            needsDisplay = true
+            onDocumentFormatChange?(documentFormat)
+        }
+    }
+    public var onDocumentFormatChange: ((MarkdownDocumentFormat) -> Void)?
 
     private let theme: MarkdownTheme
     private let annotationOverlay: MarkdownAnnotationOverlayView
@@ -20,8 +32,15 @@ public final class EditorWorkspaceView: NSView {
     )
     private let titleLabel = NSTextField(labelWithString: "Untitled")
     private let statusLabel = NSTextField(labelWithString: "")
+    private let formatLabel = NSTextField(labelWithString: "Format")
+    private let formatButton = NSPopUpButton(frame: .zero, pullsDown: false)
     private let rule = NSBox()
-    private let maxColumnWidth: CGFloat = 860
+    private let formatBackdropView = ChromeBackdropView(
+        material: .popover,
+        tintColor: NSColor(calibratedWhite: 1.0, alpha: 0.62),
+        strokeColor: NSColor(calibratedWhite: 0.72, alpha: 0.16),
+        cornerRadius: 8
+    )
     private var topBarHeightConstraint: NSLayoutConstraint?
     private var minimapTrailingConstraint: NSLayoutConstraint?
     private var minimapTopConstraint: NSLayoutConstraint?
@@ -32,6 +51,7 @@ public final class EditorWorkspaceView: NSView {
     private var statusBottomConstraint: NSLayoutConstraint?
     private var statusWidthConstraint: NSLayoutConstraint?
     private var ruleTopConstraint: NSLayoutConstraint?
+    private var formatBottomConstraint: NSLayoutConstraint?
 
     public init(frame frameRect: NSRect = .zero, theme: MarkdownTheme = .clean) {
         self.theme = theme
@@ -39,6 +59,7 @@ public final class EditorWorkspaceView: NSView {
         self.scrollView = NSScrollView(frame: .zero)
         self.annotationOverlay = MarkdownAnnotationOverlayView(textView: textView, theme: theme)
         self.minimapView = MarkdownMinimapView(textView: textView, theme: theme)
+        self.documentFormat = MarkdownDocumentFormat.stored()
         super.init(frame: frameRect)
         setup()
     }
@@ -72,6 +93,10 @@ public final class EditorWorkspaceView: NSView {
 
     var minimapForTesting: MarkdownMinimapView {
         minimapView
+    }
+
+    public var resolvedTextContainerWidthForTesting: CGFloat {
+        textView.textContainer?.containerSize.width ?? 0
     }
 
     public override func layout() {
@@ -117,6 +142,23 @@ public final class EditorWorkspaceView: NSView {
         statusLabel.alignment = .right
         statusLabel.lineBreakMode = .byTruncatingTail
 
+        formatBackdropView.translatesAutoresizingMaskIntoConstraints = false
+        formatLabel.translatesAutoresizingMaskIntoConstraints = false
+        formatLabel.font = theme.smallFont
+        formatLabel.textColor = theme.secondaryTextColor
+        formatLabel.alignment = .left
+
+        formatButton.translatesAutoresizingMaskIntoConstraints = false
+        formatButton.controlSize = .small
+        formatButton.font = theme.smallFont
+        formatButton.isBordered = false
+        formatButton.target = self
+        formatButton.action = #selector(formatSelectionChanged)
+        for format in MarkdownDocumentFormat.allCases {
+            formatButton.addItem(withTitle: format.menuTitle)
+            formatButton.lastItem?.representedObject = format.rawValue
+        }
+
         rule.translatesAutoresizingMaskIntoConstraints = false
         rule.boxType = .separator
         rule.alphaValue = 0.45
@@ -130,6 +172,9 @@ public final class EditorWorkspaceView: NSView {
         addSubview(minimapView)
         addSubview(titleLabel)
         addSubview(statusLabel)
+        addSubview(formatBackdropView)
+        addSubview(formatLabel)
+        addSubview(formatButton)
         addSubview(rule)
 
         NotificationCenter.default.addObserver(
@@ -162,6 +207,7 @@ public final class EditorWorkspaceView: NSView {
         statusBottomConstraint = statusLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
         statusWidthConstraint = statusLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 220)
         ruleTopConstraint = rule.topAnchor.constraint(equalTo: topAnchor, constant: 44)
+        formatBottomConstraint = formatBackdropView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -192,6 +238,18 @@ public final class EditorWorkspaceView: NSView {
             statusBottomConstraint!,
             statusWidthConstraint!,
 
+            formatBackdropView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            formatBottomConstraint!,
+            formatBackdropView.heightAnchor.constraint(equalToConstant: 32),
+
+            formatLabel.leadingAnchor.constraint(equalTo: formatBackdropView.leadingAnchor, constant: 11),
+            formatLabel.centerYAnchor.constraint(equalTo: formatBackdropView.centerYAnchor),
+
+            formatButton.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 7),
+            formatButton.trailingAnchor.constraint(equalTo: formatBackdropView.trailingAnchor, constant: -4),
+            formatButton.centerYAnchor.constraint(equalTo: formatBackdropView.centerYAnchor),
+            formatButton.widthAnchor.constraint(equalToConstant: 118),
+
             rule.leadingAnchor.constraint(equalTo: leadingAnchor),
             rule.trailingAnchor.constraint(equalTo: trailingAnchor),
             ruleTopConstraint!,
@@ -206,6 +264,7 @@ public final class EditorWorkspaceView: NSView {
             self.needsDisplay = true
         }
         updateScaledChrome()
+        syncFormatControl()
     }
 
     @objc private func boundsDidChange() {
@@ -228,9 +287,10 @@ public final class EditorWorkspaceView: NSView {
     private func updateTextInsets() {
         let visibleWidth = max(320, scrollView.contentSize.width)
         let scale = currentTheme.viewScale
-        let horizontalPadding = max(CGFloat(20), 28 * scale)
-        let sideInset = max(horizontalPadding, ((visibleWidth - maxColumnWidth) / 2) + horizontalPadding)
-        textView.textContainerInset = NSSize(width: sideInset, height: max(48, 76 * scale))
+        let horizontalPadding = documentFormat.editorHorizontalPadding(scale: scale)
+        let centeredInset = (visibleWidth - documentFormat.editorContentWidth) / 2
+        let sideInset = max(horizontalPadding, centeredInset)
+        textView.textContainerInset = NSSize(width: sideInset, height: documentFormat.editorVerticalInset(scale: scale))
         textView.textContainer?.containerSize = NSSize(
             width: max(240, visibleWidth - (sideInset * 2)),
             height: CGFloat.greatestFiniteMagnitude
@@ -255,8 +315,11 @@ public final class EditorWorkspaceView: NSView {
         let theme = currentTheme
         titleLabel.font = theme.smallFont
         statusLabel.font = theme.smallFont
+        formatLabel.font = theme.smallFont
+        formatButton.font = theme.smallFont
         titleLabel.textColor = theme.secondaryTextColor
         statusLabel.textColor = theme.secondaryTextColor
+        formatLabel.textColor = theme.secondaryTextColor
 
         minimapTrailingConstraint?.constant = -max(9, theme.scaledMetric(12))
         minimapTopConstraint?.constant = max(46, theme.scaledMetric(58))
@@ -268,7 +331,31 @@ public final class EditorWorkspaceView: NSView {
         statusTrailingConstraint?.constant = -max(13, theme.scaledMetric(18))
         statusBottomConstraint?.constant = -max(9, theme.scaledMetric(12))
         statusWidthConstraint?.constant = max(170, theme.scaledMetric(220))
+        formatBottomConstraint?.constant = -max(9, theme.scaledMetric(12))
         ruleTopConstraint?.constant = max(38, theme.scaledMetric(44))
+    }
+
+    private func syncFormatControl() {
+        for index in 0..<formatButton.numberOfItems {
+            guard
+                let rawValue = formatButton.item(at: index)?.representedObject as? String,
+                rawValue == documentFormat.rawValue
+            else {
+                continue
+            }
+            formatButton.selectItem(at: index)
+            return
+        }
+    }
+
+    @objc private func formatSelectionChanged() {
+        guard
+            let rawValue = formatButton.selectedItem?.representedObject as? String,
+            let format = MarkdownDocumentFormat(rawValue: rawValue)
+        else {
+            return
+        }
+        documentFormat = format
     }
 
     private var currentTheme: MarkdownTheme {

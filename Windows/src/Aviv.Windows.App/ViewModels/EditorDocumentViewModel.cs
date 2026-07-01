@@ -94,6 +94,19 @@ public sealed partial class EditorDocumentViewModel : ObservableObject
         UpdateDocumentTitle();
     }
 
+    public async Task OpenPathAsync(string path)
+    {
+        if (string.IsNullOrWhiteSpace(path))
+        {
+            return;
+        }
+
+        DocumentPath = path;
+        Markdown = await fileService.ReadMarkdownAsync(path);
+        lastSavedMarkdown = Markdown;
+        IsEdited = false;
+    }
+
     [RelayCommand]
     private void NewDocument()
     {

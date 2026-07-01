@@ -19,6 +19,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             documentSession.open(urls: launchURLs)
         }
         NSApp.activate(ignoringOtherApps: true)
+        DispatchQueue.main.async { [weak self] in
+            MarkdownDefaultAppService.presentPromptIfNeeded(window: self?.documentSession.activeController?.window)
+        }
     }
 
     func application(_ sender: NSApplication, openFile filename: String) -> Bool {

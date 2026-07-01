@@ -68,6 +68,15 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         applyMarkdownStyle()
     }
 
+    public func loadMarkdownForPrint(_ markdown: String) {
+        guard let textStorage else { return }
+        isApplyingMarkdownStyle = true
+        textStorage.setAttributedString(styler.attributedString(for: markdown, selectedRanges: []))
+        sourceEditor.isHidden = true
+        activeEditableSourceRange = nil
+        isApplyingMarkdownStyle = false
+    }
+
     public func applyMarkdownStyle() {
         guard !isApplyingMarkdownStyle, let textStorage else { return }
         let ranges = selectedRanges.compactMap { $0.rangeValue }
