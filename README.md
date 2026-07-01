@@ -1,12 +1,15 @@
 # Aviv Markdown ✨
 
-**Aviv is a hyper-clean native macOS Markdown editor with a calm WYSIWYG writing surface.**
+**Aviv is a hyper-clean native macOS and Windows Markdown editor with a calm WYSIWYG writing surface.**
 
 It is built for people who want Markdown files, native speed, and a focused document feel without the usual split preview/source editor clutter. You write real `.md` files, but Aviv renders them inline so the page feels quiet, minimal, and direct.
 
-This is the source code repo. For a convenient macOS DMG install download, use the Aviv download page:
+This is the source code repo. For convenient installer downloads, use the Aviv download page:
 
-**Download Aviv for macOS:** https://pitchai.net/aviv-editor/
+**Download Aviv installers:** https://pitchai.net/aviv-editor/
+
+- macOS DMG
+- Windows x64 ZIP
 
 ![Aviv editor screenshot](Docs/assets/aviv-editor.png)
 
@@ -17,7 +20,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - **WYSIWYG-style Markdown editing** without giving up the underlying plain-text `.md` file.
 - **No split preview pane** and no mode switcher.
 - **Stable layout while editing** so content does not jump when the cursor moves.
-- **Native AppKit macOS app** instead of Electron.
+- **Native AppKit macOS app** and **native WinUI 3 Windows app** instead of Electron.
 - **Minimal, glassy, readable UI** with subtle frosted top and minimap surfaces.
 
 ## Features 🚀
