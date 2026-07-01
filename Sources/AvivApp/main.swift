@@ -12,6 +12,10 @@ if arguments.contains("--verify-minimap") {
     exit(MarkdownMinimapVerifier.runCLI())
 }
 
+if arguments.contains("--verify-scroll-jitter") {
+    exit(MarkdownScrollJitterVerifier.runCLI())
+}
+
 if arguments.contains("--verify-commands") {
     exit(AppCommandVerifier.runCLI())
 }
@@ -108,6 +112,18 @@ if let minimapSnapshotIndex = arguments.firstIndex(of: "--snapshot-minimap"), ar
 
     do {
         try MarkdownSnapshotRenderer.renderMinimapFixture(to: URL(fileURLWithPath: path), scrollRatio: scrollRatio, viewScale: viewScale)
+        print("snapshot: \(path)")
+        exit(0)
+    } catch {
+        fputs("snapshot failed: \(error)\n", stderr)
+        exit(1)
+    }
+}
+
+if let scrollStabilitySnapshotIndex = arguments.firstIndex(of: "--snapshot-scroll-stability"), arguments.indices.contains(scrollStabilitySnapshotIndex + 1) {
+    let path = arguments[scrollStabilitySnapshotIndex + 1]
+    do {
+        try MarkdownScrollJitterVerifier.renderSnapshot(to: URL(fileURLWithPath: path))
         print("snapshot: \(path)")
         exit(0)
     } catch {

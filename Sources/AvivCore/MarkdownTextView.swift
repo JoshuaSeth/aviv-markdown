@@ -95,8 +95,8 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 
     public override func didChangeText() {
-        super.didChangeText()
         applyMarkdownStyle()
+        super.didChangeText()
         onContentChange?(string)
         updateSourceEditor()
     }

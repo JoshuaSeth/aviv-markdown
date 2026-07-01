@@ -13,6 +13,7 @@ mkdir -p "$ROOT/dist/snapshots"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-default-app-prompt
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-layout
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-minimap
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-scroll-jitter
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/reading.png"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-heading.png" --cursor "Aviv Markdown"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-inline.png" --cursor "bold text"
@@ -25,6 +26,7 @@ mkdir -p "$ROOT/dist/snapshots"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot-minimap "$ROOT/dist/snapshots/minimap-top.png" --scroll 0
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot-minimap "$ROOT/dist/snapshots/minimap-middle.png" --scroll 0.5
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot-minimap "$ROOT/dist/snapshots/minimap-bottom.png" --scroll 1
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot-scroll-stability "$ROOT/dist/snapshots/scroll-stability-after-typing.png"
 
 echo "snapshots:"
 echo "$ROOT/dist/snapshots/reading.png"
@@ -39,3 +41,4 @@ echo "$ROOT/dist/snapshots/zoom-in.png"
 echo "$ROOT/dist/snapshots/minimap-top.png"
 echo "$ROOT/dist/snapshots/minimap-middle.png"
 echo "$ROOT/dist/snapshots/minimap-bottom.png"
+echo "$ROOT/dist/snapshots/scroll-stability-after-typing.png"

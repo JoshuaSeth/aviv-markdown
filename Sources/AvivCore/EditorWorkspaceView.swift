@@ -52,6 +52,8 @@ public final class EditorWorkspaceView: NSView {
     private var statusWidthConstraint: NSLayoutConstraint?
     private var ruleTopConstraint: NSLayoutConstraint?
     private var formatBottomConstraint: NSLayoutConstraint?
+    private var lastTextGeometry: TextGeometry?
+    private let geometryEpsilon: CGFloat = 0.25
 
     public init(frame frameRect: NSRect = .zero, theme: MarkdownTheme = .clean) {
         self.theme = theme
@@ -102,7 +104,7 @@ public final class EditorWorkspaceView: NSView {
     public override func layout() {
         super.layout()
         updateScaledChrome()
-        updateTextInsets()
+        updateTextInsets(preserveVisibleOrigin: true)
     }
 
     public override func draw(_ dirtyRect: NSRect) {
@@ -268,13 +270,13 @@ public final class EditorWorkspaceView: NSView {
     }
 
     @objc private func boundsDidChange() {
-        updateTextInsets()
+        updateTextInsets(preserveVisibleOrigin: true)
         annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
     @objc private func textDidChange() {
-        updateTextInsets()
+        updateTextInsets(preserveVisibleOrigin: true)
         annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
@@ -284,31 +286,73 @@ public final class EditorWorkspaceView: NSView {
         minimapView.needsDisplay = true
     }
 
-    private func updateTextInsets() {
+    private func updateTextInsets(preserveVisibleOrigin: Bool = false) {
         let visibleWidth = max(320, scrollView.contentSize.width)
         let scale = currentTheme.viewScale
         let horizontalPadding = documentFormat.editorHorizontalPadding(scale: scale)
         let centeredInset = (visibleWidth - documentFormat.editorContentWidth) / 2
         let sideInset = max(horizontalPadding, centeredInset)
-        textView.textContainerInset = NSSize(width: sideInset, height: documentFormat.editorVerticalInset(scale: scale))
-        textView.textContainer?.containerSize = NSSize(
-            width: max(240, visibleWidth - (sideInset * 2)),
-            height: CGFloat.greatestFiniteMagnitude
+        let verticalInset = documentFormat.editorVerticalInset(scale: scale)
+        let containerWidth = max(240, visibleWidth - (sideInset * 2))
+        let geometry = TextGeometry(
+            visibleWidth: visibleWidth,
+            sideInset: sideInset,
+            verticalInset: verticalInset,
+            containerWidth: containerWidth
         )
-        textView.textContainer?.widthTracksTextView = false
-        textView.frame.size.width = visibleWidth
-        updateDocumentHeight()
-        annotationOverlay.frame = textView.bounds
+
+        if lastTextGeometry?.matches(geometry, epsilon: geometryEpsilon) != true {
+            let newInset = NSSize(width: sideInset, height: verticalInset)
+            if !sizesMatch(textView.textContainerInset, newInset) {
+                textView.textContainerInset = newInset
+            }
+
+            if let textContainer = textView.textContainer {
+                let newContainerSize = NSSize(width: containerWidth, height: CGFloat.greatestFiniteMagnitude)
+                if !sizesMatch(textContainer.containerSize, newContainerSize) {
+                    textContainer.containerSize = newContainerSize
+                }
+                if textContainer.widthTracksTextView {
+                    textContainer.widthTracksTextView = false
+                }
+            }
+
+            if abs(textView.frame.size.width - visibleWidth) > geometryEpsilon {
+                textView.frame.size.width = visibleWidth
+            }
+            lastTextGeometry = geometry
+        }
+
+        updateDocumentHeight(preserveVisibleOrigin: preserveVisibleOrigin)
+        if annotationOverlay.frame != textView.bounds {
+            annotationOverlay.frame = textView.bounds
+        }
         annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
-    private func updateDocumentHeight() {
+    private func updateDocumentHeight(preserveVisibleOrigin: Bool) {
         guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
+        let clipView = scrollView.contentView
+        let originalOrigin = clipView.bounds.origin
+
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        let laidOutHeight = ceil(textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height)
-        textView.frame.size.height = max(scrollView.contentSize.height, laidOutHeight)
+        let laidOutHeight = roundedUpToDevicePixel(textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height)
+        let documentHeight = max(scrollView.contentSize.height, laidOutHeight)
+        if abs(textView.frame.size.height - documentHeight) > geometryEpsilon {
+            textView.frame.size.height = documentHeight
+        }
+
+        guard preserveVisibleOrigin else { return }
+        let maxY = max(0, textView.frame.height - clipView.bounds.height)
+        let targetY = min(max(0, originalOrigin.y), maxY)
+        let target = NSPoint(x: originalOrigin.x, y: targetY)
+        if abs(clipView.bounds.origin.y - target.y) > geometryEpsilon ||
+            abs(clipView.bounds.origin.x - target.x) > geometryEpsilon {
+            clipView.scroll(to: target)
+            scrollView.reflectScrolledClipView(clipView)
+        }
     }
 
     private func updateScaledChrome() {
@@ -360,6 +404,29 @@ public final class EditorWorkspaceView: NSView {
 
     private var currentTheme: MarkdownTheme {
         textView.styler.theme
+    }
+
+    private func roundedUpToDevicePixel(_ value: CGFloat) -> CGFloat {
+        let scale = window?.backingScaleFactor ?? NSScreen.main?.backingScaleFactor ?? 2
+        return (value * scale).rounded(.up) / scale
+    }
+
+    private func sizesMatch(_ lhs: NSSize, _ rhs: NSSize) -> Bool {
+        abs(lhs.width - rhs.width) <= geometryEpsilon && abs(lhs.height - rhs.height) <= geometryEpsilon
+    }
+
+    private struct TextGeometry {
+        let visibleWidth: CGFloat
+        let sideInset: CGFloat
+        let verticalInset: CGFloat
+        let containerWidth: CGFloat
+
+        func matches(_ other: TextGeometry, epsilon: CGFloat) -> Bool {
+            abs(visibleWidth - other.visibleWidth) <= epsilon &&
+                abs(sideInset - other.sideInset) <= epsilon &&
+                abs(verticalInset - other.verticalInset) <= epsilon &&
+                abs(containerWidth - other.containerWidth) <= epsilon
+        }
     }
 }
 
