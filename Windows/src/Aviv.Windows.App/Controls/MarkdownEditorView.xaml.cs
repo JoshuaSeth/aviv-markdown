@@ -20,6 +20,7 @@ public sealed partial class MarkdownEditorView : UserControl
     private readonly MarkdownStyler styler = new();
     private readonly WinUiMarkdownFormatter formatter = new();
     private bool applying;
+    private bool isLoaded;
     private double viewScale = 1.0;
     private MarkdownEditableSourceSpan? activeSourceSpan;
 
@@ -32,7 +33,15 @@ public sealed partial class MarkdownEditorView : UserControl
         DiagnosticLog.Write("MarkdownEditorView constructor starting.");
         (Editor, Minimap, SourcePopup, SourceEditor) = BuildLayout();
         Minimap.ScrollRatioRequested += ScrollToRatio;
+        Loaded += OnLoaded;
         DiagnosticLog.Write("MarkdownEditorView constructor completed.");
+    }
+
+    private void OnLoaded(object sender, RoutedEventArgs args)
+    {
+        isLoaded = true;
+        ApplyMarkdownStyle();
+        Editor.Focus(FocusState.Programmatic);
     }
 
     private (RichEditBox Editor, MarkdownMinimapView Minimap, Popup SourcePopup, TextBox SourceEditor) BuildLayout()
@@ -150,8 +159,11 @@ public sealed partial class MarkdownEditorView : UserControl
         Markdown = markdown;
         Editor.Document.SetText(TextSetOptions.None, markdown);
         applying = false;
-        ApplyMarkdownStyle();
-        Editor.Focus(FocusState.Programmatic);
+        if (isLoaded)
+        {
+            ApplyMarkdownStyle();
+            Editor.Focus(FocusState.Programmatic);
+        }
     }
 
     public void SetViewScale(double scale)
@@ -212,7 +224,7 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void OnTextChanged(object sender, RoutedEventArgs args)
     {
-        if (applying)
+        if (applying || !isLoaded)
         {
             return;
         }
