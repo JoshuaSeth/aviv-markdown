@@ -33,8 +33,14 @@ public static class AvivNativeWindow {
   [DllImport("kernel32.dll")]
   public static extern IntPtr GetConsoleWindow();
 
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  public static extern IntPtr FindWindow(string lpClassName, string lpWindowName);
+
   [DllImport("user32.dll")]
   public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
+
+  [DllImport("user32.dll")]
+  public static extern bool BringWindowToTop(IntPtr hWnd);
 
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
   public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
@@ -113,8 +119,22 @@ try {
     [AvivNativeWindow]::ShowWindow($consoleHandle, 6) | Out-Null
   }
 
+  $classConsoleHandle = [AvivNativeWindow]::FindWindow("ConsoleWindowClass", $null)
+  if ($classConsoleHandle -ne [IntPtr]::Zero -and $classConsoleHandle -ne $consoleHandle) {
+    Write-Host "Minimizing ConsoleWindowClass window $classConsoleHandle before capture."
+    [AvivNativeWindow]::ShowWindow($classConsoleHandle, 6) | Out-Null
+  }
+
+  $runnerWindows = Get-Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and ($_.MainWindowTitle -like "*HostedComputeAgent*" -or $_.MainWindowTitle -like "*hosted-compute-agent*") }
+  foreach ($runnerWindow in $runnerWindows) {
+    Write-Host "Minimizing runner window $($runnerWindow.Id) '$($runnerWindow.MainWindowTitle)' handle $($runnerWindow.MainWindowHandle)."
+    [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 6) | Out-Null
+  }
+
   [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
+  [AvivNativeWindow]::BringWindowToTop($handle) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 500
   $titleBuilder = [System.Text.StringBuilder]::new(256)
