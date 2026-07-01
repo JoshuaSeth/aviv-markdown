@@ -14,6 +14,18 @@ New-Item -ItemType Directory -Force -Path $ScreenshotDir | Out-Null
 Add-Type -AssemblyName System.Windows.Forms
 Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName Microsoft.VisualBasic
+Add-Type @"
+using System;
+using System.Runtime.InteropServices;
+
+public static class AvivNativeWindow {
+  [DllImport("user32.dll")]
+  public static extern bool SetForegroundWindow(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
+}
+"@
 
 $fixture = @'
 # Windows Aviv Verification
@@ -38,8 +50,22 @@ native windows verifier
 
 $process = Start-Process -FilePath $Exe -PassThru
 try {
-  Start-Sleep -Seconds 6
-  [Microsoft.VisualBasic.Interaction]::AppActivate($process.Id) | Out-Null
+  $handle = [IntPtr]::Zero
+  for ($attempt = 0; $attempt -lt 30; $attempt++) {
+    Start-Sleep -Milliseconds 500
+    $process.Refresh()
+    if ($process.MainWindowHandle -ne [IntPtr]::Zero) {
+      $handle = $process.MainWindowHandle
+      break
+    }
+  }
+
+  if ($handle -eq [IntPtr]::Zero) {
+    throw "Aviv window handle was not available after launch."
+  }
+
+  [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
+  [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 500
 
   Set-Clipboard -Value $fixture
