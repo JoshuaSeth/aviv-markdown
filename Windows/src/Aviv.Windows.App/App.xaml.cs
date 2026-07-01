@@ -26,6 +26,7 @@ public partial class App : Application
                 DiagnosticLog.Write($"AppDomain unhandled exception object: {args.ExceptionObject}");
             }
         };
+        AppDomain.CurrentDomain.ProcessExit += (_, _) => DiagnosticLog.Write("ProcessExit raised.");
         TaskScheduler.UnobservedTaskException += (_, args) =>
         {
             DiagnosticLog.WriteException("TaskScheduler unobserved exception", args.Exception);
@@ -44,6 +45,7 @@ public partial class App : Application
         {
             DiagnosticLog.Write("OnLaunched starting.");
             window = new MainWindow();
+            window.Closed += (_, _) => DiagnosticLog.Write("MainWindow closed.");
             DiagnosticLog.Write("MainWindow created.");
             window.Activate();
             DiagnosticLog.Write("MainWindow activated.");

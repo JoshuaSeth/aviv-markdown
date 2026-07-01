@@ -4,6 +4,7 @@ $Root = Resolve-Path "$PSScriptRoot/.."
 $Exe = Join-Path $Root "dist/win-x64/Aviv.Windows.App.exe"
 $ScreenshotDir = Join-Path $Root "dist/screenshots"
 $Screenshot = Join-Path $ScreenshotDir "windows-ui-verification.png"
+$LaunchScreenshot = Join-Path $ScreenshotDir "windows-ui-after-launch.png"
 $DiagnosticLog = Join-Path $ScreenshotDir "windows-ui-verification.log"
 
 if (!(Test-Path $Exe)) {
@@ -159,6 +160,34 @@ native windows verifier
 ```
 '@
 
+function Save-FixedScreenCapture {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Path,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  $left = 96
+  $top = 72
+  $width = 1160
+  $height = 760
+  $bitmap = [System.Drawing.Bitmap]::new($width, $height)
+  $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+  try {
+    $graphics.CopyFromScreen([System.Drawing.Point]::new($left, $top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
+    $bitmap.Save($Path, [System.Drawing.Imaging.ImageFormat]::Png)
+  }
+  finally {
+    $graphics.Dispose()
+    $bitmap.Dispose()
+  }
+
+  $file = Get-Item $Path
+  Write-Host "Captured $Label screenshot: $Path ($($file.Length) bytes)"
+}
+
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $env:AVIV_UI_VERIFY = "1"
 $process = Start-Process -FilePath $Exe -PassThru
@@ -209,6 +238,15 @@ try {
     Write-Host "Switching Aviv capture handle from $handle to enumerated visible window $bestHandle."
     $handle = $bestHandle
   }
+
+  Set-Clipboard -Value $fixture
+  [System.Windows.Forms.SendKeys]::SendWait("^a")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("^v")
+  Start-Sleep -Milliseconds 800
+  Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
+  $process.Refresh()
+  Write-Host "Aviv process after launch capture: HasExited=$($process.HasExited)"
 
   $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
   if ($consoleHandle -ne [IntPtr]::Zero) {
