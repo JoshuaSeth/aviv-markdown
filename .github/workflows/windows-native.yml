@@ -1,0 +1,54 @@
+name: Windows Native
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "Windows/**"
+      - ".github/workflows/windows-native.yml"
+  workflow_dispatch:
+
+jobs:
+  build-test-publish:
+    name: Build, test, and publish Windows app
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET 10
+        uses: actions/setup-dotnet@v5
+        with:
+          dotnet-version: "10.0.x"
+
+      - name: Restore
+        run: dotnet restore Windows/Aviv.Windows.slnx
+
+      - name: Test core parity library
+        run: dotnet test Windows/tests/Aviv.Windows.Core.Tests/Aviv.Windows.Core.Tests.csproj --configuration Release --no-restore
+
+      - name: Publish WinUI app x64
+        shell: pwsh
+        run: Windows/scripts/publish-win-x64.ps1
+
+      - name: Smoke check published app
+        shell: pwsh
+        run: |
+          $exe = "Windows/dist/win-x64/Aviv.Windows.App.exe"
+          if (!(Test-Path $exe)) {
+            throw "Published executable not found: $exe"
+          }
+          Get-ChildItem Windows/dist/win-x64 | Select-Object Name, Length
+
+      - name: Archive published app
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force -Path Windows/dist/artifacts | Out-Null
+          Compress-Archive -Path Windows/dist/win-x64/* -DestinationPath Windows/dist/artifacts/Aviv-Windows-win-x64.zip -Force
+
+      - name: Upload Windows app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aviv-Windows-win-x64
+          path: Windows/dist/artifacts/Aviv-Windows-win-x64.zip
