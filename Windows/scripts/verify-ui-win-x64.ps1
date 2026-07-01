@@ -4,6 +4,7 @@ $Root = Resolve-Path "$PSScriptRoot/.."
 $Exe = Join-Path $Root "dist/win-x64/Aviv.Windows.App.exe"
 $ScreenshotDir = Join-Path $Root "dist/screenshots"
 $Screenshot = Join-Path $ScreenshotDir "windows-ui-verification.png"
+$ImmediateScreenshot = Join-Path $ScreenshotDir "windows-ui-immediate-after-launch.png"
 $LaunchScreenshot = Join-Path $ScreenshotDir "windows-ui-after-launch.png"
 $DiagnosticLog = Join-Path $ScreenshotDir "windows-ui-verification.log"
 
@@ -188,9 +189,64 @@ function Save-FixedScreenCapture {
   Write-Host "Captured $Label screenshot: $Path ($($file.Length) bytes)"
 }
 
+function Move-BlockingWindowsOutOfCapture {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Stage
+  )
+
+  $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
+  if ($consoleHandle -ne [IntPtr]::Zero) {
+    Write-Host "Moving verifier console window $consoleHandle out of capture ($Stage)."
+    [AvivNativeWindow]::ShowWindow($consoleHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($consoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
+  }
+
+  $classConsoleHandle = [AvivNativeWindow]::FindWindow("ConsoleWindowClass", $null)
+  if ($classConsoleHandle -ne [IntPtr]::Zero -and $classConsoleHandle -ne $consoleHandle) {
+    Write-Host "Moving ConsoleWindowClass window $classConsoleHandle out of capture ($Stage)."
+    [AvivNativeWindow]::ShowWindow($classConsoleHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($classConsoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
+  }
+
+  $runnerWindows = Get-Process -ErrorAction SilentlyContinue |
+    Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and ($_.MainWindowTitle -like "*HostedComputeAgent*" -or $_.MainWindowTitle -like "*hosted-compute-agent*") }
+  foreach ($runnerWindow in $runnerWindows) {
+    Write-Host "Moving runner window $($runnerWindow.Id) '$($runnerWindow.MainWindowTitle)' handle $($runnerWindow.MainWindowHandle) out of capture ($Stage)."
+    [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($runnerWindow.MainWindowHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
+  }
+}
+
+function Write-AvivProcesses {
+  param(
+    [Parameter(Mandatory = $true)]
+    [string]$Label
+  )
+
+  Write-Host "Aviv processes ${Label}:"
+  $appProcesses = @(Get-Process -Name "Aviv.Windows.App" -ErrorAction SilentlyContinue)
+  if ($appProcesses.Count -eq 0) {
+    Write-Host "  none"
+    return
+  }
+
+  foreach ($appProcess in $appProcesses) {
+    $appProcess.Refresh()
+    Write-Host "  pid=$($appProcess.Id) hasExited=$($appProcess.HasExited) mainWindow=$($appProcess.MainWindowHandle) title='$($appProcess.MainWindowTitle)'"
+    [AvivNativeWindow]::DescribeTopLevelWindows($appProcess.Id) | ForEach-Object { Write-Host "    $_" }
+  }
+}
+
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $env:AVIV_UI_VERIFY = "1"
-$process = Start-Process -FilePath $Exe -PassThru
+Move-BlockingWindowsOutOfCapture "before app launch"
+$startInfo = [System.Diagnostics.ProcessStartInfo]::new($Exe)
+$startInfo.UseShellExecute = $false
+$process = [System.Diagnostics.Process]::Start($startInfo)
+if ($null -eq $process) {
+  throw "Aviv process did not start."
+}
 try {
   $handle = [IntPtr]::Zero
   for ($attempt = 0; $attempt -lt 120; $attempt++) {
@@ -239,6 +295,7 @@ try {
     $handle = $bestHandle
   }
 
+  Save-FixedScreenCapture $ImmediateScreenshot "immediate after-launch UI"
   Set-Clipboard -Value $fixture
   [System.Windows.Forms.SendKeys]::SendWait("^a")
   Start-Sleep -Milliseconds 250
@@ -252,28 +309,8 @@ try {
   else {
     Write-Host "Aviv process after launch capture: HasExited=False"
   }
-
-  $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
-  if ($consoleHandle -ne [IntPtr]::Zero) {
-    Write-Host "Moving verifier console window $consoleHandle out of capture."
-    [AvivNativeWindow]::ShowWindow($consoleHandle, 1) | Out-Null
-    [AvivNativeWindow]::SetWindowPos($consoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
-  }
-
-  $classConsoleHandle = [AvivNativeWindow]::FindWindow("ConsoleWindowClass", $null)
-  if ($classConsoleHandle -ne [IntPtr]::Zero -and $classConsoleHandle -ne $consoleHandle) {
-    Write-Host "Moving ConsoleWindowClass window $classConsoleHandle out of capture."
-    [AvivNativeWindow]::ShowWindow($classConsoleHandle, 1) | Out-Null
-    [AvivNativeWindow]::SetWindowPos($classConsoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
-  }
-
-  $runnerWindows = Get-Process -ErrorAction SilentlyContinue |
-    Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and ($_.MainWindowTitle -like "*HostedComputeAgent*" -or $_.MainWindowTitle -like "*hosted-compute-agent*") }
-  foreach ($runnerWindow in $runnerWindows) {
-    Write-Host "Moving runner window $($runnerWindow.Id) '$($runnerWindow.MainWindowTitle)' handle $($runnerWindow.MainWindowHandle) out of capture."
-    [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 1) | Out-Null
-    [AvivNativeWindow]::SetWindowPos($runnerWindow.MainWindowHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
-  }
+  Write-AvivProcesses "after launch capture"
+  Move-BlockingWindowsOutOfCapture "after launch capture"
 
   $showResult = [AvivNativeWindow]::ShowWindow($handle, 9)
   $positionResult = [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040)
@@ -316,6 +353,7 @@ try {
   else {
     Write-Host "Aviv process before final capture: HasExited=False"
   }
+  Write-AvivProcesses "before final capture"
   Write-Host "Capture target before screenshot: $([AvivNativeWindow]::DescribeWindow($handle))"
 
   $left = 96

@@ -21,8 +21,6 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         DiagnosticLog.Write("MainWindow constructor starting.");
-        InitializeComponent();
-        DiagnosticLog.Write("MainWindow InitializeComponent completed.");
         Content = rootGrid;
         Title = "Aviv";
         rootGrid.Background = ResourceBrush("AvivBackgroundBrush");
