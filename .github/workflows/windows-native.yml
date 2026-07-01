@@ -41,6 +41,10 @@ jobs:
           }
           Get-ChildItem Windows/dist/win-x64 | Select-Object Name, Length
 
+      - name: Verify UI interaction and screenshot
+        shell: pwsh
+        run: Windows/scripts/verify-ui-win-x64.ps1
+
       - name: Archive published app
         shell: pwsh
         run: |
@@ -52,3 +56,9 @@ jobs:
         with:
           name: Aviv-Windows-win-x64
           path: Windows/dist/artifacts/Aviv-Windows-win-x64.zip
+
+      - name: Upload Windows UI screenshots
+        uses: actions/upload-artifact@v4
+        with:
+          name: Aviv-Windows-ui-screenshots
+          path: Windows/dist/screenshots/*.png
