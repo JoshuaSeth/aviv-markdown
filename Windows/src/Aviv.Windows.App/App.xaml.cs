@@ -68,6 +68,7 @@ public partial class App : Application
             }
 
             var hwnd = WindowNative.GetWindowHandle(window);
+            DiagnosticLog.Write($"Verification initial window state: {DescribeWindow(hwnd)}.");
             try
             {
                 var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
@@ -75,7 +76,7 @@ public partial class App : Application
                 appWindow.Title = "Aviv";
                 appWindow.MoveAndResize(new RectInt32(96, 72, 1160, 760));
                 appWindow.Show();
-                DiagnosticLog.Write($"Verification AppWindow placement succeeded for hwnd={hwnd}.");
+                DiagnosticLog.Write($"Verification AppWindow placement succeeded for hwnd={hwnd}: {DescribeWindow(hwnd)}.");
             }
             catch (Exception exception)
             {
@@ -85,7 +86,15 @@ public partial class App : Application
             var showResult = ShowWindow(hwnd, 9);
             var positionResult = SetWindowPos(hwnd, HwndTopmost, 96, 72, 1160, 760, 0x0040);
             var foregroundResult = SetForegroundWindow(hwnd);
-            DiagnosticLog.Write($"Verification placement hwnd={hwnd} ShowWindow={showResult} SetWindowPos={positionResult} SetForegroundWindow={foregroundResult}.");
+            DiagnosticLog.Write($"Verification placement hwnd={hwnd} ShowWindow={showResult} SetWindowPos={positionResult} SetForegroundWindow={foregroundResult}: {DescribeWindow(hwnd)}.");
+        }
+
+        private static string DescribeWindow(IntPtr hwnd)
+        {
+            var rectText = GetWindowRect(hwnd, out var rect)
+                ? $"{rect.Left},{rect.Top},{rect.Right},{rect.Bottom} {rect.Right - rect.Left}x{rect.Bottom - rect.Top}"
+                : "unavailable";
+            return $"visible={IsWindowVisible(hwnd)} iconic={IsIconic(hwnd)} rect={rectText}";
         }
 
         [DllImport("user32.dll")]
@@ -99,5 +108,26 @@ public partial class App : Application
         [DllImport("user32.dll")]
         [return: MarshalAs(UnmanagedType.Bool)]
         private static extern bool SetForegroundWindow(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool GetWindowRect(IntPtr hWnd, out NativeRect rect);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsWindowVisible(IntPtr hWnd);
+
+        [DllImport("user32.dll")]
+        [return: MarshalAs(UnmanagedType.Bool)]
+        private static extern bool IsIconic(IntPtr hWnd);
+
+        [StructLayout(LayoutKind.Sequential)]
+        private struct NativeRect
+        {
+            public int Left;
+            public int Top;
+            public int Right;
+            public int Bottom;
+        }
     }
 }

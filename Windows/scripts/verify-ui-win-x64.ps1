@@ -18,11 +18,22 @@ Add-Type -AssemblyName System.Drawing
 Add-Type -AssemblyName Microsoft.VisualBasic
 Add-Type @"
 using System;
+using System.Collections.Generic;
 using System.Runtime.InteropServices;
 using System.Text;
 
 public static class AvivNativeWindow {
   public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
+
+  private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
+
+  [StructLayout(LayoutKind.Sequential)]
+  public struct RECT {
+    public int Left;
+    public int Top;
+    public int Right;
+    public int Bottom;
+  }
 
   [DllImport("user32.dll")]
   public static extern bool SetForegroundWindow(IntPtr hWnd);
@@ -47,6 +58,82 @@ public static class AvivNativeWindow {
 
   [DllImport("user32.dll")]
   public static extern bool PrintWindow(IntPtr hwnd, IntPtr hdcBlt, uint nFlags);
+
+  [DllImport("user32.dll")]
+  private static extern bool EnumWindows(EnumWindowsProc lpEnumFunc, IntPtr lParam);
+
+  [DllImport("user32.dll")]
+  private static extern uint GetWindowThreadProcessId(IntPtr hWnd, out uint lpdwProcessId);
+
+  [DllImport("user32.dll")]
+  private static extern bool IsWindowVisible(IntPtr hWnd);
+
+  [DllImport("user32.dll")]
+  private static extern bool IsIconic(IntPtr hWnd);
+
+  [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+  private static extern int GetClassName(IntPtr hWnd, StringBuilder lpClassName, int nMaxCount);
+
+  [DllImport("user32.dll")]
+  private static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
+
+  public static string DescribeWindow(IntPtr hWnd) {
+    var title = new StringBuilder(256);
+    GetWindowText(hWnd, title, title.Capacity);
+
+    var className = new StringBuilder(256);
+    GetClassName(hWnd, className, className.Capacity);
+
+    RECT rect;
+    var rectText = GetWindowRect(hWnd, out rect)
+      ? string.Format("{0},{1},{2},{3} {4}x{5}", rect.Left, rect.Top, rect.Right, rect.Bottom, rect.Right - rect.Left, rect.Bottom - rect.Top)
+      : "unavailable";
+
+    return string.Format("hwnd={0} visible={1} iconic={2} class='{3}' title='{4}' rect={5}",
+      hWnd, IsWindowVisible(hWnd), IsIconic(hWnd), className.ToString(), title.ToString(), rectText);
+  }
+
+  public static string[] DescribeTopLevelWindows(int processId) {
+    var lines = new List<string>();
+    EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+      uint windowProcessId;
+      GetWindowThreadProcessId(hWnd, out windowProcessId);
+      if (windowProcessId == (uint)processId) {
+        lines.Add(DescribeWindow(hWnd));
+      }
+
+      return true;
+    }, IntPtr.Zero);
+
+    return lines.ToArray();
+  }
+
+  public static IntPtr FindLargestVisibleWindow(int processId) {
+    IntPtr bestHandle = IntPtr.Zero;
+    long bestArea = -1;
+    EnumWindows(delegate(IntPtr hWnd, IntPtr lParam) {
+      uint windowProcessId;
+      GetWindowThreadProcessId(hWnd, out windowProcessId);
+      if (windowProcessId != (uint)processId || !IsWindowVisible(hWnd) || IsIconic(hWnd)) {
+        return true;
+      }
+
+      RECT rect;
+      if (!GetWindowRect(hWnd, out rect)) {
+        return true;
+      }
+
+      var area = (long)Math.Max(0, rect.Right - rect.Left) * Math.Max(0, rect.Bottom - rect.Top);
+      if (area > bestArea) {
+        bestArea = area;
+        bestHandle = hWnd;
+      }
+
+      return true;
+    }, IntPtr.Zero);
+
+    return bestHandle;
+  }
 }
 "@
 
@@ -114,6 +201,14 @@ try {
     throw "Aviv window handle was not available after launch. Main process HasExited=$($process.HasExited). Matching processes:`n$knownProcesses"
   }
 
+  Write-Host "Process-owned top-level windows after launch:"
+  [AvivNativeWindow]::DescribeTopLevelWindows($process.Id) | ForEach-Object { Write-Host "  $_" }
+  $bestHandle = [AvivNativeWindow]::FindLargestVisibleWindow($process.Id)
+  if ($bestHandle -ne [IntPtr]::Zero -and $bestHandle -ne $handle) {
+    Write-Host "Switching Aviv capture handle from $handle to enumerated visible window $bestHandle."
+    $handle = $bestHandle
+  }
+
   $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
   if ($consoleHandle -ne [IntPtr]::Zero) {
     Write-Host "Minimizing verifier console window $consoleHandle before capture."
@@ -146,6 +241,8 @@ try {
   }
   Write-Host "Window activation results: ShowWindow=$showResult SetWindowPos=$positionResult BringWindowToTop=$bringResult SetForegroundWindow=$foregroundResult"
   Start-Sleep -Milliseconds 500
+  Write-Host "Process-owned top-level windows after activation:"
+  [AvivNativeWindow]::DescribeTopLevelWindows($process.Id) | ForEach-Object { Write-Host "  $_" }
   $titleBuilder = [System.Text.StringBuilder]::new(256)
   [AvivNativeWindow]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity) | Out-Null
   Write-Host "Using Aviv window handle $handle with title '$($titleBuilder.ToString())'"
@@ -165,6 +262,7 @@ try {
   [AvivNativeWindow]::BringWindowToTop($handle) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 300
+  Write-Host "Capture target before screenshot: $([AvivNativeWindow]::DescribeWindow($handle))"
 
   $left = 96
   $top = 72
