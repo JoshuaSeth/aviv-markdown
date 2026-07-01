@@ -246,7 +246,12 @@ try {
   Start-Sleep -Milliseconds 800
   Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
   $process.Refresh()
-  Write-Host "Aviv process after launch capture: HasExited=$($process.HasExited)"
+  if ($process.HasExited) {
+    Write-Host "Aviv process after launch capture: HasExited=True ExitCode=$($process.ExitCode)"
+  }
+  else {
+    Write-Host "Aviv process after launch capture: HasExited=False"
+  }
 
   $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
   if ($consoleHandle -ne [IntPtr]::Zero) {
@@ -304,6 +309,13 @@ try {
   [AvivNativeWindow]::BringWindowToTop($handle) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 300
+  $process.Refresh()
+  if ($process.HasExited) {
+    Write-Host "Aviv process before final capture: HasExited=True ExitCode=$($process.ExitCode)"
+  }
+  else {
+    Write-Host "Aviv process before final capture: HasExited=False"
+  }
   Write-Host "Capture target before screenshot: $([AvivNativeWindow]::DescribeWindow($handle))"
 
   $left = 96
