@@ -1,6 +1,9 @@
 using Aviv.Windows.App.Services;
+using Microsoft.UI;
+using Microsoft.UI.Windowing;
 using Microsoft.UI.Xaml;
 using System.Runtime.InteropServices;
+using Windows.Graphics;
 using WinRT.Interop;
 
 namespace Aviv.Windows.App;
@@ -65,6 +68,20 @@ public partial class App : Application
             }
 
             var hwnd = WindowNative.GetWindowHandle(window);
+            try
+            {
+                var windowId = Win32Interop.GetWindowIdFromWindow(hwnd);
+                var appWindow = AppWindow.GetFromWindowId(windowId);
+                appWindow.Title = "Aviv";
+                appWindow.MoveAndResize(new RectInt32(96, 72, 1160, 760));
+                appWindow.Show();
+                DiagnosticLog.Write($"Verification AppWindow placement succeeded for hwnd={hwnd}.");
+            }
+            catch (Exception exception)
+            {
+                DiagnosticLog.WriteException("Verification AppWindow placement failed", exception);
+            }
+
             var showResult = ShowWindow(hwnd, 9);
             var positionResult = SetWindowPos(hwnd, HwndTopmost, 96, 72, 1160, 760, 0x0040);
             var foregroundResult = SetForegroundWindow(hwnd);
