@@ -149,6 +149,25 @@ public sealed class MarkdownCoreTests
     }
 
     [Fact]
+    public void EditTransformerMatchesMacWrapAndHeadingCommands()
+    {
+        const string markdown = "hello world\nsecond line";
+        var selected = new TextRange(markdown.IndexOf("world", StringComparison.Ordinal), "world".Length);
+
+        var bold = MarkdownEditTransformer.WrapSelection(markdown, selected, "**", "**");
+        Assert.Equal("hello **world**\nsecond line", bold.Markdown);
+        Assert.Equal(new TextRange("hello **".Length, "world".Length), bold.Selection);
+
+        var code = MarkdownEditTransformer.WrapSelection(markdown, new TextRange(0, 0), "`", "`");
+        Assert.Equal("``hello world\nsecond line", code.Markdown);
+        Assert.Equal(new TextRange(1, 0), code.Selection);
+
+        var heading = MarkdownEditTransformer.MakeHeading("# Existing\nbody", new TextRange(2, 0), 2);
+        Assert.Equal("## Existing\nbody", heading.Markdown);
+        Assert.Equal(new TextRange(3, 0), heading.Selection);
+    }
+
+    [Fact]
     public void LayoutVerifierKeepsContentRolesStableAcrossCursorPositions()
     {
         var result = MarkdownLayoutVerifier.Verify(MarkdownSamples.LayoutFixture);
