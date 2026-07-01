@@ -16,6 +16,10 @@ if arguments.contains("--verify-scroll-jitter") {
     exit(MarkdownScrollJitterVerifier.runCLI())
 }
 
+if arguments.contains("--verify-scroll-bounds") {
+    exit(MarkdownScrollBoundsVerifier.runCLI())
+}
+
 if arguments.contains("--verify-commands") {
     exit(AppCommandVerifier.runCLI())
 }

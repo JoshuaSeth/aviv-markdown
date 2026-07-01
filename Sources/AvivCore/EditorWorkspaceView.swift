@@ -122,6 +122,9 @@ public final class EditorWorkspaceView: NSView {
         scrollView.hasVerticalScroller = true
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
+        scrollView.automaticallyAdjustsContentInsets = false
+        scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
+        scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.documentView = textView
 
         textView.frame = NSRect(x: 0, y: 0, width: 900, height: 1400)
