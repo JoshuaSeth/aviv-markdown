@@ -4,12 +4,19 @@ using Aviv.Windows.Core;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
+using Microsoft.UI.Xaml.Controls.Primitives;
+using Microsoft.UI.Xaml.Data;
 using Microsoft.UI.Xaml.Input;
+using Microsoft.UI.Xaml.Media;
 
 namespace Aviv.Windows.App.Controls;
 
 public sealed partial class MarkdownEditorView : UserControl
 {
+    private readonly RichEditBox Editor;
+    private readonly MarkdownMinimapView Minimap;
+    private readonly Popup SourcePopup;
+    private readonly TextBox SourceEditor;
     private readonly MarkdownStyler styler = new();
     private readonly WinUiMarkdownFormatter formatter = new();
     private bool applying;
@@ -23,9 +30,117 @@ public sealed partial class MarkdownEditorView : UserControl
     public MarkdownEditorView()
     {
         DiagnosticLog.Write("MarkdownEditorView constructor starting.");
-        InitializeComponent();
+        (Editor, Minimap, SourcePopup, SourceEditor) = BuildLayout();
         Minimap.ScrollRatioRequested += ScrollToRatio;
         DiagnosticLog.Write("MarkdownEditorView constructor completed.");
+    }
+
+    private (RichEditBox Editor, MarkdownMinimapView Minimap, Popup SourcePopup, TextBox SourceEditor) BuildLayout()
+    {
+        var root = new Grid
+        {
+            Background = Brush(0xFF, 0xFB, 0xFC, 0xFD)
+        };
+
+        var editor = new RichEditBox
+        {
+            AcceptsReturn = true,
+            BorderThickness = new Thickness(0),
+            Background = Brush(0x00, 0xFF, 0xFF, 0xFF),
+            FontFamily = new FontFamily("Segoe UI"),
+            FontSize = 17,
+            HorizontalAlignment = HorizontalAlignment.Stretch,
+            HorizontalContentAlignment = HorizontalAlignment.Stretch,
+            IsSpellCheckEnabled = true,
+            Padding = new Thickness(64, 72, 122, 52),
+            SelectionHighlightColor = Brush(0x33, 0x24, 0x8A, 0xCB),
+            TextWrapping = TextWrapping.Wrap,
+            VerticalAlignment = VerticalAlignment.Stretch
+        };
+        root.Children.Add(editor);
+
+        var titleText = new TextBlock
+        {
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+            FontSize = 12,
+            Foreground = Brush(0xFF, 0x6A, 0x72, 0x80)
+        };
+        titleText.SetBinding(TextBlock.TextProperty, new Binding { Path = new PropertyPath("DocumentTitle") });
+
+        var titleBar = new Border
+        {
+            Height = 54,
+            VerticalAlignment = VerticalAlignment.Top,
+            Background = Brush(0xDD, 0xFD, 0xFE, 0xFF),
+            BorderBrush = Brush(0x1F, 0x6B, 0x72, 0x80),
+            BorderThickness = new Thickness(0, 0, 0, 1),
+            Child = titleText
+        };
+        root.Children.Add(titleBar);
+
+        var minimap = new MarkdownMinimapView
+        {
+            Margin = new Thickness(5)
+        };
+        var minimapChrome = new Border
+        {
+            Width = 86,
+            Margin = new Thickness(0, 58, 12, 40),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Stretch,
+            Background = Brush(0xDD, 0xFD, 0xFE, 0xFF),
+            BorderBrush = Brush(0x1F, 0x6B, 0x72, 0x80),
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Child = minimap
+        };
+        root.Children.Add(minimapChrome);
+
+        var statusText = new TextBlock
+        {
+            Margin = new Thickness(0, 0, 18, 12),
+            HorizontalAlignment = HorizontalAlignment.Right,
+            VerticalAlignment = VerticalAlignment.Bottom,
+            FontSize = 12,
+            Foreground = Brush(0xFF, 0x6A, 0x72, 0x80)
+        };
+        statusText.SetBinding(TextBlock.TextProperty, new Binding { Path = new PropertyPath("StatusText") });
+        root.Children.Add(statusText);
+
+        var sourceEditor = new TextBox
+        {
+            MinWidth = 280,
+            BorderThickness = new Thickness(0),
+            FontFamily = new FontFamily("Cascadia Mono"),
+            FontSize = 12
+        };
+        var sourcePopup = new Popup
+        {
+            IsLightDismissEnabled = true,
+            Child = new Border
+            {
+                Background = Brush(0xDD, 0xFD, 0xFE, 0xFF),
+                BorderBrush = Brush(0x1F, 0x6B, 0x72, 0x80),
+                BorderThickness = new Thickness(1),
+                CornerRadius = new CornerRadius(6),
+                Padding = new Thickness(6),
+                Child = sourceEditor
+            }
+        };
+
+        editor.TextChanged += OnTextChanged;
+        editor.SelectionChanged += OnSelectionChanged;
+        sourceEditor.KeyDown += OnSourceEditorKeyDown;
+        root.Children.Add(sourcePopup);
+        Content = root;
+
+        return (editor, minimap, sourcePopup, sourceEditor);
+    }
+
+    private static SolidColorBrush Brush(byte a, byte r, byte g, byte b)
+    {
+        return new SolidColorBrush(global::Windows.UI.Color.FromArgb(a, r, g, b));
     }
 
     public void LoadMarkdown(string markdown)

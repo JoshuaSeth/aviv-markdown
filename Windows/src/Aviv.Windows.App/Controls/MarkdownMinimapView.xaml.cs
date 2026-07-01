@@ -10,13 +10,19 @@ namespace Aviv.Windows.App.Controls;
 
 public sealed partial class MarkdownMinimapView : UserControl
 {
+    private readonly Canvas MinimapCanvas;
     private MarkdownMinimapViewportMetrics? metrics;
 
     public event Action<double>? ScrollRatioRequested;
 
     public MarkdownMinimapView()
     {
-        InitializeComponent();
+        MinimapCanvas = new Canvas
+        {
+            Background = new SolidColorBrush(Colors.Transparent)
+        };
+        MinimapCanvas.PointerPressed += OnPointerPressed;
+        Content = MinimapCanvas;
         SizeChanged += (_, _) => Render(currentMarkdown, currentVisibleMinY, currentVisibleHeight, currentDocumentHeight);
     }
 
