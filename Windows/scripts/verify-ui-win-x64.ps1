@@ -23,14 +23,6 @@ using System.Runtime.InteropServices;
 public static class AvivNativeWindow {
   public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 
-  [StructLayout(LayoutKind.Sequential)]
-  public struct RECT {
-    public int Left;
-    public int Top;
-    public int Right;
-    public int Bottom;
-  }
-
   [DllImport("user32.dll")]
   public static extern bool SetForegroundWindow(IntPtr hWnd);
 
@@ -39,9 +31,6 @@ public static class AvivNativeWindow {
 
   [DllImport("user32.dll")]
   public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
-
-  [DllImport("user32.dll")]
-  public static extern bool GetWindowRect(IntPtr hWnd, out RECT lpRect);
 }
 "@
 
@@ -122,16 +111,13 @@ try {
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 300
 
-  $rect = [AvivNativeWindow+RECT]::new()
-  if (![AvivNativeWindow]::GetWindowRect($handle, [ref]$rect)) {
-    throw "Could not read Aviv window bounds for screenshot."
-  }
-
-  $width = [Math]::Max(1, $rect.Right - $rect.Left)
-  $height = [Math]::Max(1, $rect.Bottom - $rect.Top)
+  $left = 96
+  $top = 72
+  $width = 1160
+  $height = 760
   $bitmap = [System.Drawing.Bitmap]::new($width, $height)
   $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-  $graphics.CopyFromScreen([System.Drawing.Point]::new($rect.Left, $rect.Top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
+  $graphics.CopyFromScreen([System.Drawing.Point]::new($left, $top), [System.Drawing.Point]::Empty, [System.Drawing.Size]::new($width, $height))
   $bitmap.Save($Screenshot, [System.Drawing.Imaging.ImageFormat]::Png)
   $graphics.Dispose()
   $bitmap.Dispose()
