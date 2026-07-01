@@ -13,6 +13,7 @@ namespace Aviv.Windows.App;
 public sealed partial class MainWindow : Window
 {
     private const VirtualKey BacktickKey = (VirtualKey)192;
+    private readonly Grid rootGrid = new();
     private readonly EditorDocumentViewModel viewModel;
     private readonly MarkdownEditorView editorView;
     private bool syncingFromViewModel;
@@ -20,11 +21,12 @@ public sealed partial class MainWindow : Window
     public MainWindow()
     {
         DiagnosticLog.Write("MainWindow constructor starting.");
-        InitializeComponent();
-        DiagnosticLog.Write("MainWindow InitializeComponent completed.");
+        Content = rootGrid;
+        rootGrid.Background = ResourceBrush("AvivBackgroundBrush");
+        DiagnosticLog.Write("MainWindow root grid created.");
 
         viewModel = new EditorDocumentViewModel(new MarkdownFileService(this));
-        RootGrid.DataContext = viewModel;
+        rootGrid.DataContext = viewModel;
         DiagnosticLog.Write("MainWindow DataContext assigned.");
 
         editorView = new MarkdownEditorView();
@@ -65,15 +67,15 @@ public sealed partial class MainWindow : Window
 
     private void BuildLayout()
     {
-        RootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
-        RootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
         var menuBar = new MenuBar
         {
             Background = ResourceBrush("AvivChromeBrush")
         };
         Grid.SetRow(menuBar, 0);
-        RootGrid.Children.Add(menuBar);
+        rootGrid.Children.Add(menuBar);
 
         menuBar.Items.Add(Menu("File",
             Item("New", viewModel.NewDocumentCommand),
@@ -125,7 +127,7 @@ public sealed partial class MainWindow : Window
             Item("Merge All Windows", viewModel.MergeAllWindowsCommand)));
 
         Grid.SetRow(editorView, 1);
-        RootGrid.Children.Add(editorView);
+        rootGrid.Children.Add(editorView);
     }
 
     private static MenuBarItem Menu(string title, params MenuFlyoutItemBase[] items)
@@ -198,6 +200,6 @@ public sealed partial class MainWindow : Window
             action();
             args.Handled = true;
         };
-        RootGrid.KeyboardAccelerators.Add(accelerator);
+        rootGrid.KeyboardAccelerators.Add(accelerator);
     }
 }
