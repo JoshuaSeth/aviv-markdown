@@ -300,7 +300,7 @@ try {
   Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
   $process.Refresh()
   if ($process.HasExited) {
-    Write-Host "Aviv process after launch capture: HasExited=True ExitCode=$($process.ExitCode)"
+    throw "Aviv exited after launch capture. ExitCode=$($process.ExitCode)"
   }
   else {
     Write-Host "Aviv process after launch capture: HasExited=False"
@@ -344,7 +344,7 @@ try {
   Start-Sleep -Milliseconds 300
   $process.Refresh()
   if ($process.HasExited) {
-    Write-Host "Aviv process before final capture: HasExited=True ExitCode=$($process.ExitCode)"
+    throw "Aviv exited before final capture. ExitCode=$($process.ExitCode)"
   }
   else {
     Write-Host "Aviv process before final capture: HasExited=False"

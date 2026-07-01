@@ -42,7 +42,6 @@ jobs:
           Get-ChildItem Windows/dist/win-x64 | Select-Object Name, Length
 
       - name: Verify UI interaction and screenshot
-        continue-on-error: true
         shell: pwsh
         run: Windows/scripts/verify-ui-win-x64.ps1
 
@@ -59,6 +58,7 @@ jobs:
           path: Windows/dist/artifacts/Aviv-Windows-win-x64.zip
 
       - name: Upload Windows UI screenshots
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: Aviv-Windows-ui-screenshots
