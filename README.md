@@ -88,6 +88,7 @@ Core invariants are tested directly: moving the cursor should not shift rendered
 Sources/AvivApp      macOS app shell, menus, windows, tabs, packaging verifiers
 Sources/AvivCore     editor view, Markdown styling, minimap, parsing, snapshots
 Tests/AvivCoreTests  layout, minimap, edge-case, command, and styling tests
+Windows              native WinUI 3 Windows app, shared C# core, tests, publish scripts
 Scripts              packaging, LaunchServices install, verification scripts
 Docs                 design notes and regression checklists
 Samples              sample Markdown fixtures
