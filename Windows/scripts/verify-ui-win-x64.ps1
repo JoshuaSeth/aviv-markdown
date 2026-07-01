@@ -30,6 +30,9 @@ public static class AvivNativeWindow {
   [DllImport("user32.dll")]
   public static extern bool ShowWindow(IntPtr hWnd, int nCmdShow);
 
+  [DllImport("kernel32.dll")]
+  public static extern IntPtr GetConsoleWindow();
+
   [DllImport("user32.dll")]
   public static extern bool SetWindowPos(IntPtr hWnd, IntPtr hWndInsertAfter, int X, int Y, int cx, int cy, uint uFlags);
 
@@ -102,6 +105,12 @@ try {
       Format-Table -AutoSize |
       Out-String
     throw "Aviv window handle was not available after launch. Main process HasExited=$($process.HasExited). Matching processes:`n$knownProcesses"
+  }
+
+  $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
+  if ($consoleHandle -ne [IntPtr]::Zero) {
+    Write-Host "Minimizing verifier console window $consoleHandle before capture."
+    [AvivNativeWindow]::ShowWindow($consoleHandle, 6) | Out-Null
   }
 
   [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
