@@ -132,10 +132,18 @@ try {
     [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 6) | Out-Null
   }
 
-  [AvivNativeWindow]::ShowWindow($handle, 9) | Out-Null
-  [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
-  [AvivNativeWindow]::BringWindowToTop($handle) | Out-Null
-  [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
+  $showResult = [AvivNativeWindow]::ShowWindow($handle, 9)
+  $positionResult = [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040)
+  $bringResult = [AvivNativeWindow]::BringWindowToTop($handle)
+  $foregroundResult = [AvivNativeWindow]::SetForegroundWindow($handle)
+  try {
+    [Microsoft.VisualBasic.Interaction]::AppActivate($process.Id)
+    Write-Host "AppActivate succeeded for Aviv process $($process.Id)."
+  }
+  catch {
+    Write-Host "AppActivate failed for Aviv process $($process.Id): $($_.Exception.Message)"
+  }
+  Write-Host "Window activation results: ShowWindow=$showResult SetWindowPos=$positionResult BringWindowToTop=$bringResult SetForegroundWindow=$foregroundResult"
   Start-Sleep -Milliseconds 500
   $titleBuilder = [System.Text.StringBuilder]::new(256)
   [AvivNativeWindow]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity) | Out-Null
@@ -147,6 +155,13 @@ try {
   [System.Windows.Forms.SendKeys]::SendWait("^v")
   Start-Sleep -Seconds 2
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
+  try {
+    [Microsoft.VisualBasic.Interaction]::AppActivate($process.Id)
+  }
+  catch {
+    Write-Host "Second AppActivate failed for Aviv process $($process.Id): $($_.Exception.Message)"
+  }
+  [AvivNativeWindow]::BringWindowToTop($handle) | Out-Null
   [AvivNativeWindow]::SetForegroundWindow($handle) | Out-Null
   Start-Sleep -Milliseconds 300
 
