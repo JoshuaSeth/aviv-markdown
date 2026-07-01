@@ -86,6 +86,13 @@ public sealed partial class MainWindow : Window
 
     private void BuildLayout()
     {
+        if (editorView is null)
+        {
+            rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+            rootGrid.Children.Add(SafeVerifierEditor());
+            return;
+        }
+
         rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
@@ -145,17 +152,8 @@ public sealed partial class MainWindow : Window
             Item("Move Tab to New Window", viewModel.MoveTabToNewWindowCommand),
             Item("Merge All Windows", viewModel.MergeAllWindowsCommand)));
 
-        if (editorView is not null)
-        {
-            Grid.SetRow(editorView, 1);
-            rootGrid.Children.Add(editorView);
-        }
-        else
-        {
-            var safeEditor = SafeVerifierEditor();
-            Grid.SetRow(safeEditor, 1);
-            rootGrid.Children.Add(safeEditor);
-        }
+        Grid.SetRow(editorView, 1);
+        rootGrid.Children.Add(editorView);
     }
 
     private TextBox SafeVerifierEditor()
