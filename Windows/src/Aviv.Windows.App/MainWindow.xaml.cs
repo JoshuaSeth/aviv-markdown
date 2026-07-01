@@ -164,7 +164,7 @@ public sealed partial class MainWindow : Window
 
     private static Microsoft.UI.Xaml.Media.SolidColorBrush SolidBrush(byte a, byte r, byte g, byte b)
     {
-        return new Microsoft.UI.Xaml.Media.SolidColorBrush(Windows.UI.Color.FromArgb(a, r, g, b));
+        return new Microsoft.UI.Xaml.Media.SolidColorBrush(global::Windows.UI.Color.FromArgb(a, r, g, b));
     }
 
     private void InstallKeyboardAccelerators()
