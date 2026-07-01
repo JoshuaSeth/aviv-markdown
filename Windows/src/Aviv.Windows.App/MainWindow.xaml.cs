@@ -96,61 +96,9 @@ public sealed partial class MainWindow : Window
         rootGrid.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
         rootGrid.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
 
-        var menuBar = new MenuBar
-        {
-            Background = ResourceBrush("AvivChromeBrush")
-        };
-        Grid.SetRow(menuBar, 0);
-        rootGrid.Children.Add(menuBar);
-
-        menuBar.Items.Add(Menu("File",
-            Item("New", viewModel.NewDocumentCommand),
-            Item("New Tab", viewModel.NewTabCommand),
-            Item("Open...", viewModel.OpenDocumentCommand),
-            Separator(),
-            Item("Close", viewModel.CloseDocumentCommand),
-            Separator(),
-            Item("Save", viewModel.SaveDocumentCommand),
-            Item("Save As...", viewModel.SaveDocumentAsCommand),
-            Item("Revert to Saved", viewModel.RevertDocumentCommand),
-            Separator(),
-            Item("Page Setup...", viewModel.PageSetupCommand),
-            Item("Print...", viewModel.PrintDocumentCommand)));
-
-        menuBar.Items.Add(Menu("Edit",
-            Item("Undo", viewModel.UndoCommand),
-            Item("Redo", viewModel.RedoCommand),
-            Separator(),
-            Item("Cut", viewModel.CutCommand),
-            Item("Copy", viewModel.CopyCommand),
-            Item("Paste", viewModel.PasteCommand),
-            Item("Paste and Match Style", viewModel.PastePlainTextCommand),
-            Separator(),
-            Item("Select All", viewModel.SelectAllCommand),
-            Separator(),
-            Item("Find...", viewModel.FindCommand),
-            Item("Find and Replace...", viewModel.FindAndReplaceCommand),
-            Item("Find Next", viewModel.FindNextCommand),
-            Item("Find Previous", viewModel.FindPreviousCommand)));
-
-        menuBar.Items.Add(Menu("View",
-            Item("Actual Size", viewModel.ResetTextSizeCommand),
-            Item("Zoom In", viewModel.IncreaseTextSizeCommand),
-            Item("Zoom Out", viewModel.DecreaseTextSizeCommand)));
-
-        menuBar.Items.Add(Menu("Format",
-            Item("Bold", viewModel.ToggleBoldCommand),
-            Item("Italic", viewModel.ToggleItalicCommand),
-            Item("Code", viewModel.ToggleCodeCommand),
-            Separator(),
-            Item("Heading 1", viewModel.Heading1Command),
-            Item("Heading 2", viewModel.Heading2Command)));
-
-        menuBar.Items.Add(Menu("Window",
-            Item("Show Previous Tab", viewModel.ShowPreviousTabCommand),
-            Item("Show Next Tab", viewModel.ShowNextTabCommand),
-            Item("Move Tab to New Window", viewModel.MoveTabToNewWindowCommand),
-            Item("Merge All Windows", viewModel.MergeAllWindowsCommand)));
+        var toolbar = Toolbar();
+        Grid.SetRow(toolbar, 0);
+        rootGrid.Children.Add(toolbar);
 
         Grid.SetRow(editorView, 1);
         rootGrid.Children.Add(editorView);
@@ -173,6 +121,44 @@ public sealed partial class MainWindow : Window
     private static bool UseSafeVerifierEditor()
     {
         return string.Equals(Environment.GetEnvironmentVariable("AVIV_SAFE_EDITOR"), "1", StringComparison.Ordinal);
+    }
+
+    private StackPanel Toolbar()
+    {
+        var toolbar = new StackPanel
+        {
+            Orientation = Orientation.Horizontal,
+            Padding = new Thickness(10, 7, 10, 7),
+            Spacing = 6,
+            Background = ResourceBrush("AvivChromeBrush")
+        };
+
+        toolbar.Children.Add(ToolButton("New", viewModel.NewDocumentCommand));
+        toolbar.Children.Add(ToolButton("Open", viewModel.OpenDocumentCommand));
+        toolbar.Children.Add(ToolButton("Save", viewModel.SaveDocumentCommand));
+        toolbar.Children.Add(ToolButton("Undo", viewModel.UndoCommand));
+        toolbar.Children.Add(ToolButton("Redo", viewModel.RedoCommand));
+        toolbar.Children.Add(ToolButton("B", viewModel.ToggleBoldCommand));
+        toolbar.Children.Add(ToolButton("I", viewModel.ToggleItalicCommand));
+        toolbar.Children.Add(ToolButton("Code", viewModel.ToggleCodeCommand));
+        toolbar.Children.Add(ToolButton("H1", viewModel.Heading1Command));
+        toolbar.Children.Add(ToolButton("H2", viewModel.Heading2Command));
+        toolbar.Children.Add(ToolButton("-", viewModel.DecreaseTextSizeCommand));
+        toolbar.Children.Add(ToolButton("+", viewModel.IncreaseTextSizeCommand));
+        return toolbar;
+    }
+
+    private static Button ToolButton(string text, ICommand command)
+    {
+        return new Button
+        {
+            Content = text,
+            Command = command,
+            FontSize = 12,
+            MinHeight = 30,
+            MinWidth = 38,
+            Padding = new Thickness(10, 3, 10, 4)
+        };
     }
 
     private static MenuBarItem Menu(string title, params MenuFlyoutItemBase[] items)
