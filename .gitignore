@@ -3,6 +3,10 @@
 .swiftpm/
 DerivedData/
 dist/
+bin/
+obj/
+**/bin/
+**/obj/
 
 # App/package artifacts
 *.app
