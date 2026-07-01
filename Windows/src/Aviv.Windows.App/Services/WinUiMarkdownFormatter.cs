@@ -119,8 +119,8 @@ public sealed class WinUiMarkdownFormatter
         }) * (float)viewScale;
     }
 
-    private static Windows.UI.Color ColorFromHex(byte red, byte green, byte blue)
+    private static global::Windows.UI.Color ColorFromHex(byte red, byte green, byte blue)
     {
-        return Windows.UI.Color.FromArgb(255, red, green, blue);
+        return global::Windows.UI.Color.FromArgb(255, red, green, blue);
     }
 }

@@ -69,7 +69,7 @@ public sealed partial class MarkdownMinimapView : UserControl
             Height = metrics.ThumbRect.Height,
             Stroke = new SolidColorBrush(ColorFromHex(0x0C, 0x74, 0xB8)),
             StrokeThickness = 1,
-            Fill = new SolidColorBrush(Windows.UI.Color.FromArgb(34, 12, 116, 184)),
+            Fill = new SolidColorBrush(global::Windows.UI.Color.FromArgb(34, 12, 116, 184)),
             RadiusX = 3,
             RadiusY = 3
         };
@@ -128,8 +128,8 @@ public sealed partial class MarkdownMinimapView : UserControl
         return new SolidColorBrush(color);
     }
 
-    private static Windows.UI.Color ColorFromHex(byte red, byte green, byte blue)
+    private static global::Windows.UI.Color ColorFromHex(byte red, byte green, byte blue)
     {
-        return Windows.UI.Color.FromArgb(255, red, green, blue);
+        return global::Windows.UI.Color.FromArgb(255, red, green, blue);
     }
 }
