@@ -6,6 +6,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     let workspace = EditorWorkspaceView()
     var onRequestNewDocument: ((Any?) -> Void)?
     var onWindowWillClose: ((DocumentWindowController) -> Void)?
+    var onDocumentURLAccessed: ((URL) -> Void)?
 
     var canRevertToSaved: Bool {
         isEdited || documentURL != nil
@@ -105,7 +106,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
     }
 
-    func open(url: URL) {
+    @discardableResult
+    func open(url: URL) -> Bool {
         do {
             let text = try MarkdownDocumentIO.read(from: url)
             documentURL = url
@@ -116,8 +118,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             window?.representedURL = url
             updateWindowTitle()
             workspace.textView.window?.makeFirstResponder(workspace.textView)
+            onDocumentURLAccessed?(url)
+            return true
         } catch {
             presentError(error)
+            return false
         }
     }
 
@@ -149,6 +154,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             window?.representedURL = url
             isEdited = false
             updateWindowTitle()
+            onDocumentURLAccessed?(url)
         } catch {
             presentError(error)
         }

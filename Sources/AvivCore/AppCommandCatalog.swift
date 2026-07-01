@@ -65,6 +65,9 @@ public enum AppCommandCatalog {
             .command(delegateCommand("new", "New", "newDocument:", key: "n")),
             .command(delegateCommand("newTab", "New Tab", "newTab:", key: "t")),
             .command(delegateCommand("open", "Open...", "openDocument:", key: "o")),
+            .submenu(title: "Open Recent", entries: [
+                .command(delegateCommand("clearRecentDocuments", "Clear Menu", "clearRecentDocuments:"))
+            ]),
             .separator,
             .command(delegateCommand("close", "Close", "closeDocument:", key: "w")),
             .separator,
@@ -225,6 +228,7 @@ public enum AppMenuBuilder {
         let mainMenu = NSMenu()
         for menuSpec in menus {
             let menuItem = NSMenuItem()
+            menuItem.title = menuSpec.title
             let menu = NSMenu(title: menuSpec.title)
             menuItem.submenu = menu
             mainMenu.addItem(menuItem)

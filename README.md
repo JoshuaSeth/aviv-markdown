@@ -32,6 +32,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Smart syntax reveal on the active line.
 - Headings, bold, italic, code, links, local image attachments, blockquotes, rules, tables, task lists, and fenced code.
 - Native open/save panels for `.md` files.
+- Native **Open Recent** menu for quickly returning to recent Markdown documents.
 - Multiple windows and native macOS document tabs.
 - `Cmd-T` for a new tab, `Cmd-W` to close the active tab/window.
 - Drag tabs out into new windows and merge windows back together.
@@ -84,6 +85,7 @@ This runs:
 
 - Swift unit tests
 - command/menu verifier
+- open-recent menu behavior verifier
 - tab/window verifier
 - layout stability verifier
 - minimap viewport verifier

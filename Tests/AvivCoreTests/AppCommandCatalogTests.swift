@@ -7,6 +7,7 @@ final class AppCommandCatalogTests: XCTestCase {
         assertCommand("new", title: "New", action: "newDocument:", key: "n", modifiers: [.command], target: .appDelegate)
         assertCommand("newTab", title: "New Tab", action: "newTab:", key: "t", modifiers: [.command], target: .appDelegate)
         assertCommand("open", title: "Open...", action: "openDocument:", key: "o", modifiers: [.command], target: .appDelegate)
+        assertCommand("clearRecentDocuments", title: "Clear Menu", action: "clearRecentDocuments:", key: "", modifiers: [], target: .appDelegate)
         assertCommand("close", title: "Close", action: "closeDocument:", key: "w", modifiers: [.command], target: .appDelegate)
         assertCommand("save", title: "Save", action: "saveDocument:", key: "s", modifiers: [.command], target: .appDelegate)
         assertCommand("saveAs", title: "Save As...", action: "saveDocumentAs:", key: "S", modifiers: [.command, .shift], target: .appDelegate)

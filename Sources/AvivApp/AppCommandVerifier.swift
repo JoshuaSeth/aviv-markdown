@@ -6,8 +6,9 @@ enum AppCommandVerifier {
     static func runCLI() -> Int32 {
         _ = NSApplication.shared
         let printService = RecordingPrintService()
+        let recentDocuments = RecordingRecentDocumentManager()
         let controller = DocumentWindowController(printService: printService)
-        let delegate = AppDelegate(documentController: controller)
+        let delegate = AppDelegate(documentController: controller, recentDocuments: recentDocuments)
         NSApp.delegate = delegate
         delegate.buildMenu()
         controller.window?.makeFirstResponder(controller.workspace.textView)
@@ -15,7 +16,12 @@ enum AppCommandVerifier {
         var failures: [String] = []
         failures.append(contentsOf: verifyMenuStructure())
         failures.append(contentsOf: verifyCommandTargets(delegate: delegate, controller: controller))
-        failures.append(contentsOf: verifyBehavior(delegate: delegate, controller: controller, printService: printService))
+        failures.append(contentsOf: verifyBehavior(
+            delegate: delegate,
+            controller: controller,
+            printService: printService,
+            recentDocuments: recentDocuments
+        ))
 
         controller.close()
 
@@ -97,7 +103,8 @@ enum AppCommandVerifier {
     private static func verifyBehavior(
         delegate: AppDelegate,
         controller: DocumentWindowController,
-        printService: RecordingPrintService
+        printService: RecordingPrintService,
+        recentDocuments: RecordingRecentDocumentManager
     ) -> [String] {
         var failures: [String] = []
 
@@ -107,8 +114,14 @@ enum AppCommandVerifier {
                 .appendingPathExtension("md")
             try "old".write(to: url, atomically: true, encoding: .utf8)
             controller.open(url: url)
+            if recentDocuments.recentDocumentURLs.first != url {
+                failures.append("Opening a document did not add it to recent documents")
+            }
             controller.workspace.textView.loadMarkdown("changed")
             delegate.saveDocument(nil)
+            if recentDocuments.recentDocumentURLs.first != url {
+                failures.append("Saving a document did not keep it at the top of recent documents")
+            }
             let saved = try String(contentsOf: url, encoding: .utf8)
             if saved != "changed" {
                 failures.append("Save command did not write the active document text")
@@ -149,6 +162,65 @@ enum AppCommandVerifier {
             failures.append("Bold command did not wrap selected text")
         }
 
+        failures.append(contentsOf: verifyOpenRecentMenu(delegate: delegate, recentDocuments: recentDocuments))
+
+        return failures
+    }
+
+    private static func verifyOpenRecentMenu(
+        delegate: AppDelegate,
+        recentDocuments: RecordingRecentDocumentManager
+    ) -> [String] {
+        var failures: [String] = []
+        guard
+            let fileMenu = NSApp.mainMenu?.item(withTitle: "File")?.submenu,
+            let openRecentMenu = fileMenu.item(withTitle: "Open Recent")?.submenu
+        else {
+            return ["Open Recent submenu is missing from the File menu"]
+        }
+
+        let recentURL = FileManager.default.temporaryDirectory
+            .appendingPathComponent("aviv-open-recent-\(UUID().uuidString)")
+            .appendingPathExtension("md")
+
+        do {
+            try "# Recent\n\nOpened from native menu.".write(to: recentURL, atomically: true, encoding: .utf8)
+            recentDocuments.noteNewRecentDocumentURL(recentURL)
+            openRecentMenu.delegate?.menuNeedsUpdate?(openRecentMenu)
+
+            guard let recentItem = openRecentMenu.items.first(where: { ($0.representedObject as? URL) == recentURL }) else {
+                try? FileManager.default.removeItem(at: recentURL)
+                return ["Open Recent submenu did not render the recorded recent file"]
+            }
+
+            if recentItem.action != #selector(AppDelegate.openRecentDocument(_:)) {
+                failures.append("Open Recent file item does not target openRecentDocument:")
+            }
+            if recentItem.title != recentURL.lastPathComponent {
+                failures.append("Open Recent file item title is \(recentItem.title), expected \(recentURL.lastPathComponent)")
+            }
+
+            delegate.openRecentDocument(recentItem)
+            if !delegate.documentSession.controllers.contains(where: { $0.representedDocumentURL == recentURL }) {
+                failures.append("Open Recent item did not open the represented document")
+            }
+
+            delegate.clearRecentDocuments(nil)
+            if !recentDocuments.recentDocumentURLs.isEmpty {
+                failures.append("Clear Menu did not clear recent documents")
+            }
+            openRecentMenu.delegate?.menuNeedsUpdate?(openRecentMenu)
+            if openRecentMenu.items.first?.title != "No Recent Documents" {
+                failures.append("Open Recent submenu did not show the empty state after clearing")
+            }
+            if openRecentMenu.items.last?.isEnabled == true {
+                failures.append("Clear Menu stayed enabled after clearing recent documents")
+            }
+        } catch {
+            failures.append("Open Recent verification threw \(error)")
+        }
+
+        try? FileManager.default.removeItem(at: recentURL)
         return failures
     }
 
@@ -194,5 +266,22 @@ private final class RecordingPrintService: DocumentPrintService {
 
     func print(markdown: String, title: String, format: MarkdownDocumentFormat, baseURL: URL?, window: NSWindow?) {
         printCount += 1
+    }
+}
+
+private final class RecordingRecentDocumentManager: RecentDocumentManaging {
+    private(set) var recentDocumentURLs: [URL] = []
+
+    func noteNewRecentDocumentURL(_ url: URL) {
+        recentDocumentURLs.removeAll { normalized($0) == normalized(url) }
+        recentDocumentURLs.insert(url, at: 0)
+    }
+
+    func clearRecentDocuments() {
+        recentDocumentURLs.removeAll()
+    }
+
+    private func normalized(_ url: URL) -> URL {
+        url.standardizedFileURL.resolvingSymlinksInPath()
     }
 }

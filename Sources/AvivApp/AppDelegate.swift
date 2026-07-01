@@ -1,11 +1,18 @@
 import AppKit
 import AvivCore
 
-final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
+final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
     let documentSession: DocumentSessionController
+    private weak var openRecentMenu: NSMenu?
 
-    init(documentController: DocumentWindowController? = nil) {
-        self.documentSession = DocumentSessionController(initialController: documentController)
+    init(
+        documentController: DocumentWindowController? = nil,
+        recentDocuments: RecentDocumentManaging = AppKitRecentDocumentManager()
+    ) {
+        self.documentSession = DocumentSessionController(
+            initialController: documentController,
+            recentDocuments: recentDocuments
+        )
         super.init()
     }
 
@@ -53,6 +60,16 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
 
     @objc func openDocument(_ sender: Any?) {
         documentSession.presentOpenPanel()
+    }
+
+    @objc func openRecentDocument(_ sender: Any?) {
+        guard let item = sender as? NSMenuItem, let url = item.representedObject as? URL else { return }
+        documentSession.open(urls: [url])
+    }
+
+    @objc func clearRecentDocuments(_ sender: Any?) {
+        documentSession.recentDocuments.clearRecentDocuments()
+        rebuildOpenRecentMenu()
     }
 
     @objc func saveDocument(_ sender: Any?) {
@@ -125,7 +142,19 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
         if menuItem.action == #selector(revertDocumentToSaved(_:)) {
             return activeDocumentController()?.canRevertToSaved ?? false
         }
+        if menuItem.action == #selector(openRecentDocument(_:)) {
+            return menuItem.representedObject is URL
+        }
+        if menuItem.action == #selector(clearRecentDocuments(_:)) {
+            return !documentSession.recentDocuments.recentDocumentURLs.isEmpty
+        }
         return true
+    }
+
+    func menuNeedsUpdate(_ menu: NSMenu) {
+        if menu === openRecentMenu {
+            rebuildOpenRecentMenu()
+        }
     }
 
     func buildMenu() {
@@ -140,5 +169,62 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation {
             }
         }
         NSApp.windowsMenu = NSApp.mainMenu?.item(withTitle: "Window")?.submenu
+        configureOpenRecentMenu()
+    }
+
+    private func configureOpenRecentMenu() {
+        guard
+            let fileMenu = NSApp.mainMenu?.item(withTitle: "File")?.submenu,
+            let recentMenu = fileMenu.item(withTitle: "Open Recent")?.submenu
+        else {
+            return
+        }
+
+        openRecentMenu = recentMenu
+        recentMenu.autoenablesItems = false
+        recentMenu.delegate = self
+        rebuildOpenRecentMenu()
+    }
+
+    private func rebuildOpenRecentMenu() {
+        guard let menu = openRecentMenu else { return }
+
+        menu.removeAllItems()
+        let urls = documentSession.recentDocuments.recentDocumentURLs
+
+        if urls.isEmpty {
+            let emptyItem = NSMenuItem(title: "No Recent Documents", action: nil, keyEquivalent: "")
+            emptyItem.isEnabled = false
+            menu.addItem(emptyItem)
+        } else {
+            for url in urls.prefix(15) {
+                let item = NSMenuItem(
+                    title: displayName(for: url),
+                    action: #selector(openRecentDocument(_:)),
+                    keyEquivalent: ""
+                )
+                item.target = self
+                item.representedObject = url
+                item.toolTip = url.path
+                menu.addItem(item)
+            }
+        }
+
+        menu.addItem(.separator())
+        let clearItem = NSMenuItem(
+            title: "Clear Menu",
+            action: #selector(clearRecentDocuments(_:)),
+            keyEquivalent: ""
+        )
+        clearItem.identifier = NSUserInterfaceItemIdentifier("clearRecentDocuments")
+        clearItem.target = self
+        clearItem.keyEquivalentModifierMask = []
+        clearItem.isEnabled = !urls.isEmpty
+        menu.addItem(clearItem)
+    }
+
+    private func displayName(for url: URL) -> String {
+        let displayName = FileManager.default.displayName(atPath: url.path)
+        return displayName.isEmpty ? url.lastPathComponent : displayName
     }
 }

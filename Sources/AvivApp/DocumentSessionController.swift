@@ -4,12 +4,15 @@ import AvivCore
 final class DocumentSessionController {
     private(set) var controllers: [DocumentWindowController] = []
     private let printServiceFactory: () -> DocumentPrintService
+    let recentDocuments: RecentDocumentManaging
 
     init(
         initialController: DocumentWindowController? = nil,
-        printServiceFactory: @escaping () -> DocumentPrintService = { AppKitDocumentPrintService() }
+        printServiceFactory: @escaping () -> DocumentPrintService = { AppKitDocumentPrintService() },
+        recentDocuments: RecentDocumentManaging = AppKitRecentDocumentManager()
     ) {
         self.printServiceFactory = printServiceFactory
+        self.recentDocuments = recentDocuments
         if let initialController {
             adopt(initialController)
         }
@@ -84,6 +87,7 @@ final class DocumentSessionController {
 
         for url in urls {
             if let existing = existingController(for: url) {
+                recentDocuments.noteNewRecentDocumentURL(url)
                 activate(existing)
                 continue
             }
@@ -132,6 +136,9 @@ final class DocumentSessionController {
         }
         controller.onWindowWillClose = { [weak self] controller in
             self?.remove(controller)
+        }
+        controller.onDocumentURLAccessed = { [weak self] url in
+            self?.recentDocuments.noteNewRecentDocumentURL(url)
         }
         controller.window?.tabbingIdentifier = DocumentWindowController.documentTabbingIdentifier
         controller.window?.tabbingMode = .preferred
