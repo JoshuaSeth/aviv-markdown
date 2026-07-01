@@ -239,7 +239,7 @@ function Write-AvivProcesses {
 }
 
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
-$env:AVIV_UI_VERIFY = "1"
+Remove-Item Env:AVIV_UI_VERIFY -ErrorAction SilentlyContinue
 Move-BlockingWindowsOutOfCapture "before app launch"
 $process = Start-Process -FilePath $Exe -PassThru
 try {
