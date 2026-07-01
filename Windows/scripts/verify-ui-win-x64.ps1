@@ -23,6 +23,7 @@ using System.Runtime.InteropServices;
 using System.Text;
 
 public static class AvivNativeWindow {
+  public static readonly IntPtr HWND_BOTTOM = new IntPtr(1);
   public static readonly IntPtr HWND_TOPMOST = new IntPtr(-1);
 
   private delegate bool EnumWindowsProc(IntPtr hWnd, IntPtr lParam);
@@ -211,21 +212,24 @@ try {
 
   $consoleHandle = [AvivNativeWindow]::GetConsoleWindow()
   if ($consoleHandle -ne [IntPtr]::Zero) {
-    Write-Host "Minimizing verifier console window $consoleHandle before capture."
-    [AvivNativeWindow]::ShowWindow($consoleHandle, 6) | Out-Null
+    Write-Host "Moving verifier console window $consoleHandle out of capture."
+    [AvivNativeWindow]::ShowWindow($consoleHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($consoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
   }
 
   $classConsoleHandle = [AvivNativeWindow]::FindWindow("ConsoleWindowClass", $null)
   if ($classConsoleHandle -ne [IntPtr]::Zero -and $classConsoleHandle -ne $consoleHandle) {
-    Write-Host "Minimizing ConsoleWindowClass window $classConsoleHandle before capture."
-    [AvivNativeWindow]::ShowWindow($classConsoleHandle, 6) | Out-Null
+    Write-Host "Moving ConsoleWindowClass window $classConsoleHandle out of capture."
+    [AvivNativeWindow]::ShowWindow($classConsoleHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($classConsoleHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
   }
 
   $runnerWindows = Get-Process -ErrorAction SilentlyContinue |
     Where-Object { $_.MainWindowHandle -ne [IntPtr]::Zero -and ($_.MainWindowTitle -like "*HostedComputeAgent*" -or $_.MainWindowTitle -like "*hosted-compute-agent*") }
   foreach ($runnerWindow in $runnerWindows) {
-    Write-Host "Minimizing runner window $($runnerWindow.Id) '$($runnerWindow.MainWindowTitle)' handle $($runnerWindow.MainWindowHandle)."
-    [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 6) | Out-Null
+    Write-Host "Moving runner window $($runnerWindow.Id) '$($runnerWindow.MainWindowTitle)' handle $($runnerWindow.MainWindowHandle) out of capture."
+    [AvivNativeWindow]::ShowWindow($runnerWindow.MainWindowHandle, 1) | Out-Null
+    [AvivNativeWindow]::SetWindowPos($runnerWindow.MainWindowHandle, [AvivNativeWindow]::HWND_BOTTOM, 1300, 900, 420, 180, 0x0040) | Out-Null
   }
 
   $showResult = [AvivNativeWindow]::ShowWindow($handle, 9)
