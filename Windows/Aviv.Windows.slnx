@@ -1,5 +1,8 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/Aviv.Windows.App/Aviv.Windows.App.csproj">
+      <Platform Project="x64" />
+    </Project>
     <Project Path="src/Aviv.Windows.Core/Aviv.Windows.Core.csproj" />
   </Folder>
   <Folder Name="/tests/">

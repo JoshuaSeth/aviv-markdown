@@ -41,7 +41,16 @@ The Windows implementation is being built from the macOS source surface, not as 
 Cross-platform core verification runs on macOS and Windows:
 
 ```bash
-dotnet test Windows/Aviv.Windows.slnx
+dotnet test Windows/tests/Aviv.Windows.Core.Tests/Aviv.Windows.Core.Tests.csproj
 ```
 
-WinUI runtime and real UI interaction verification must run on Windows because WinUI 3 is a Windows UI stack.
+The WinUI app restores on macOS, but the WinUI XAML compiler is a Windows executable. App build, runtime, screenshot, and real UI interaction verification must run on Windows.
+
+## Publish
+
+Self-contained unpackaged Windows client builds are produced from Windows PowerShell:
+
+```powershell
+Windows/scripts/publish-win-x64.ps1
+Windows/scripts/publish-win-arm64.ps1
+```

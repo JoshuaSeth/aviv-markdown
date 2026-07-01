@@ -12,6 +12,10 @@ obj/
 *.app
 *.dSYM
 *.zip
+!Windows/src/Aviv.Windows.App/
+!Windows/src/Aviv.Windows.App/**
+Windows/src/Aviv.Windows.App/bin/
+Windows/src/Aviv.Windows.App/obj/
 
 # Local editor and environment files
 .env
