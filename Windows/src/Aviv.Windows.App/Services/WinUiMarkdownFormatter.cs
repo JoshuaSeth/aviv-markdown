@@ -56,11 +56,7 @@ public sealed class WinUiMarkdownFormatter
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x20, 0x24, 0x2A);
                 break;
             case MarkdownStyleRole.SyntaxHidden:
-                range.CharacterFormat.Hidden = FormatEffect.Off;
-                range.CharacterFormat.Name = "Segoe UI";
-                range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
-                range.CharacterFormat.BackgroundColor = Colors.Transparent;
+                ApplyHiddenSyntax(range);
                 break;
             case MarkdownStyleRole.SyntaxVisible:
                 range.CharacterFormat.Hidden = FormatEffect.Off;
@@ -123,11 +119,7 @@ public sealed class WinUiMarkdownFormatter
                 range.CharacterFormat.Size = CodeFontSize * (float)viewScale;
                 break;
             case MarkdownStyleRole.TableSeparatorHidden:
-                range.CharacterFormat.Hidden = FormatEffect.Off;
-                range.CharacterFormat.Name = "Segoe UI";
-                range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
-                range.CharacterFormat.BackgroundColor = Colors.Transparent;
+                ApplyHiddenSyntax(range);
                 break;
             case MarkdownStyleRole.ImageSource:
                 range.CharacterFormat.Hidden = FormatEffect.Off;
@@ -135,6 +127,19 @@ public sealed class WinUiMarkdownFormatter
                 range.CharacterFormat.BackgroundColor = ColorFromHex(0xF1, 0xF4, 0xF7);
                 break;
         }
+    }
+
+    private static void ApplyHiddenSyntax(ITextRange range)
+    {
+        range.CharacterFormat.Hidden = FormatEffect.Off;
+        range.CharacterFormat.Name = "Segoe UI";
+        range.CharacterFormat.Size = HiddenSyntaxFontSize;
+        range.CharacterFormat.Bold = FormatEffect.Off;
+        range.CharacterFormat.Italic = FormatEffect.Off;
+        range.CharacterFormat.Underline = UnderlineType.None;
+        range.CharacterFormat.Strikethrough = FormatEffect.Off;
+        range.CharacterFormat.BackgroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
+        range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
     }
 
     private static float HeadingSize(string? detail, double viewScale)

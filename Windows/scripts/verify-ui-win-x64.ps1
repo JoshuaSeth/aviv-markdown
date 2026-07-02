@@ -56,6 +56,12 @@ public static class AvivNativeWindow {
   [DllImport("user32.dll")]
   public static extern bool BringWindowToTop(IntPtr hWnd);
 
+  [DllImport("user32.dll")]
+  public static extern bool SetCursorPos(int x, int y);
+
+  [DllImport("user32.dll")]
+  private static extern void mouse_event(uint dwFlags, uint dx, uint dy, uint dwData, UIntPtr dwExtraInfo);
+
   [DllImport("user32.dll", CharSet = CharSet.Unicode)]
   public static extern int GetWindowText(IntPtr hWnd, StringBuilder lpString, int nMaxCount);
 
@@ -136,6 +142,12 @@ public static class AvivNativeWindow {
     }, IntPtr.Zero);
 
     return bestHandle;
+  }
+
+  public static void LeftClick(int x, int y) {
+    SetCursorPos(x, y);
+    mouse_event(0x0002, 0, 0, 0, UIntPtr.Zero);
+    mouse_event(0x0004, 0, 0, 0, UIntPtr.Zero);
   }
 }
 "@
@@ -238,6 +250,50 @@ function Write-AvivProcesses {
   }
 }
 
+function Focus-AvivEditor {
+  param(
+    [Parameter(Mandatory = $true)]
+    [IntPtr]$Handle,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Stage
+  )
+
+  Write-Host "Focusing Aviv editor for $Stage."
+  [AvivNativeWindow]::ShowWindow($Handle, 9) | Out-Null
+  [AvivNativeWindow]::BringWindowToTop($Handle) | Out-Null
+  [AvivNativeWindow]::SetForegroundWindow($Handle) | Out-Null
+  [AvivNativeWindow]::LeftClick(180, 230)
+  Start-Sleep -Milliseconds 200
+}
+
+function Replace-EditorText {
+  param(
+    [Parameter(Mandatory = $true)]
+    [IntPtr]$Handle,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Text,
+
+    [Parameter(Mandatory = $true)]
+    [string]$Stage
+  )
+
+  Focus-AvivEditor $Handle $Stage
+  Set-Clipboard -Value $Text
+  [System.Windows.Forms.SendKeys]::SendWait("^a")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{BACKSPACE}")
+  Start-Sleep -Milliseconds 150
+  [System.Windows.Forms.SendKeys]::SendWait("^v")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
+  Start-Sleep -Milliseconds 150
+  [System.Windows.Forms.SendKeys]::SendWait("^{HOME}")
+  Start-Sleep -Milliseconds 150
+  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT 2}")
+}
+
 $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $env:AVIV_SKIP_DEFAULT_APP_PROMPT = "1"
 Remove-Item Env:AVIV_UI_VERIFY -ErrorAction SilentlyContinue
@@ -293,14 +349,7 @@ try {
   }
 
   Save-FixedScreenCapture $ImmediateScreenshot "immediate after-launch UI"
-  Set-Clipboard -Value $fixture
-  [System.Windows.Forms.SendKeys]::SendWait("^a")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("^v")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
-  Start-Sleep -Milliseconds 150
-  [System.Windows.Forms.SendKeys]::SendWait("^{HOME}")
+  Replace-EditorText $handle $fixture "initial fixture paste"
   Start-Sleep -Milliseconds 800
   Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
   $process.Refresh()
@@ -332,14 +381,7 @@ try {
   [AvivNativeWindow]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity) | Out-Null
   Write-Host "Using Aviv window handle $handle with title '$($titleBuilder.ToString())'"
 
-  Set-Clipboard -Value $fixture
-  [System.Windows.Forms.SendKeys]::SendWait("^a")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("^v")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
-  Start-Sleep -Milliseconds 150
-  [System.Windows.Forms.SendKeys]::SendWait("^{HOME}")
+  Replace-EditorText $handle $fixture "final fixture paste"
   Start-Sleep -Seconds 2
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
   try {
