@@ -1,6 +1,7 @@
 using Aviv.Windows.App.Services;
 using Aviv.Windows.App.ViewModels;
 using Aviv.Windows.Core;
+using Microsoft.UI.Dispatching;
 using Microsoft.UI.Text;
 using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
@@ -17,6 +18,7 @@ public sealed partial class MarkdownEditorView : UserControl
     private readonly MarkdownMinimapView Minimap;
     private readonly Popup SourcePopup;
     private readonly TextBox SourceEditor;
+    private readonly DispatcherQueueTimer styleUpdateTimer;
     private readonly MarkdownStyler styler = new();
     private readonly WinUiMarkdownFormatter formatter = new();
     private bool applying;
@@ -32,6 +34,10 @@ public sealed partial class MarkdownEditorView : UserControl
     {
         DiagnosticLog.Write("MarkdownEditorView constructor starting.");
         (Editor, Minimap, SourcePopup, SourceEditor) = BuildLayout();
+        styleUpdateTimer = DispatcherQueue.CreateTimer();
+        styleUpdateTimer.Interval = TimeSpan.FromMilliseconds(120);
+        styleUpdateTimer.IsRepeating = false;
+        styleUpdateTimer.Tick += (_, _) => ApplyMarkdownStyle();
         Minimap.ScrollRatioRequested += ScrollToRatio;
         Loaded += OnLoaded;
         DiagnosticLog.Write("MarkdownEditorView constructor completed.");
@@ -233,15 +239,24 @@ public sealed partial class MarkdownEditorView : UserControl
 
         Markdown = ReadEditorText();
         MarkdownChanged?.Invoke(Markdown);
-        ApplyMarkdownStyle();
+        ScheduleMarkdownStyle();
     }
 
     private void OnSelectionChanged(object sender, RoutedEventArgs args)
     {
-        if (!applying)
+        if (applying)
         {
-            ApplyMarkdownStyle();
+            return;
+        }
+
+        ScheduleMarkdownStyle();
+        if (SourcePopupEnabled())
+        {
             UpdateSourceEditor();
+        }
+        else
+        {
+            CloseSourcePopup();
         }
     }
 
@@ -253,11 +268,23 @@ public sealed partial class MarkdownEditorView : UserControl
         }
 
         applying = true;
+        styleUpdateTimer.Stop();
         Markdown = ReadEditorText();
         var snapshot = styler.Snapshot(Markdown, [CurrentSelection()]);
         formatter.Apply(Editor, snapshot, viewScale);
         RenderMinimap();
         applying = false;
+    }
+
+    private void ScheduleMarkdownStyle()
+    {
+        if (!isLoaded || applying)
+        {
+            return;
+        }
+
+        styleUpdateTimer.Stop();
+        styleUpdateTimer.Start();
     }
 
     private void UpdateSourceEditor()
@@ -282,6 +309,17 @@ public sealed partial class MarkdownEditorView : UserControl
         SourcePopup.HorizontalOffset = 80;
         SourcePopup.VerticalOffset = 58;
         SourcePopup.IsOpen = true;
+    }
+
+    private void CloseSourcePopup()
+    {
+        SourcePopup.IsOpen = false;
+        activeSourceSpan = null;
+    }
+
+    private static bool SourcePopupEnabled()
+    {
+        return string.Equals(Environment.GetEnvironmentVariable("AVIV_ENABLE_SOURCE_POPUP"), "1", StringComparison.Ordinal);
     }
 
     private void OnSourceEditorKeyDown(object sender, KeyRoutedEventArgs args)
