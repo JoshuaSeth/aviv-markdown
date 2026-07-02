@@ -129,7 +129,10 @@ public sealed partial class MarkdownMinimapView : UserControl
             case "tableHeader":
             case "tableSeparator":
             case "tableRow":
-                DrawTableRow(line.Kind.Columns, contentX - 1, y, Math.Max(baseWidth, contentWidth * 0.70), lineStep, line.Kind.Name == "tableHeader" ? 0x94 : line.Kind.Name == "tableSeparator" ? 0x40 : 0x6C);
+                var tableAlpha = line.Kind.Name == "tableHeader"
+                    ? (byte)0x94
+                    : line.Kind.Name == "tableSeparator" ? (byte)0x40 : (byte)0x6C;
+                DrawTableRow(line.Kind.Columns, contentX - 1, y, Math.Max(baseWidth, contentWidth * 0.70), lineStep, tableAlpha);
                 break;
             case "codeFence":
                 AddRect(insetX + 2, y, 4.2, 1.1, Brush(0x72, 0x6A, 0x72, 0x80));
