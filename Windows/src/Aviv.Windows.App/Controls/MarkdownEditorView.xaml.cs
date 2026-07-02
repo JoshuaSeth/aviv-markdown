@@ -154,6 +154,7 @@ public sealed partial class MarkdownEditorView : UserControl
         editor.TextChanged += OnTextChanged;
         editor.SelectionChanged += OnSelectionChanged;
         sourceEditor.KeyDown += OnSourceEditorKeyDown;
+        sourceEditor.LostFocus += OnSourceEditorLostFocus;
         root.Children.Add(sourcePopup);
         Content = root;
 
@@ -263,7 +264,7 @@ public sealed partial class MarkdownEditorView : UserControl
             return;
         }
 
-        ScheduleMarkdownStyle();
+        RenderMinimap();
         if (SourcePopupEnabled())
         {
             UpdateSourceEditor();
@@ -303,6 +304,11 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void UpdateSourceEditor()
     {
+        if (SourceEditor.FocusState != FocusState.Unfocused)
+        {
+            return;
+        }
+
         var selection = CurrentSelection();
         if (selection.Length != 0)
         {
@@ -318,7 +324,11 @@ public sealed partial class MarkdownEditorView : UserControl
             return;
         }
 
-        SourceEditor.Text = activeSourceSpan.Source;
+        if (!string.Equals(SourceEditor.Text, activeSourceSpan.Source, StringComparison.Ordinal))
+        {
+            SourceEditor.Text = activeSourceSpan.Source;
+        }
+
         SourcePopup.XamlRoot = XamlRoot;
         SourcePopup.HorizontalOffset = 80;
         SourcePopup.VerticalOffset = 58;
@@ -338,18 +348,49 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void OnSourceEditorKeyDown(object sender, KeyRoutedEventArgs args)
     {
+        if (args.Key == global::Windows.System.VirtualKey.Escape)
+        {
+            CloseSourcePopup();
+            Editor.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+            args.Handled = true;
+            return;
+        }
+
         if (args.Key != global::Windows.System.VirtualKey.Enter || activeSourceSpan is null)
         {
             return;
         }
 
-        var span = activeSourceSpan;
-        var next = Markdown.Remove(span.Range.Start, span.Range.Length).Insert(span.Range.Start, SourceEditor.Text);
-        LoadMarkdown(next);
-        Editor.Document.Selection.SetRange(span.Range.Start, span.Range.Start + SourceEditor.Text.Length);
-        MarkdownChanged?.Invoke(Markdown);
-        SourcePopup.IsOpen = false;
+        CommitSourceEditor();
         args.Handled = true;
+    }
+
+    private void OnSourceEditorLostFocus(object sender, RoutedEventArgs args)
+    {
+        CloseSourcePopup();
+    }
+
+    private void CommitSourceEditor()
+    {
+        if (activeSourceSpan is null)
+        {
+            return;
+        }
+
+        var span = activeSourceSpan;
+        var replacement = SourceEditor.Text;
+        CloseSourcePopup();
+
+        if (!string.Equals(replacement, span.Source, StringComparison.Ordinal))
+        {
+            var next = Markdown.Remove(span.Range.Start, span.Range.Length).Insert(span.Range.Start, replacement);
+            LoadMarkdown(next);
+            var cursor = Math.Clamp(span.Range.Start + replacement.Length, 0, Markdown.Length);
+            Editor.Document.Selection.SetRange(cursor, cursor);
+            MarkdownChanged?.Invoke(Markdown);
+        }
+
+        Editor.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
     }
 
     private TextRange CurrentSelection()

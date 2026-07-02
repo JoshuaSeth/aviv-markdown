@@ -9,7 +9,7 @@ public sealed class WinUiMarkdownFormatter
 {
     private const float BodyFontSize = 17;
     private const float CodeFontSize = 15;
-    private const float HiddenSyntaxFontSize = 0.1f;
+    private const float HiddenSyntaxFontSize = 1.0f;
 
     public void Apply(RichEditBox editor, MarkdownStyleSnapshot snapshot, double viewScale)
     {
@@ -56,10 +56,10 @@ public sealed class WinUiMarkdownFormatter
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x20, 0x24, 0x2A);
                 break;
             case MarkdownStyleRole.SyntaxHidden:
-                range.CharacterFormat.Hidden = FormatEffect.On;
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Segoe UI";
                 range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = Colors.Transparent;
+                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
                 range.CharacterFormat.BackgroundColor = Colors.Transparent;
                 break;
             case MarkdownStyleRole.SyntaxVisible:
@@ -123,10 +123,10 @@ public sealed class WinUiMarkdownFormatter
                 range.CharacterFormat.Size = CodeFontSize * (float)viewScale;
                 break;
             case MarkdownStyleRole.TableSeparatorHidden:
-                range.CharacterFormat.Hidden = FormatEffect.On;
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Segoe UI";
                 range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = Colors.Transparent;
+                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
                 range.CharacterFormat.BackgroundColor = Colors.Transparent;
                 break;
             case MarkdownStyleRole.ImageSource:
