@@ -45,7 +45,7 @@ public partial class App : Application
         try
         {
             DiagnosticLog.Write("OnLaunched starting.");
-            window = new MainWindow(LaunchArgumentParser.FirstFilePath(args.Arguments));
+            window = new MainWindow(LaunchArgumentParser.FirstFilePath(args.Arguments) ?? LaunchArgumentParser.FirstProcessFilePath());
             window.Closed += (_, _) => DiagnosticLog.Write("MainWindow closed.");
             DiagnosticLog.Write("MainWindow created.");
             window.Activate();
@@ -128,6 +128,21 @@ public partial class App : Application
             foreach (Match match in TokenRegex().Matches(arguments))
             {
                 var token = match.Groups[1].Success ? match.Groups[1].Value : match.Groups[2].Value;
+                if (string.IsNullOrWhiteSpace(token) || token.StartsWith("--", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                return token;
+            }
+
+            return null;
+        }
+
+        public static string? FirstProcessFilePath()
+        {
+            foreach (var token in Environment.GetCommandLineArgs().Skip(1))
+            {
                 if (string.IsNullOrWhiteSpace(token) || token.StartsWith("--", StringComparison.Ordinal))
                 {
                     continue;
