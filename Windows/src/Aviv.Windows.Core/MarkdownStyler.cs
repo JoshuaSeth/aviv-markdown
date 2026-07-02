@@ -277,7 +277,7 @@ public sealed class MarkdownStyler
         var checkbox = new TextRange(contentRange.Start + match.Groups[2].Index, match.Groups[2].Length);
         var markerEnd = contentRange.Start + match.Index + match.Length;
         return new TaskParse(
-            new TextRange(contentRange.Start + match.Index, match.Length),
+            prefix,
             checkbox,
             new TextRange(markerEnd, contentRange.End - markerEnd),
             match.Groups[2].Value.Contains('x') || match.Groups[2].Value.Contains('X'));

@@ -22,6 +22,7 @@ public sealed class WinUiMarkdownFormatter
         fullRange.CharacterFormat.Size = BodyFontSize * (float)viewScale;
         fullRange.CharacterFormat.ForegroundColor = ColorFromHex(0x20, 0x24, 0x2A);
         fullRange.CharacterFormat.BackgroundColor = Colors.Transparent;
+        fullRange.CharacterFormat.Hidden = FormatEffect.Off;
         fullRange.CharacterFormat.Bold = FormatEffect.Off;
         fullRange.CharacterFormat.Italic = FormatEffect.Off;
         fullRange.CharacterFormat.Underline = UnderlineType.None;
@@ -48,41 +49,49 @@ public sealed class WinUiMarkdownFormatter
         switch (run.Role)
         {
             case MarkdownStyleRole.Heading:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Segoe UI Semibold";
                 range.CharacterFormat.Size = HeadingSize(run.Detail, viewScale);
                 range.CharacterFormat.Bold = FormatEffect.On;
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x20, 0x24, 0x2A);
                 break;
             case MarkdownStyleRole.SyntaxHidden:
+                range.CharacterFormat.Hidden = FormatEffect.On;
                 range.CharacterFormat.Name = "Segoe UI";
                 range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
-                range.CharacterFormat.BackgroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
+                range.CharacterFormat.ForegroundColor = Colors.Transparent;
+                range.CharacterFormat.BackgroundColor = Colors.Transparent;
                 break;
             case MarkdownStyleRole.SyntaxVisible:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Segoe UI";
                 range.CharacterFormat.Size = BodyFontSize * (float)viewScale;
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x97, 0xA0, 0xAD);
                 break;
             case MarkdownStyleRole.InlineCode:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Cascadia Mono";
                 range.CharacterFormat.Size = CodeFontSize * (float)viewScale;
                 range.CharacterFormat.BackgroundColor = ColorFromHex(0xF1, 0xF4, 0xF7);
                 break;
             case MarkdownStyleRole.CodeBlock:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Cascadia Mono";
                 range.CharacterFormat.Size = CodeFontSize * (float)viewScale;
                 range.CharacterFormat.BackgroundColor = ColorFromHex(0xF1, 0xF4, 0xF7);
                 break;
             case MarkdownStyleRole.LinkText:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x0C, 0x74, 0xB8);
                 range.CharacterFormat.Underline = UnderlineType.Single;
                 break;
             case MarkdownStyleRole.Bold:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Bold = FormatEffect.On;
                 break;
             case MarkdownStyleRole.Italic:
             case MarkdownStyleRole.Quote:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Italic = FormatEffect.On;
                 if (run.Role == MarkdownStyleRole.Quote)
                 {
@@ -90,31 +99,38 @@ public sealed class WinUiMarkdownFormatter
                 }
                 break;
             case MarkdownStyleRole.Strikethrough:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Strikethrough = FormatEffect.On;
                 break;
             case MarkdownStyleRole.HorizontalRule:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x97, 0xA0, 0xAD);
                 range.CharacterFormat.Strikethrough = FormatEffect.On;
                 break;
             case MarkdownStyleRole.TaskMarkerChecked:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Cascadia Mono";
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x0C, 0x74, 0xB8);
                 break;
             case MarkdownStyleRole.TaskMarkerUnchecked:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Cascadia Mono";
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x6A, 0x72, 0x80);
                 break;
             case MarkdownStyleRole.Table:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.Name = "Cascadia Mono";
                 range.CharacterFormat.Size = CodeFontSize * (float)viewScale;
                 break;
             case MarkdownStyleRole.TableSeparatorHidden:
+                range.CharacterFormat.Hidden = FormatEffect.On;
                 range.CharacterFormat.Name = "Segoe UI";
                 range.CharacterFormat.Size = HiddenSyntaxFontSize;
-                range.CharacterFormat.ForegroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
-                range.CharacterFormat.BackgroundColor = ColorFromHex(0xFB, 0xFC, 0xFD);
+                range.CharacterFormat.ForegroundColor = Colors.Transparent;
+                range.CharacterFormat.BackgroundColor = Colors.Transparent;
                 break;
             case MarkdownStyleRole.ImageSource:
+                range.CharacterFormat.Hidden = FormatEffect.Off;
                 range.CharacterFormat.ForegroundColor = ColorFromHex(0x6A, 0x72, 0x80);
                 range.CharacterFormat.BackgroundColor = ColorFromHex(0xF1, 0xF4, 0xF7);
                 break;
