@@ -155,11 +155,11 @@ public static class AvivNativeWindow {
 $fixture = @'
 # Windows Aviv Verification
 
-This text was pasted by the Windows UI verifier into the native WinUI app.
+This document was loaded by the Windows UI verifier into the native WinUI app.
 
 It includes **bold text**, _quiet emphasis_, `inline code`, and [a stable link](https://example.com/windows).
 
-- [x] Real keyboard paste reached the editor
+- [x] Real Windows launch reached the editor
 - [ ] Layout should remain calm while syntax is styled
 
 | Block | State |
@@ -267,28 +267,16 @@ function Focus-AvivEditor {
   Start-Sleep -Milliseconds 200
 }
 
-function Replace-EditorText {
+function Position-EditorAtFixtureStart {
   param(
     [Parameter(Mandatory = $true)]
     [IntPtr]$Handle,
-
-    [Parameter(Mandatory = $true)]
-    [string]$Text,
 
     [Parameter(Mandatory = $true)]
     [string]$Stage
   )
 
   Focus-AvivEditor $Handle $Stage
-  Set-Clipboard -Value $Text
-  [System.Windows.Forms.SendKeys]::SendWait("^a")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("{BACKSPACE}")
-  Start-Sleep -Milliseconds 150
-  [System.Windows.Forms.SendKeys]::SendWait("^v")
-  Start-Sleep -Milliseconds 250
-  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
-  Start-Sleep -Milliseconds 150
   [System.Windows.Forms.SendKeys]::SendWait("^{HOME}")
   Start-Sleep -Milliseconds 150
   [System.Windows.Forms.SendKeys]::SendWait("{RIGHT 2}")
@@ -298,8 +286,10 @@ $env:AVIV_DIAGNOSTIC_LOG = $DiagnosticLog
 $env:AVIV_SKIP_DEFAULT_APP_PROMPT = "1"
 Remove-Item Env:AVIV_UI_VERIFY -ErrorAction SilentlyContinue
 Remove-Item Env:AVIV_SAFE_EDITOR -ErrorAction SilentlyContinue
+$FixturePath = Join-Path $ScreenshotDir "windows-ui-fixture.md"
+Set-Content -Path $FixturePath -Value $fixture -Encoding UTF8 -NoNewline
 Move-BlockingWindowsOutOfCapture "before app launch"
-$process = Start-Process -FilePath $Exe -PassThru
+$process = Start-Process -FilePath $Exe -ArgumentList @("`"$FixturePath`"") -PassThru
 try {
   $handle = [IntPtr]::Zero
   for ($attempt = 0; $attempt -lt 120; $attempt++) {
@@ -349,7 +339,8 @@ try {
   }
 
   Save-FixedScreenCapture $ImmediateScreenshot "immediate after-launch UI"
-  Replace-EditorText $handle $fixture "initial fixture paste"
+  Start-Sleep -Seconds 2
+  Position-EditorAtFixtureStart $handle "initial fixture positioning"
   Start-Sleep -Milliseconds 800
   Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
   $process.Refresh()
@@ -381,7 +372,7 @@ try {
   [AvivNativeWindow]::GetWindowText($handle, $titleBuilder, $titleBuilder.Capacity) | Out-Null
   Write-Host "Using Aviv window handle $handle with title '$($titleBuilder.ToString())'"
 
-  Replace-EditorText $handle $fixture "final fixture paste"
+  Position-EditorAtFixtureStart $handle "final fixture positioning"
   Start-Sleep -Seconds 2
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
   try {
