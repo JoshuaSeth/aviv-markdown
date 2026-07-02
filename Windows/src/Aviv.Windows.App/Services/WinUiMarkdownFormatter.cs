@@ -9,7 +9,7 @@ public sealed class WinUiMarkdownFormatter
 {
     private const float BodyFontSize = 17;
     private const float CodeFontSize = 15;
-    private const float HiddenSyntaxFontSize = 1.0f;
+    private const float HiddenSyntaxFontSize = 0.1f;
 
     public void Apply(RichEditBox editor, MarkdownStyleSnapshot snapshot, double viewScale)
     {
