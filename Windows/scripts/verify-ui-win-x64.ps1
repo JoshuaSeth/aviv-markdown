@@ -297,6 +297,8 @@ try {
   [System.Windows.Forms.SendKeys]::SendWait("^a")
   Start-Sleep -Milliseconds 250
   [System.Windows.Forms.SendKeys]::SendWait("^v")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
   Start-Sleep -Milliseconds 800
   Save-FixedScreenCapture $LaunchScreenshot "after-launch UI"
   $process.Refresh()
@@ -332,6 +334,8 @@ try {
   [System.Windows.Forms.SendKeys]::SendWait("^a")
   Start-Sleep -Milliseconds 250
   [System.Windows.Forms.SendKeys]::SendWait("^v")
+  Start-Sleep -Milliseconds 250
+  [System.Windows.Forms.SendKeys]::SendWait("{RIGHT}")
   Start-Sleep -Seconds 2
   [AvivNativeWindow]::SetWindowPos($handle, [AvivNativeWindow]::HWND_TOPMOST, 96, 72, 1160, 760, 0x0040) | Out-Null
   try {

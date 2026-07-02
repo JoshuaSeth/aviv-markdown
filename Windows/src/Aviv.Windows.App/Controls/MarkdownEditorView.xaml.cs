@@ -363,7 +363,11 @@ public sealed partial class MarkdownEditorView : UserControl
     private string ReadEditorText()
     {
         Editor.Document.GetText(TextGetOptions.None, out var text);
-        return text.Replace("\r", string.Empty, StringComparison.Ordinal);
+        var normalized = text
+            .Replace("\r\n", "\n", StringComparison.Ordinal)
+            .Replace('\r', '\n');
+
+        return normalized.EndsWith('\n') ? normalized[..^1] : normalized;
     }
 
     private void RenderMinimap()
