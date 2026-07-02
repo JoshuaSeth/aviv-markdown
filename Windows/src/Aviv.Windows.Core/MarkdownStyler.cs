@@ -65,7 +65,7 @@ public sealed class MarkdownStyler
             if (IsFence(trimmed))
             {
                 runs.Add(new MarkdownStyleRun(line.LineRange, MarkdownStyleRole.CodeBlock));
-                runs.Add(new MarkdownStyleRun(line.ContentRange, active ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
+                runs.Add(new MarkdownStyleRun(line.ContentRange, MarkdownStyleRole.SyntaxHidden));
                 insideFence = !insideFence;
                 continue;
             }
@@ -79,11 +79,11 @@ public sealed class MarkdownStyler
             if (tableRows.TryGetValue(line.ContentRange.Start, out var tableRow))
             {
                 runs.Add(new MarkdownStyleRun(line.LineRange, MarkdownStyleRole.Table));
-                if (!active)
+                if (tableRow.IsSeparator)
                 {
-                    runs.Add(new MarkdownStyleRun(line.ContentRange, tableRow.IsSeparator ? MarkdownStyleRole.TableSeparatorHidden : MarkdownStyleRole.SyntaxHidden));
+                    runs.Add(new MarkdownStyleRun(line.ContentRange, active ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.TableSeparatorHidden));
                 }
-                else if (!tableRow.IsSeparator)
+                else
                 {
                     ApplyInlineStyles(markdown, line.ContentRange, active, runs, renderImages: false);
                 }
@@ -93,7 +93,7 @@ public sealed class MarkdownStyler
             if (ParseHeading(line.Text, line.ContentRange) is { } heading)
             {
                 runs.Add(new MarkdownStyleRun(line.LineRange, MarkdownStyleRole.Heading, heading.Level.ToString()));
-                runs.Add(new MarkdownStyleRun(heading.SyntaxRange, active ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
+                runs.Add(new MarkdownStyleRun(heading.SyntaxRange, MarkdownStyleRole.SyntaxHidden));
                 ApplyInlineStyles(markdown, heading.BodyRange, active, runs);
             }
             else if (IsHorizontalRule(trimmed))
@@ -103,7 +103,7 @@ public sealed class MarkdownStyler
             else if (ParseTaskList(line.Text, line.ContentRange) is { } task)
             {
                 runs.Add(new MarkdownStyleRun(line.LineRange, MarkdownStyleRole.List));
-                runs.Add(new MarkdownStyleRun(task.PrefixRange, active ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
+                runs.Add(new MarkdownStyleRun(task.PrefixRange, MarkdownStyleRole.SyntaxHidden));
                 runs.Add(new MarkdownStyleRun(task.CheckboxRange, task.Checked ? MarkdownStyleRole.TaskMarkerChecked : MarkdownStyleRole.TaskMarkerUnchecked));
                 ApplyInlineStyles(markdown, task.BodyRange, active, runs);
             }
@@ -148,8 +148,8 @@ public sealed class MarkdownStyler
         ApplyMatches(new Regex(@"`([^`\n]+)`"), markdown, searchRange, protectedRanges, match =>
         {
             var content = new TextRange(match.Groups[1].Index, match.Groups[1].Length);
-            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, 1), lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
-            runs.Add(new MarkdownStyleRun(new TextRange(match.Index + match.Length - 1, 1), lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, 1), MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(match.Index + match.Length - 1, 1), MarkdownStyleRole.SyntaxHidden));
             runs.Add(new MarkdownStyleRun(content, MarkdownStyleRole.InlineCode));
             protectedRanges.Add(new TextRange(match.Index, match.Length));
         });
@@ -159,10 +159,10 @@ public sealed class MarkdownStyler
             var textRange = new TextRange(match.Groups[1].Index, match.Groups[1].Length);
             var targetRange = new TextRange(match.Groups[2].Index, match.Groups[2].Length);
             runs.Add(new MarkdownStyleRun(textRange, MarkdownStyleRole.LinkText));
-            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, textRange.Start - match.Index), lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
-            runs.Add(new MarkdownStyleRun(new TextRange(textRange.End, targetRange.Start - textRange.End), lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
-            runs.Add(new MarkdownStyleRun(targetRange, lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
-            runs.Add(new MarkdownStyleRun(new TextRange(targetRange.End, match.Index + match.Length - targetRange.End), lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, textRange.Start - match.Index), MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(textRange.End, targetRange.Start - textRange.End), MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(targetRange, MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(targetRange.End, match.Index + match.Length - targetRange.End), MarkdownStyleRole.SyntaxHidden));
             protectedRanges.Add(new TextRange(match.Index, match.Length));
         });
 
@@ -185,9 +185,8 @@ public sealed class MarkdownStyler
         {
             var delimiter = new TextRange(match.Groups[1].Index, match.Groups[1].Length);
             var content = new TextRange(match.Groups[2].Index, match.Groups[2].Length);
-            var syntaxRole = lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden;
-            runs.Add(new MarkdownStyleRun(delimiter, syntaxRole));
-            runs.Add(new MarkdownStyleRun(new TextRange(content.End, delimiter.Length), syntaxRole));
+            runs.Add(new MarkdownStyleRun(delimiter, MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(content.End, delimiter.Length), MarkdownStyleRole.SyntaxHidden));
             runs.Add(new MarkdownStyleRun(content, contentRole));
             protectedRanges.Add(new TextRange(match.Index, match.Length));
         });
@@ -206,9 +205,8 @@ public sealed class MarkdownStyler
         ApplyMatches(regex, markdown, searchRange, protectedRanges, match =>
         {
             var content = new TextRange(match.Groups[1].Index, match.Groups[1].Length);
-            var syntaxRole = lineActive ? MarkdownStyleRole.SyntaxVisible : MarkdownStyleRole.SyntaxHidden;
-            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, delimiter.Length), syntaxRole));
-            runs.Add(new MarkdownStyleRun(new TextRange(match.Index + match.Length - delimiter.Length, delimiter.Length), syntaxRole));
+            runs.Add(new MarkdownStyleRun(new TextRange(match.Index, delimiter.Length), MarkdownStyleRole.SyntaxHidden));
+            runs.Add(new MarkdownStyleRun(new TextRange(match.Index + match.Length - delimiter.Length, delimiter.Length), MarkdownStyleRole.SyntaxHidden));
             runs.Add(new MarkdownStyleRun(content, contentRole));
             protectedRanges.Add(new TextRange(match.Index, match.Length));
         });

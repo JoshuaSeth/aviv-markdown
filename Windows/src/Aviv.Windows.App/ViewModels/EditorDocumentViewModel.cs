@@ -7,8 +7,10 @@ namespace Aviv.Windows.App.ViewModels;
 
 public sealed partial class EditorDocumentViewModel : ObservableObject
 {
-    private const double DefaultViewScale = 1.0;
-    private const double ZoomStep = 1.12;
+    private const double DefaultViewScale = 0.86;
+    private const double MinimumViewScale = 0.60;
+    private const double MaximumViewScale = 1.60;
+    private const double ZoomStep = 1.10;
     private readonly IMarkdownFileService fileService;
     private string lastSavedMarkdown = MarkdownSamples.Starter;
 
@@ -201,14 +203,14 @@ public sealed partial class EditorDocumentViewModel : ObservableObject
     [RelayCommand]
     private void IncreaseTextSize()
     {
-        ViewScale = Math.Min(2.2, ViewScale * ZoomStep);
+        ViewScale = Math.Min(MaximumViewScale, ViewScale * ZoomStep);
         ViewScaleChanged?.Invoke(ViewScale);
     }
 
     [RelayCommand]
     private void DecreaseTextSize()
     {
-        ViewScale = Math.Max(0.72, ViewScale / ZoomStep);
+        ViewScale = Math.Max(MinimumViewScale, ViewScale / ZoomStep);
         ViewScaleChanged?.Invoke(ViewScale);
     }
 

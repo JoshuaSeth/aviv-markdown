@@ -14,6 +14,11 @@ namespace Aviv.Windows.App.Controls;
 
 public sealed partial class MarkdownEditorView : UserControl
 {
+    private const double BaseBodyFontSize = 17;
+    private const double BaseHorizontalPadding = 28;
+    private const double BaseTopPadding = 72;
+    private const double BaseRightPadding = 122;
+    private const double BaseBottomPadding = 52;
     private readonly RichEditBox Editor;
     private readonly MarkdownMinimapView Minimap;
     private readonly Popup SourcePopup;
@@ -65,11 +70,11 @@ public sealed partial class MarkdownEditorView : UserControl
             BorderThickness = new Thickness(0),
             Background = Brush(0x00, 0xFF, 0xFF, 0xFF),
             FontFamily = new FontFamily("Segoe UI"),
-            FontSize = 17,
+            FontSize = BaseBodyFontSize * viewScale,
             HorizontalAlignment = HorizontalAlignment.Stretch,
             HorizontalContentAlignment = HorizontalAlignment.Stretch,
             IsSpellCheckEnabled = true,
-            Padding = new Thickness(64, 72, 122, 52),
+            Padding = EditorPadding(),
             SelectionHighlightColor = Brush(0x33, 0x24, 0x8A, 0xCB),
             TextWrapping = TextWrapping.Wrap,
             VerticalAlignment = VerticalAlignment.Stretch
@@ -177,9 +182,18 @@ public sealed partial class MarkdownEditorView : UserControl
     public void SetViewScale(double scale)
     {
         viewScale = scale;
-        Editor.FontSize = 17 * viewScale;
-        Editor.Padding = new Thickness(64 * viewScale, 72 * viewScale, 122 * viewScale, 52 * viewScale);
+        Editor.FontSize = BaseBodyFontSize * viewScale;
+        Editor.Padding = EditorPadding();
         ApplyMarkdownStyle();
+    }
+
+    private Thickness EditorPadding()
+    {
+        return new Thickness(
+            BaseHorizontalPadding * viewScale,
+            BaseTopPadding * viewScale,
+            BaseRightPadding * viewScale,
+            BaseBottomPadding * viewScale);
     }
 
     public void ApplyEditAction(EditorEditAction action)
@@ -355,7 +369,7 @@ public sealed partial class MarkdownEditorView : UserControl
     private void RenderMinimap()
     {
         var lines = Math.Max(1, Markdown.Split('\n').Length);
-        var visibleLines = 28 / Math.Max(0.72, viewScale);
+        var visibleLines = 28 / Math.Max(0.60, viewScale);
         var currentLine = Markdown[..Math.Clamp(CurrentSelection().Start, 0, Markdown.Length)].Count(character => character == '\n');
         var documentHeight = Math.Max(visibleLines, lines);
         var visibleMinY = Math.Min(Math.Max(0, currentLine - visibleLines / 2), Math.Max(0, documentHeight - visibleLines));

@@ -115,6 +115,25 @@ public sealed class MarkdownCoreTests
     }
 
     [Fact]
+    public void StylerKeepsRenderedMarkdownSyntaxHidden()
+    {
+        const string markdown = """
+        ## Secondary Heading
+
+        Write **bold text**, _quiet emphasis_, `inline code`, and [links](https://example.com) directly.
+        """;
+
+        var runs = new MarkdownStyler().RunsFor(markdown, [new TextRange(markdown.IndexOf("bold", StringComparison.Ordinal), 0)]);
+
+        Assert.Contains(runs, run => RunText(markdown, run) == "## " && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.Contains(runs, run => RunText(markdown, run) == "**" && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.Contains(runs, run => RunText(markdown, run) == "_" && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.Contains(runs, run => RunText(markdown, run) == "`" && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.Contains(runs, run => RunText(markdown, run) == "[" && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.Contains(runs, run => RunText(markdown, run) == "https://example.com" && run.Role == MarkdownStyleRole.SyntaxHidden);
+    }
+
+    [Fact]
     public void MinimapStructureRecognizesMarkdownBlocks()
     {
         var lines = MarkdownMinimapStructure.Lines(MarkdownSamples.LayoutFixture);
@@ -174,5 +193,10 @@ public sealed class MarkdownCoreTests
 
         Assert.True(result.Passed, string.Join(Environment.NewLine, result.Failures));
         Assert.True(result.MeasuredSelections >= 12);
+    }
+
+    private static string RunText(string markdown, MarkdownStyleRun run)
+    {
+        return markdown.Substring(run.Range.Start, run.Range.Length);
     }
 }
