@@ -44,7 +44,7 @@ public sealed class MarkdownStyler
 
         runs.Add(new MarkdownStyleRun(new TextRange(0, markdown.Length), MarkdownStyleRole.Base));
         ApplyBlockAndInlineStyles(markdown, selected, runs);
-        return new MarkdownStyleSnapshot(markdown, runs.OrderBy(run => run.Range.Start).ThenBy(run => run.Range.Length).ToArray(), MarkdownAnnotationParser.Tokens(markdown, selected));
+        return new MarkdownStyleSnapshot(markdown, runs.ToArray(), MarkdownAnnotationParser.Tokens(markdown, selected));
     }
 
     public IReadOnlyList<MarkdownStyleRun> RunsFor(string markdown, IReadOnlyList<TextRange>? selectedRanges = null)

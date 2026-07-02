@@ -124,8 +124,12 @@ public sealed class MarkdownCoreTests
         """;
 
         var runs = new MarkdownStyler().RunsFor(markdown, [new TextRange(markdown.IndexOf("bold", StringComparison.Ordinal), 0)]);
+        var orderedRuns = runs.ToList();
+        var headingIndex = orderedRuns.FindIndex(run => run.Role == MarkdownStyleRole.Heading);
+        var headingSyntaxIndex = orderedRuns.FindIndex(run => RunText(markdown, run) == "## " && run.Role == MarkdownStyleRole.SyntaxHidden);
 
-        Assert.Contains(runs, run => RunText(markdown, run) == "## " && run.Role == MarkdownStyleRole.SyntaxHidden);
+        Assert.True(headingIndex >= 0);
+        Assert.True(headingSyntaxIndex > headingIndex);
         Assert.Contains(runs, run => RunText(markdown, run) == "**" && run.Role == MarkdownStyleRole.SyntaxHidden);
         Assert.Contains(runs, run => RunText(markdown, run) == "_" && run.Role == MarkdownStyleRole.SyntaxHidden);
         Assert.Contains(runs, run => RunText(markdown, run) == "`" && run.Role == MarkdownStyleRole.SyntaxHidden);
