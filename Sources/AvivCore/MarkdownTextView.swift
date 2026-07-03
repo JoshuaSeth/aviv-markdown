@@ -1,4 +1,5 @@
 import AppKit
+import QuickLookThumbnailing
 
 public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     public let styler: MarkdownStyler
@@ -200,14 +201,14 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
             return cached
         }
 
-        let displayName = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL)?.lastPathComponent
-            ?? reference.target
+        let url = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL)
+        let displayName = url?.lastPathComponent ?? reference.target
         let resolved: MarkdownResolvedImage
-        if let url = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL),
-           let image = NSImage(contentsOf: url) {
+        if let url,
+           let image = MarkdownImageLoader.image(contentsOf: url) {
             resolved = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
         } else {
-            resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: nil)
+            resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: url)
         }
         imageCache[cacheKey] = resolved
         return resolved
@@ -354,5 +355,45 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         guard let regex = try? NSRegularExpression(pattern: #"^#{1,6}\s+"#) else { return nil }
         let range = NSRange(location: 0, length: (line as NSString).length)
         return regex.firstMatch(in: line, range: range)?.range
+    }
+}
+
+private enum MarkdownImageLoader {
+    static func image(contentsOf url: URL) -> NSImage? {
+        if let image = NSImage(contentsOf: url),
+           image.size.width > 0,
+           image.size.height > 0 {
+            return image
+        }
+
+        guard url.pathExtension.lowercased() == "svg",
+              FileManager.default.fileExists(atPath: url.path)
+        else {
+            return nil
+        }
+
+        return quickLookThumbnail(for: url)
+    }
+
+    private static func quickLookThumbnail(for url: URL) -> NSImage? {
+        let request = QLThumbnailGenerator.Request(
+            fileAt: url,
+            size: CGSize(width: 1600, height: 1600),
+            scale: NSScreen.main?.backingScaleFactor ?? 2,
+            representationTypes: .all
+        )
+        let semaphore = DispatchSemaphore(value: 0)
+        var renderedImage: NSImage?
+
+        QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
+            renderedImage = representation?.nsImage
+            semaphore.signal()
+        }
+
+        guard semaphore.wait(timeout: .now() + .seconds(2)) == .success else {
+            return nil
+        }
+
+        return renderedImage
     }
 }

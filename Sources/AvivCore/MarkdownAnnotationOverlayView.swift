@@ -137,7 +137,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
         } else {
             NSColor(calibratedRed: 0.956, green: 0.962, blue: 0.966, alpha: 0.92).setFill()
             frame.fill()
-            let label = reference.altText.isEmpty ? resolved.displayName : reference.altText
+            let label = placeholderLabel(for: reference, resolved: resolved)
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: theme.smallFont,
                 .foregroundColor: theme.secondaryTextColor,
@@ -151,6 +151,15 @@ public final class MarkdownAnnotationOverlayView: NSView {
         theme.secondaryTextColor.withAlphaComponent(0.20).setStroke()
         path.lineWidth = 1
         path.stroke()
+    }
+
+    private func placeholderLabel(for reference: MarkdownImageReference, resolved: MarkdownResolvedImage) -> String {
+        if let sourceURL = resolved.sourceURL,
+           !FileManager.default.fileExists(atPath: sourceURL.path) {
+            return "Missing image: \(resolved.displayName)"
+        }
+
+        return reference.altText.isEmpty ? resolved.displayName : reference.altText
     }
 
     private func fittedSize(_ source: NSSize, within maximum: NSSize) -> NSSize {

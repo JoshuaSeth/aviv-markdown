@@ -103,6 +103,39 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(resolved.displayName, "photo.png")
     }
 
+    func testLocalSVGResolutionLoadsRelativeImageFromDocumentFolder() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let imageURL = directory.appendingPathComponent("diagram.svg")
+        try writeTestSVG(to: imageURL)
+
+        let reference = try XCTUnwrap(MarkdownImageParser.images(in: "![Diagram](diagram.svg)").first)
+        let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
+        textView.markdownImageBaseURL = directory
+
+        let resolved = textView.resolvedMarkdownImage(for: reference)
+        XCTAssertNotNil(resolved.image)
+        XCTAssertGreaterThan(resolved.image?.size.width ?? 0, 0)
+        XCTAssertGreaterThan(resolved.image?.size.height ?? 0, 0)
+        XCTAssertEqual(resolved.sourceURL?.standardizedFileURL, imageURL.standardizedFileURL)
+        XCTAssertEqual(resolved.displayName, "diagram.svg")
+    }
+
+    func testMissingLocalImageResolutionKeepsSourceURLForDiagnostics() throws {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        let missingURL = directory.appendingPathComponent("missing.svg")
+
+        let reference = try XCTUnwrap(MarkdownImageParser.images(in: "![Missing](missing.svg)").first)
+        let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
+        textView.markdownImageBaseURL = directory
+
+        let resolved = textView.resolvedMarkdownImage(for: reference)
+        XCTAssertNil(resolved.image)
+        XCTAssertEqual(resolved.sourceURL?.standardizedFileURL, missingURL.standardizedFileURL)
+        XCTAssertEqual(resolved.displayName, "missing.svg")
+    }
+
     func testUndoRevertsTextChangeWithoutStyleUndoStep() {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.loadMarkdown("Hello **world**")
@@ -184,5 +217,16 @@ final class MarkdownStylerTests: XCTestCase {
             return
         }
         try png.write(to: url)
+    }
+
+    private func writeTestSVG(to url: URL) throws {
+        let svg = """
+        <svg xmlns="http://www.w3.org/2000/svg" width="180" height="90" viewBox="0 0 180 90">
+          <rect width="180" height="90" rx="12" fill="#0c74b8"/>
+          <circle cx="50" cy="45" r="22" fill="#f7d154"/>
+          <path d="M85 30h70v12H85zM85 52h48v10H85z" fill="#ffffff"/>
+        </svg>
+        """
+        try svg.write(to: url, atomically: true, encoding: .utf8)
     }
 }
