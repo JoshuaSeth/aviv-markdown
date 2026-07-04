@@ -6,18 +6,26 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     public var onContentChange: ((String) -> Void)?
     public var onSelectionChange: (() -> Void)?
     public var onViewScaleChange: (() -> Void)?
+    public var onImageResolutionChange: (() -> Void)?
     public var markdownImageBaseURL: URL? {
         didSet {
             imageCache.removeAll()
+            pendingImageLoads.removeAll()
             needsDisplay = true
         }
     }
 
+    private static let largeDocumentStylingThreshold = 12_000
+    private static let deferredStyleDelay: DispatchTimeInterval = .milliseconds(180)
     private let localUndoManager = UndoManager()
     private var isApplyingMarkdownStyle = false
     private var activeEditableSourceRange: NSRange?
     private var isUpdatingSourceEditor = false
     private var imageCache: [String: MarkdownResolvedImage] = [:]
+    private var pendingImageLoads = Set<String>()
+    private var pendingEditedRanges: [NSRange] = []
+    private var pendingStyleWorkItem: DispatchWorkItem?
+    private var lastStyledSelectionRanges: [NSRange] = []
     private lazy var sourceEditor: NSTextField = {
         let field = NSTextField(frame: .zero)
         field.isHidden = true
@@ -63,14 +71,17 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 
     public func loadMarkdown(_ markdown: String) {
+        cancelDeferredMarkdownStyle()
         isApplyingMarkdownStyle = true
         textStorage?.setAttributedString(NSAttributedString(string: markdown))
         isApplyingMarkdownStyle = false
         applyMarkdownStyle()
+        lastStyledSelectionRanges = selectedRanges.compactMap { $0.rangeValue }
     }
 
     public func loadMarkdownForPrint(_ markdown: String) {
         guard let textStorage else { return }
+        cancelDeferredMarkdownStyle()
         isApplyingMarkdownStyle = true
         textStorage.setAttributedString(styler.attributedString(for: markdown, selectedRanges: []))
         sourceEditor.isHidden = true
@@ -79,6 +90,11 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 
     public func applyMarkdownStyle() {
+        cancelDeferredMarkdownStyle()
+        applyMarkdownStyleImmediately()
+    }
+
+    private func applyMarkdownStyleImmediately() {
         guard !isApplyingMarkdownStyle, let textStorage else { return }
         let ranges = selectedRanges.compactMap { $0.rangeValue }
         isApplyingMarkdownStyle = true
@@ -92,30 +108,51 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
             undoManager?.enableUndoRegistration()
         }
         isApplyingMarkdownStyle = false
+        lastStyledSelectionRanges = ranges
         updateSourceEditor()
     }
 
     public override func didChangeText() {
-        applyMarkdownStyle()
+        let affectedRanges = consumePendingEditedRanges()
+        if shouldDeferLiveStyling {
+            applyMarkdownStyle(affectedRanges: affectedRanges + lastStyledSelectionRanges)
+            scheduleDeferredMarkdownStyle()
+        } else {
+            applyMarkdownStyle()
+        }
         super.didChangeText()
         onContentChange?(string)
         updateSourceEditor()
     }
 
+    public override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
+        let shouldChange = super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+        if shouldChange {
+            let replacementLength = (replacementString ?? "").utf16.count
+            pendingEditedRanges.append(NSRange(location: affectedCharRange.location, length: replacementLength))
+            if affectedCharRange.length > 0 {
+                pendingEditedRanges.append(NSRange(location: affectedCharRange.location, length: 0))
+            }
+        }
+        return shouldChange
+    }
+
     public override func setSelectedRange(_ charRange: NSRange) {
+        let previousRanges = lastStyledSelectionRanges
         super.setSelectedRange(charRange)
         guard !isApplyingMarkdownStyle else { return }
-        applyMarkdownStyle()
+        applyMarkdownStyleAfterSelectionChange(previousRanges: previousRanges)
         enclosingScrollView?.contentView.needsDisplay = true
         updateSourceEditor()
         onSelectionChange?()
     }
 
     public override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
+        let previousRanges = lastStyledSelectionRanges
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
         guard !isApplyingMarkdownStyle else { return }
         if !stillSelectingFlag {
-            applyMarkdownStyle()
+            applyMarkdownStyleAfterSelectionChange(previousRanges: previousRanges)
             enclosingScrollView?.contentView.needsDisplay = true
             updateSourceEditor()
             onSelectionChange?()
@@ -207,11 +244,87 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         if let url,
            let image = MarkdownImageLoader.image(contentsOf: url) {
             resolved = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
+        } else if let url,
+                  MarkdownImageLoader.canGenerateThumbnail(for: url) {
+            resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: url)
+            startThumbnailLoad(for: url, cacheKey: cacheKey, displayName: displayName)
         } else {
             resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: url)
         }
         imageCache[cacheKey] = resolved
         return resolved
+    }
+
+    private func applyMarkdownStyle(affectedRanges: [NSRange]) {
+        guard !isApplyingMarkdownStyle, let textStorage else { return }
+        let ranges = selectedRanges.compactMap { $0.rangeValue }
+        isApplyingMarkdownStyle = true
+        let undoWasEnabled = undoManager?.isUndoRegistrationEnabled ?? false
+        if undoWasEnabled {
+            undoManager?.disableUndoRegistration()
+        }
+        styler.apply(to: textStorage, selectedRanges: ranges, affectedRanges: affectedRanges + ranges)
+        if undoWasEnabled {
+            undoManager?.enableUndoRegistration()
+        }
+        isApplyingMarkdownStyle = false
+        lastStyledSelectionRanges = ranges
+        updateSourceEditor()
+    }
+
+    private func applyMarkdownStyleAfterSelectionChange(previousRanges: [NSRange]) {
+        if shouldDeferLiveStyling {
+            applyMarkdownStyle(affectedRanges: previousRanges + selectedRanges.compactMap { $0.rangeValue })
+        } else {
+            applyMarkdownStyle()
+        }
+    }
+
+    private var shouldDeferLiveStyling: Bool {
+        (textStorage?.length ?? 0) >= Self.largeDocumentStylingThreshold
+    }
+
+    private func consumePendingEditedRanges() -> [NSRange] {
+        defer { pendingEditedRanges.removeAll(keepingCapacity: true) }
+        if pendingEditedRanges.isEmpty {
+            return [selectedRange()]
+        }
+        return pendingEditedRanges
+    }
+
+    private func scheduleDeferredMarkdownStyle() {
+        pendingStyleWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingStyleWorkItem = nil
+            self.applyMarkdownStyleImmediately()
+            self.needsDisplay = true
+            self.subviews.forEach { $0.needsDisplay = true }
+        }
+        pendingStyleWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + Self.deferredStyleDelay, execute: workItem)
+    }
+
+    private func cancelDeferredMarkdownStyle() {
+        pendingStyleWorkItem?.cancel()
+        pendingStyleWorkItem = nil
+    }
+
+    private func startThumbnailLoad(for url: URL, cacheKey: String, displayName: String) {
+        guard !pendingImageLoads.contains(cacheKey) else { return }
+        pendingImageLoads.insert(cacheKey)
+
+        MarkdownImageLoader.generateThumbnail(for: url) { [weak self] image in
+            DispatchQueue.main.async {
+                guard let self else { return }
+                self.pendingImageLoads.remove(cacheKey)
+                self.imageCache[cacheKey] = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
+                guard image != nil else { return }
+                self.needsDisplay = true
+                self.subviews.forEach { $0.needsDisplay = true }
+                self.onImageResolutionChange?()
+            }
+        }
     }
 
     private func configure() {
@@ -366,34 +479,23 @@ private enum MarkdownImageLoader {
             return image
         }
 
-        guard url.pathExtension.lowercased() == "svg",
-              FileManager.default.fileExists(atPath: url.path)
-        else {
-            return nil
-        }
-
-        return quickLookThumbnail(for: url)
+        return nil
     }
 
-    private static func quickLookThumbnail(for url: URL) -> NSImage? {
+    static func canGenerateThumbnail(for url: URL) -> Bool {
+        url.pathExtension.lowercased() == "svg" && FileManager.default.fileExists(atPath: url.path)
+    }
+
+    static func generateThumbnail(for url: URL, completion: @escaping (NSImage?) -> Void) {
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
             size: CGSize(width: 1600, height: 1600),
             scale: NSScreen.main?.backingScaleFactor ?? 2,
             representationTypes: .all
         )
-        let semaphore = DispatchSemaphore(value: 0)
-        var renderedImage: NSImage?
 
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
-            renderedImage = representation?.nsImage
-            semaphore.signal()
+            completion(representation?.nsImage)
         }
-
-        guard semaphore.wait(timeout: .now() + .seconds(2)) == .success else {
-            return nil
-        }
-
-        return renderedImage
     }
 }

@@ -60,10 +60,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         workspace.textView.onContentChange = { [weak self] text in
             guard let self else { return }
             self.isEdited = text != self.savedText
-            self.workspace.updateMetrics()
+            self.workspace.scheduleMetricsUpdate()
         }
         workspace.textView.onSelectionChange = { [weak self] in
-            self?.workspace.updateMetrics()
+            self?.workspace.scheduleMetricsUpdate()
         }
     }
 

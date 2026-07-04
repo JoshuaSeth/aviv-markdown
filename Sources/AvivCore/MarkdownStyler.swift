@@ -21,20 +21,42 @@ public final class MarkdownStyler {
 
     public func apply(to textStorage: NSTextStorage, selectedRanges: [NSRange]) {
         let markdown = textStorage.string
-        let selected = selectedRanges
-        let attributed = attributedString(for: markdown, selectedRanges: selected)
+        let fullRange = NSRange(location: 0, length: (markdown as NSString).length)
+        guard fullRange.length > 0 else { return }
+
         textStorage.beginEditing()
-        textStorage.setAttributedString(attributed)
+        textStorage.setAttributes(theme.baseAttributes, range: fullRange)
+        applyBlockAndInlineStyles(to: textStorage, selectedRanges: selectedRanges)
         textStorage.endEditing()
     }
 
-    private func applyBlockAndInlineStyles(to attributed: NSMutableAttributedString, selectedRanges: [NSRange]) {
-        let nsString = attributed.string as NSString
-        let tableRows = MarkdownTableParser.rowMap(in: attributed.string)
-        var index = 0
-        var insideFence = false
+    public func apply(to textStorage: NSTextStorage, selectedRanges: [NSRange], affectedRanges: [NSRange]) {
+        let nsString = textStorage.string as NSString
+        guard nsString.length > 0,
+              let styleRange = expandedLineRange(covering: affectedRanges + selectedRanges, in: nsString)
+        else {
+            return
+        }
 
-        while index < nsString.length {
+        textStorage.beginEditing()
+        textStorage.setAttributes(theme.baseAttributes, range: styleRange)
+        applyBlockAndInlineStyles(to: textStorage, selectedRanges: selectedRanges, limitRange: styleRange)
+        textStorage.endEditing()
+    }
+
+    private func applyBlockAndInlineStyles(
+        to attributed: NSMutableAttributedString,
+        selectedRanges: [NSRange],
+        limitRange: NSRange? = nil
+    ) {
+        let nsString = attributed.string as NSString
+        let tableRows = limitRange == nil ? MarkdownTableParser.rowMap(in: attributed.string) : [:]
+        let styleLimit = limitRange.map { NSIntersectionRange($0, NSRange(location: 0, length: nsString.length)) }
+        let upperBound = styleLimit.map { NSMaxRange($0) } ?? nsString.length
+        var index = styleLimit.map { lineRange(containing: $0.location, in: nsString).location } ?? 0
+        var insideFence = styleLimit == nil ? false : isInsideFence(at: index, in: nsString)
+
+        while index < nsString.length, index < upperBound {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
             let line = nsString.substring(with: contentRange)
@@ -314,7 +336,23 @@ public final class MarkdownStyler {
         protectedRanges: inout [NSRange],
         handler: (NSTextCheckingResult) -> [NSRange]
     ) {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        guard let regex = MarkdownStylerRegex.regex(for: pattern) else { return }
+        applyMatches(
+            regex: regex,
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges,
+            handler: handler
+        )
+    }
+
+    private func applyMatches(
+        regex: NSRegularExpression,
+        to attributed: NSMutableAttributedString,
+        in searchRange: NSRange,
+        protectedRanges: inout [NSRange],
+        handler: (NSTextCheckingResult) -> [NSRange]
+    ) {
         let string = attributed.string
         let matches = regex.matches(in: string, range: searchRange)
         for match in matches where match.range.location != NSNotFound {
@@ -374,7 +412,7 @@ public final class MarkdownStyler {
     }
 
     private func parseTaskList(line: String, contentRange: NSRange) -> (prefixRange: NSRange, checkboxRange: NSRange, bodyRange: NSRange, checked: Bool)? {
-        guard let match = firstMatch(pattern: #"^(\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])\s+"#, in: line) else { return nil }
+        guard let match = firstMatch(regex: MarkdownStylerRegex.taskList, in: line) else { return nil }
         let prefix = match.range(at: 1)
         let checkbox = match.range(at: 2)
         let full = match.range(at: 0)
@@ -390,7 +428,7 @@ public final class MarkdownStyler {
     }
 
     private func parseList(line: String, contentRange: NSRange) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
-        guard let match = firstMatch(pattern: #"^\s*(?:[-+*]|\d+[.)])\s+"#, in: line) else { return nil }
+        guard let match = firstMatch(regex: MarkdownStylerRegex.list, in: line) else { return nil }
         let full = match.range(at: 0)
         let bodyStart = contentRange.location + full.length
         return (
@@ -400,7 +438,7 @@ public final class MarkdownStyler {
     }
 
     private func parseBlockquote(line: String, contentRange: NSRange) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
-        guard let match = firstMatch(pattern: #"^\s*>\s?"#, in: line) else { return nil }
+        guard let match = firstMatch(regex: MarkdownStylerRegex.blockquote, in: line) else { return nil }
         let full = match.range(at: 0)
         let bodyStart = contentRange.location + full.length
         return (
@@ -409,8 +447,7 @@ public final class MarkdownStyler {
         )
     }
 
-    private func firstMatch(pattern: String, in line: String) -> NSTextCheckingResult? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    private func firstMatch(regex: NSRegularExpression, in line: String) -> NSTextCheckingResult? {
         let range = NSRange(location: 0, length: (line as NSString).length)
         return regex.firstMatch(in: line, range: range)
     }
@@ -439,6 +476,39 @@ public final class MarkdownStyler {
         return false
     }
 
+    private func isInsideFence(at location: Int, in nsString: NSString) -> Bool {
+        var index = 0
+        var insideFence = false
+        while index < min(location, nsString.length) {
+            let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
+            let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            if isFence(trimmed) {
+                insideFence.toggle()
+            }
+            index = NSMaxRange(lineRange)
+        }
+        return insideFence
+    }
+
+    private func expandedLineRange(covering ranges: [NSRange], in nsString: NSString) -> NSRange? {
+        var result: NSRange?
+        for range in ranges {
+            guard range.location != NSNotFound else { continue }
+            let lineRange = lineRange(containing: range.location, length: range.length, in: nsString)
+            result = result.map { NSUnionRange($0, lineRange) } ?? lineRange
+        }
+        return result
+    }
+
+    private func lineRange(containing location: Int, length: Int = 0, in nsString: NSString) -> NSRange {
+        guard nsString.length > 0 else { return NSRange(location: 0, length: 0) }
+        let boundedLocation = min(max(0, location), max(0, nsString.length - 1))
+        let boundedLength = min(max(0, length), nsString.length - boundedLocation)
+        let target = NSRange(location: boundedLocation, length: boundedLength)
+        return nsString.lineRange(for: target)
+    }
+
     private func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {
         var length = lineRange.length
         while length > 0 {
@@ -455,4 +525,38 @@ public final class MarkdownStyler {
 
 private func rangesIntersect(_ first: NSRange, _ second: NSRange) -> Bool {
     NSIntersectionRange(first, second).length > 0
+}
+
+private enum MarkdownStylerRegex {
+    static let image = try! NSRegularExpression(pattern: MarkdownPatterns.image)
+    static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
+    static let link = try! NSRegularExpression(pattern: MarkdownPatterns.link)
+    static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
+    static let strike = try! NSRegularExpression(pattern: "(~~)(?=\\S)(.+?)(?<=\\S)~~")
+    static let italicAsterisk = try! NSRegularExpression(pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)")
+    static let italicUnderscore = try! NSRegularExpression(pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)")
+    static let taskList = try! NSRegularExpression(pattern: #"^(\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])\s+"#)
+    static let list = try! NSRegularExpression(pattern: #"^\s*(?:[-+*]|\d+[.)])\s+"#)
+    static let blockquote = try! NSRegularExpression(pattern: #"^\s*>\s?"#)
+
+    static func regex(for pattern: String) -> NSRegularExpression? {
+        switch pattern {
+        case MarkdownPatterns.image:
+            return image
+        case "`([^`\\n]+)`":
+            return inlineCode
+        case MarkdownPatterns.link:
+            return link
+        case "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1":
+            return bold
+        case "(~~)(?=\\S)(.+?)(?<=\\S)~~":
+            return strike
+        case "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)":
+            return italicAsterisk
+        case "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)":
+            return italicUnderscore
+        default:
+            return try? NSRegularExpression(pattern: pattern)
+        }
+    }
 }

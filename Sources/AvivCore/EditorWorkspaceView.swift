@@ -52,8 +52,12 @@ public final class EditorWorkspaceView: NSView {
     private var statusWidthConstraint: NSLayoutConstraint?
     private var ruleTopConstraint: NSLayoutConstraint?
     private var formatBottomConstraint: NSLayoutConstraint?
+    private var pendingTextGeometryWorkItem: DispatchWorkItem?
+    private var pendingMetricsWorkItem: DispatchWorkItem?
+    private var pendingMinimapWorkItem: DispatchWorkItem?
     private var lastTextGeometry: TextGeometry?
     private let geometryEpsilon: CGFloat = 0.25
+    private let largeDocumentUpdateThreshold = 12_000
 
     public init(frame frameRect: NSRect = .zero, theme: MarkdownTheme = .clean) {
         self.theme = theme
@@ -72,6 +76,7 @@ public final class EditorWorkspaceView: NSView {
     }
 
     public func loadMarkdown(_ markdown: String) {
+        cancelDeferredViewUpdates()
         textView.loadMarkdown(markdown)
         updateMetrics()
     }
@@ -91,6 +96,22 @@ public final class EditorWorkspaceView: NSView {
         let words = text.split { $0.isWhitespace || $0.isNewline }.count
         let lines = max(1, text.components(separatedBy: .newlines).count)
         statusLabel.stringValue = "\(words) words  \(lines) lines"
+    }
+
+    public func scheduleMetricsUpdate() {
+        guard shouldDeferExpensiveTextUpdates else {
+            updateMetrics()
+            return
+        }
+
+        pendingMetricsWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingMetricsWorkItem = nil
+            self.updateMetrics()
+        }
+        pendingMetricsWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(180), execute: workItem)
     }
 
     var minimapForTesting: MarkdownMinimapView {
@@ -268,28 +289,35 @@ public final class EditorWorkspaceView: NSView {
             self.needsLayout = true
             self.needsDisplay = true
         }
+        textView.onImageResolutionChange = { [weak self] in
+            self?.annotationOverlay.needsDisplay = true
+        }
         updateScaledChrome()
         syncFormatControl()
     }
 
     @objc private func boundsDidChange() {
-        updateTextInsets(preserveVisibleOrigin: true)
+        updateTextInsets(preserveVisibleOrigin: true, refreshDocumentHeight: false)
         annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
     @objc private func textDidChange() {
-        updateTextInsets(preserveVisibleOrigin: true)
+        if shouldDeferExpensiveTextUpdates {
+            scheduleTextGeometryRefresh()
+        } else {
+            updateTextInsets(preserveVisibleOrigin: true)
+        }
         annotationOverlay.needsDisplay = true
-        minimapView.needsDisplay = true
+        scheduleMinimapUpdate()
     }
 
     @objc private func selectionDidChange() {
         annotationOverlay.needsDisplay = true
-        minimapView.needsDisplay = true
+        scheduleMinimapUpdate()
     }
 
-    private func updateTextInsets(preserveVisibleOrigin: Bool = false) {
+    private func updateTextInsets(preserveVisibleOrigin: Bool = false, refreshDocumentHeight: Bool = true) {
         let visibleWidth = max(320, scrollView.contentSize.width)
         let scale = currentTheme.viewScale
         let horizontalPadding = documentFormat.editorHorizontalPadding(scale: scale)
@@ -304,6 +332,7 @@ public final class EditorWorkspaceView: NSView {
             containerWidth: containerWidth
         )
 
+        var geometryChanged = false
         if lastTextGeometry?.matches(geometry, epsilon: geometryEpsilon) != true {
             let newInset = NSSize(width: sideInset, height: verticalInset)
             if !sizesMatch(textView.textContainerInset, newInset) {
@@ -324,14 +353,57 @@ public final class EditorWorkspaceView: NSView {
                 textView.frame.size.width = visibleWidth
             }
             lastTextGeometry = geometry
+            geometryChanged = true
         }
 
-        updateDocumentHeight(preserveVisibleOrigin: preserveVisibleOrigin)
+        if refreshDocumentHeight || geometryChanged {
+            updateDocumentHeight(preserveVisibleOrigin: preserveVisibleOrigin)
+        }
         if annotationOverlay.frame != textView.bounds {
             annotationOverlay.frame = textView.bounds
         }
         annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
+    }
+
+    private var shouldDeferExpensiveTextUpdates: Bool {
+        (textView.textStorage?.length ?? 0) >= largeDocumentUpdateThreshold
+    }
+
+    private func scheduleTextGeometryRefresh() {
+        pendingTextGeometryWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingTextGeometryWorkItem = nil
+            self.updateTextInsets(preserveVisibleOrigin: true)
+        }
+        pendingTextGeometryWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(120), execute: workItem)
+    }
+
+    private func scheduleMinimapUpdate() {
+        guard shouldDeferExpensiveTextUpdates else {
+            minimapView.needsDisplay = true
+            return
+        }
+
+        pendingMinimapWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.pendingMinimapWorkItem = nil
+            self.minimapView.needsDisplay = true
+        }
+        pendingMinimapWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(180), execute: workItem)
+    }
+
+    private func cancelDeferredViewUpdates() {
+        pendingTextGeometryWorkItem?.cancel()
+        pendingTextGeometryWorkItem = nil
+        pendingMetricsWorkItem?.cancel()
+        pendingMetricsWorkItem = nil
+        pendingMinimapWorkItem?.cancel()
+        pendingMinimapWorkItem = nil
     }
 
     private func updateDocumentHeight(preserveVisibleOrigin: Bool) {

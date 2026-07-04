@@ -15,6 +15,7 @@ mkdir -p "$ROOT/dist/snapshots"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-minimap
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-scroll-bounds
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-scroll-jitter
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-typing-performance
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/reading.png"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-heading.png" --cursor "Aviv Markdown"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-inline.png" --cursor "bold text"

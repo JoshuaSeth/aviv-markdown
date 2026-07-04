@@ -53,13 +53,13 @@ public enum MarkdownAnnotationParser {
         let nsLine = line as NSString
         let fullLocalRange = NSRange(location: 0, length: nsLine.length)
 
-        if let heading = firstMatch(pattern: #"^(#{1,6})\s+"#, in: line) {
+        if let heading = firstMatch(regex: MarkdownAnnotationRegex.heading, in: line) {
             let markerRange = heading.range(at: 1)
             let global = NSRange(location: contentRange.location + markerRange.location, length: markerRange.length)
             tokens.append(MarkdownAnnotationToken(range: global, label: nsLine.substring(with: markerRange), role: .heading))
         }
 
-        if let fence = firstMatch(pattern: #"^\s*(```|~~~).*$"#, in: line) {
+        if let fence = firstMatch(regex: MarkdownAnnotationRegex.codeFence, in: line) {
             tokens.append(MarkdownAnnotationToken(range: NSRange(location: contentRange.location + fence.range.location, length: fence.range.length), label: nsLine.substring(with: fence.range), role: .codeFence))
         }
 
@@ -147,7 +147,7 @@ public enum MarkdownAnnotationParser {
         protectedRanges: [NSRange],
         handler: (NSTextCheckingResult) -> Void
     ) {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return }
+        guard let regex = MarkdownAnnotationRegex.regex(for: pattern) else { return }
         for match in regex.matches(in: line, range: range) {
             guard !protectedRanges.contains(where: { NSIntersectionRange($0, match.range).length > 0 }) else {
                 continue
@@ -165,8 +165,7 @@ public enum MarkdownAnnotationParser {
         }
     }
 
-    private static func firstMatch(pattern: String, in line: String) -> NSTextCheckingResult? {
-        guard let regex = try? NSRegularExpression(pattern: pattern) else { return nil }
+    private static func firstMatch(regex: NSRegularExpression, in line: String) -> NSTextCheckingResult? {
         let range = NSRange(location: 0, length: (line as NSString).length)
         return regex.firstMatch(in: line, range: range)
     }
@@ -182,5 +181,38 @@ public enum MarkdownAnnotationParser {
             }
         }
         return NSRange(location: lineRange.location, length: length)
+    }
+}
+
+private enum MarkdownAnnotationRegex {
+    static let heading = try! NSRegularExpression(pattern: #"^(#{1,6})\s+"#)
+    static let codeFence = try! NSRegularExpression(pattern: #"^\s*(```|~~~).*$"#)
+    static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
+    static let image = try! NSRegularExpression(pattern: MarkdownPatterns.image)
+    static let link = try! NSRegularExpression(pattern: MarkdownPatterns.link)
+    static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
+    static let strike = try! NSRegularExpression(pattern: "(~~)(?=\\S)(.+?)(?<=\\S)~~")
+    static let italicAsterisk = try! NSRegularExpression(pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)")
+    static let italicUnderscore = try! NSRegularExpression(pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)")
+
+    static func regex(for pattern: String) -> NSRegularExpression? {
+        switch pattern {
+        case "`([^`\\n]+)`":
+            return inlineCode
+        case MarkdownPatterns.image:
+            return image
+        case MarkdownPatterns.link:
+            return link
+        case "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1":
+            return bold
+        case "(~~)(?=\\S)(.+?)(?<=\\S)~~":
+            return strike
+        case "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)":
+            return italicAsterisk
+        case "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)":
+            return italicUnderscore
+        default:
+            return try? NSRegularExpression(pattern: pattern)
+        }
     }
 }

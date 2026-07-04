@@ -20,6 +20,10 @@ if arguments.contains("--verify-scroll-bounds") {
     exit(MarkdownScrollBoundsVerifier.runCLI())
 }
 
+if arguments.contains("--verify-typing-performance") {
+    exit(MarkdownTypingPerformanceVerifier.runCLI())
+}
+
 if arguments.contains("--verify-commands") {
     exit(AppCommandVerifier.runCLI())
 }

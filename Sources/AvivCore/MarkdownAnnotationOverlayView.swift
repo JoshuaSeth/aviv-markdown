@@ -32,8 +32,20 @@ public final class MarkdownAnnotationOverlayView: NSView {
         else { return }
 
         let ranges = textView.selectedRanges.compactMap { $0.rangeValue }
-        drawTables(in: textView, layoutManager: layoutManager, textContainer: textContainer, selectedRanges: ranges)
-        drawImages(in: textView, layoutManager: layoutManager, textContainer: textContainer)
+        let visibleRange = visibleCharacterRange(
+            in: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer,
+            dirtyRect: dirtyRect
+        )
+        drawTables(
+            in: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer,
+            selectedRanges: ranges,
+            visibleRange: visibleRange
+        )
+        drawImages(in: textView, layoutManager: layoutManager, textContainer: textContainer, visibleRange: visibleRange)
 
         let tokens = MarkdownAnnotationParser.tokens(in: textView.string, selectedRanges: ranges)
         guard !tokens.isEmpty else { return }
@@ -58,11 +70,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
     private func drawImages(
         in textView: MarkdownTextView,
         layoutManager: NSLayoutManager,
-        textContainer: NSTextContainer
+        textContainer: NSTextContainer,
+        visibleRange: NSRange
     ) {
         let markdown = textView.string
-        let excludedRanges = imageOverlayExcludedRanges(in: markdown)
-        let images = MarkdownImageParser.images(in: markdown).filter { image in
+        let excludedRanges = imageOverlayExcludedRanges(in: markdown, searchRange: visibleRange)
+        let images = MarkdownImageParser.images(in: markdown, range: visibleRange).filter { image in
             !excludedRanges.contains { NSIntersectionRange($0, image.range).length > 0 }
         }
         guard !images.isEmpty else { return }
@@ -170,13 +183,19 @@ public final class MarkdownAnnotationOverlayView: NSView {
         return NSSize(width: max(24, floor(source.width * scale)), height: max(24, floor(source.height * scale)))
     }
 
-    private func imageOverlayExcludedRanges(in markdown: String) -> [NSRange] {
+    private func imageOverlayExcludedRanges(in markdown: String, searchRange: NSRange) -> [NSRange] {
         var ranges: [NSRange] = []
         let nsString = markdown as NSString
-        var index = 0
-        var fenceStart: Int?
+        guard nsString.length > 0 else { return [] }
 
-        while index < nsString.length {
+        let boundedSearchRange = NSIntersectionRange(searchRange, NSRange(location: 0, length: nsString.length))
+        guard boundedSearchRange.location != NSNotFound else { return [] }
+
+        var index = nsString.lineRange(for: NSRange(location: boundedSearchRange.location, length: 0)).location
+        let searchEnd = NSMaxRange(nsString.lineRange(for: NSRange(location: min(NSMaxRange(boundedSearchRange), max(0, nsString.length - 1)), length: 0)))
+        var fenceStart: Int? = isInsideFence(at: index, in: nsString) ? index : nil
+
+        while index < nsString.length, index < searchEnd {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
             let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
@@ -196,6 +215,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
         }
 
         for block in MarkdownTableParser.blocks(in: markdown) {
+            guard NSIntersectionRange(block.range, boundedSearchRange).length > 0 else { continue }
             guard let first = block.rows.first?.lineRange,
                   let last = block.rows.last?.lineRange
             else { continue }
@@ -209,9 +229,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
         in textView: NSTextView,
         layoutManager: NSLayoutManager,
         textContainer: NSTextContainer,
-        selectedRanges: [NSRange]
+        selectedRanges: [NSRange],
+        visibleRange: NSRange
     ) {
-        let blocks = MarkdownTableParser.blocks(in: textView.string)
+        let blocks = MarkdownTableParser.blocks(in: textView.string).filter {
+            NSIntersectionRange($0.range, visibleRange).length > 0
+        }
         guard !blocks.isEmpty else { return }
 
         layoutManager.ensureLayout(for: textContainer)
@@ -434,6 +457,53 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
     private var currentTheme: MarkdownTheme {
         textView?.styler.theme ?? fallbackTheme
+    }
+
+    private func visibleCharacterRange(
+        in textView: NSTextView,
+        layoutManager: NSLayoutManager,
+        textContainer: NSTextContainer,
+        dirtyRect: NSRect
+    ) -> NSRange {
+        let documentLength = (textView.string as NSString).length
+        guard documentLength > 0 else { return NSRange(location: 0, length: 0) }
+
+        var queryRect = dirtyRect.insetBy(dx: -80, dy: -600)
+        queryRect = convert(queryRect, to: textView)
+        queryRect.origin.x -= textView.textContainerOrigin.x
+        queryRect.origin.y -= textView.textContainerOrigin.y
+
+        let glyphRange = layoutManager.glyphRange(forBoundingRect: queryRect, in: textContainer)
+        guard glyphRange.length > 0 else {
+            return NSRange(location: 0, length: documentLength)
+        }
+
+        var characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
+        characterRange = NSIntersectionRange(characterRange, NSRange(location: 0, length: documentLength))
+        guard characterRange.location != NSNotFound else {
+            return NSRange(location: 0, length: documentLength)
+        }
+
+        let nsString = textView.string as NSString
+        let startLine = nsString.lineRange(for: NSRange(location: characterRange.location, length: 0))
+        let endLocation = min(NSMaxRange(characterRange), max(0, documentLength - 1))
+        let endLine = nsString.lineRange(for: NSRange(location: endLocation, length: 0))
+        return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
+    }
+
+    private func isInsideFence(at location: Int, in nsString: NSString) -> Bool {
+        var index = 0
+        var insideFence = false
+        while index < min(location, nsString.length) {
+            let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
+            let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
+                insideFence.toggle()
+            }
+            index = NSMaxRange(lineRange)
+        }
+        return insideFence
     }
 
     private func renderedCellText(_ text: String) -> String {
