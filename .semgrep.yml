@@ -1,0 +1,87 @@
+rules:
+  - id: pitchai.swift.no-empty-catch
+    languages: [swift]
+    severity: ERROR
+    message: Empty catch blocks hide real failures.
+    patterns:
+      - pattern: |
+          catch {
+          }
+
+  - id: pitchai.swift.no-silent-try-optional
+    languages: [swift]
+    severity: ERROR
+    message: Do not use try? in business logic; handle or throw the error explicitly.
+    pattern: try? $EXPR
+
+  - id: pitchai.swift.no-force-try
+    languages: [swift]
+    severity: ERROR
+    message: Force try is forbidden in runtime code.
+    pattern: try! $EXPR
+
+  - id: pitchai.swift.no-task-detached
+    languages: [swift]
+    severity: ERROR
+    message: Task.detached is forbidden outside audited concurrency gateways.
+    pattern: Task.detached { ... }
+
+  - id: pitchai.swift.no-unchecked-sendable
+    languages: [swift]
+    severity: ERROR
+    message: "@unchecked Sendable requires an audited exception."
+    pattern-regex: '@unchecked\s+Sendable'
+
+  - id: pitchai.swift.no-mainactor-assumeisolated
+    languages: [swift]
+    severity: ERROR
+    message: MainActor.assumeIsolated requires an audited UI boundary exception.
+    pattern: MainActor.assumeIsolated(...)
+
+  - id: pitchai.swift.no-urlsession-outside-gateway
+    languages: [swift]
+    severity: ERROR
+    message: Direct URLSession calls belong in approved API gateway/client modules.
+    paths:
+      exclude:
+        - "**/API/**"
+        - "**/Api/**"
+        - "**/Client/**"
+        - "**/Clients/**"
+        - "**/Gateway/**"
+        - "**/Gateways/**"
+        - "**/Tests/**"
+    pattern-either:
+      - pattern: URLSession.shared.data(...)
+      - pattern: URLSession.shared.dataTask(...)
+      - pattern: URLSession.shared.upload(...)
+      - pattern: URLSession.shared.download(...)
+
+  - id: pitchai.swift.no-userdefaults-outside-persistence
+    languages: [swift]
+    severity: ERROR
+    message: Direct UserDefaults access belongs in persistence/config gateways.
+    paths:
+      exclude:
+        - "**/Persistence/**"
+        - "**/Storage/**"
+        - "**/Config/**"
+        - "**/Settings/**"
+        - "**/Tests/**"
+    pattern: UserDefaults.standard
+
+  - id: pitchai.swift.no-hardcoded-secret-key-name
+    languages: [swift]
+    severity: ERROR
+    message: Secret-like names with literal values are forbidden.
+    pattern-regex: '(?i)(api[_-]?key|secret|token)\s*[:=]\s*"[^"]{16,}"'
+
+  - id: pitchai.swift.no-print-logging
+    languages: [swift]
+    severity: ERROR
+    message: Use the project logger instead of print.
+    paths:
+      exclude:
+        - "**/Tests/**"
+        - "**/Preview*/**"
+    pattern: print(...)

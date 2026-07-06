@@ -1,0 +1,13 @@
+title = "PitchAI iOS secret scanning"
+
+[allowlist]
+description = "Allow placeholder values only"
+regexes = [
+  '''PLACEHOLDER_[A-Z0-9_]+''',
+  '''example(_|-)?(token|secret|key)''',
+]
+paths = [
+  '''ios_quality_gate/fixtures/.*''',
+  '''.*\.xcresult/.*''',
+  '''.*DerivedData/.*''',
+]
