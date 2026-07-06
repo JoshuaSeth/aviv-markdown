@@ -1,0 +1,8 @@
+retain_public: true
+strict: true
+disable_update_check: true
+index_exclude:
+  - Pods
+  - Carthage
+  - .build
+  - DerivedData
