@@ -76,6 +76,60 @@ public sealed partial class MarkdownMinimapView : UserControl
         }
     }
 
+    public void RenderLarge(int lineCount, double visibleMinY, double visibleHeight, double documentHeight)
+    {
+        currentMarkdown = string.Empty;
+        currentVisibleMinY = visibleMinY;
+        currentVisibleHeight = Math.Max(1, visibleHeight);
+        currentDocumentHeight = Math.Max(currentVisibleHeight, documentHeight);
+        MinimapCanvas.Children.Clear();
+
+        var width = Math.Max(1, ActualWidth);
+        var height = Math.Max(1, ActualHeight);
+        metrics = MarkdownMinimapViewport.Metrics(
+            new RectD(0, 0, width, height),
+            currentDocumentHeight,
+            new RectD(0, currentVisibleMinY, width, currentVisibleHeight),
+            horizontalInset: 4,
+            minimumThumbHeight: 10);
+
+        AddRect(
+            metrics.ThumbRect.X,
+            metrics.ThumbRect.Y,
+            metrics.ThumbRect.Width,
+            metrics.ThumbRect.Height,
+            new SolidColorBrush(global::Windows.UI.Color.FromArgb(18, 12, 116, 184)),
+            radius: 3,
+            stroke: new SolidColorBrush(global::Windows.UI.Color.FromArgb(46, 12, 116, 184)));
+
+        var insetX = 7.0;
+        var markerLaneWidth = 13.0;
+        var maxLineWidth = Math.Max(8, width - insetX * 2);
+        var contentX = insetX + markerLaneWidth;
+        var contentWidth = Math.Max(8, maxLineWidth - markerLaneWidth);
+        var drawableHeight = Math.Max(1, height - 16);
+        var projectedLines = Math.Min(180, Math.Max(1, lineCount));
+        var stride = Math.Max(1, (int)Math.Ceiling(lineCount / (double)projectedLines));
+        var lineStep = Math.Max(1.25, drawableHeight / Math.Max(1, projectedLines));
+        var y = 8.0;
+
+        for (var line = 0; line < lineCount && y <= height + lineStep; line += stride)
+        {
+            var bucket = line / Math.Max(1, stride);
+            var isHeadingHint = bucket % 12 == 0;
+            var isTableHint = bucket % 9 is 7 or 8;
+            var widthRatio = isHeadingHint ? 0.82 : isTableHint ? 0.68 : 0.52 + (bucket % 5) * 0.08;
+            var alpha = isHeadingHint ? (byte)0xA8 : isTableHint ? (byte)0x5E : (byte)0x38;
+            AddRect(
+                isHeadingHint ? insetX + 2 : contentX,
+                y,
+                Math.Min(contentWidth, contentWidth * widthRatio),
+                Math.Min(2.2, Math.Max(1.0, lineStep * 0.52)),
+                Brush(alpha, isHeadingHint ? (byte)0x0C : (byte)0x20, isHeadingHint ? (byte)0x74 : (byte)0x24, isHeadingHint ? (byte)0xB8 : (byte)0x2A));
+            y += lineStep;
+        }
+    }
+
     private void OnPointerPressed(object sender, PointerRoutedEventArgs args)
     {
         if (metrics is null)

@@ -6,8 +6,28 @@ public sealed record DocumentMetrics(int WordCount, int LineCount)
 
     public static DocumentMetrics For(string markdown)
     {
-        var words = markdown.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-        var lines = Math.Max(1, markdown.Split('\n').Length);
+        var words = 0;
+        var lines = 1;
+        var insideWord = false;
+
+        foreach (var character in markdown)
+        {
+            if (character == '\n')
+            {
+                lines++;
+            }
+
+            if (char.IsWhiteSpace(character))
+            {
+                insideWord = false;
+            }
+            else if (!insideWord)
+            {
+                words++;
+                insideWord = true;
+            }
+        }
+
         return new DocumentMetrics(words, lines);
     }
 }

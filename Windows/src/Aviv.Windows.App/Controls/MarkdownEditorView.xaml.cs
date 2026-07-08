@@ -19,15 +19,23 @@ public sealed partial class MarkdownEditorView : UserControl
     private const double BaseTopPadding = 72;
     private const double BaseRightPadding = 122;
     private const double BaseBottomPadding = 52;
+    private const int LargeDocumentThreshold = 50_000;
     private readonly RichEditBox Editor;
     private readonly MarkdownMinimapView Minimap;
     private readonly Popup SourcePopup;
     private readonly TextBox SourceEditor;
     private readonly DispatcherQueueTimer styleUpdateTimer;
+    private readonly DispatcherQueueTimer contentSyncTimer;
+    private readonly DispatcherQueueTimer minimapUpdateTimer;
     private readonly MarkdownStyler styler = new();
     private readonly WinUiMarkdownFormatter formatter = new();
     private bool applying;
     private bool isLoaded;
+    private bool markdownMayBeDirty;
+    private int[] lineStarts = [0];
+    private int lineCount = 1;
+    private int largeBaseStyleLength = -1;
+    private double largeBaseStyleScale = -1;
     private double viewScale = 1.0;
     private MarkdownEditableSourceSpan? activeSourceSpan;
 
@@ -43,6 +51,14 @@ public sealed partial class MarkdownEditorView : UserControl
         styleUpdateTimer.Interval = TimeSpan.FromMilliseconds(120);
         styleUpdateTimer.IsRepeating = false;
         styleUpdateTimer.Tick += (_, _) => ApplyMarkdownStyle();
+        contentSyncTimer = DispatcherQueue.CreateTimer();
+        contentSyncTimer.Interval = TimeSpan.FromMilliseconds(180);
+        contentSyncTimer.IsRepeating = false;
+        contentSyncTimer.Tick += (_, _) => SyncMarkdownFromEditor();
+        minimapUpdateTimer = DispatcherQueue.CreateTimer();
+        minimapUpdateTimer.Interval = TimeSpan.FromMilliseconds(120);
+        minimapUpdateTimer.IsRepeating = false;
+        minimapUpdateTimer.Tick += (_, _) => RenderMinimap();
         Minimap.ScrollRatioRequested += ScrollToRatio;
         Loaded += OnLoaded;
         DiagnosticLog.Write("MarkdownEditorView constructor completed.");
@@ -171,6 +187,9 @@ public sealed partial class MarkdownEditorView : UserControl
         DiagnosticLog.Write($"MarkdownEditorView.LoadMarkdown length={markdown.Length}.");
         applying = true;
         Markdown = markdown;
+        markdownMayBeDirty = false;
+        largeBaseStyleLength = -1;
+        UpdateDocumentIndexes(markdown);
         Editor.Document.SetText(TextSetOptions.None, markdown);
         applying = false;
         if (isLoaded)
@@ -183,6 +202,7 @@ public sealed partial class MarkdownEditorView : UserControl
     public void SetViewScale(double scale)
     {
         viewScale = scale;
+        largeBaseStyleScale = -1;
         Editor.FontSize = BaseBodyFontSize * viewScale;
         Editor.Padding = EditorPadding();
         ApplyMarkdownStyle();
@@ -252,8 +272,18 @@ public sealed partial class MarkdownEditorView : UserControl
             return;
         }
 
-        Markdown = ReadEditorText();
-        MarkdownChanged?.Invoke(Markdown);
+        markdownMayBeDirty = true;
+        if (IsLargeDocument)
+        {
+            ScheduleContentSync();
+            ScheduleMinimapUpdate();
+        }
+        else
+        {
+            Markdown = ReadEditorText();
+            UpdateDocumentIndexes(Markdown);
+            MarkdownChanged?.Invoke(Markdown);
+        }
         ScheduleMarkdownStyle();
     }
 
@@ -264,7 +294,7 @@ public sealed partial class MarkdownEditorView : UserControl
             return;
         }
 
-        RenderMinimap();
+        ScheduleMinimapUpdate();
         if (SourcePopupEnabled())
         {
             UpdateSourceEditor();
@@ -284,10 +314,23 @@ public sealed partial class MarkdownEditorView : UserControl
 
         applying = true;
         styleUpdateTimer.Stop();
-        Markdown = ReadEditorText();
-        var snapshot = styler.Snapshot(Markdown, [CurrentSelection()]);
-        formatter.Apply(Editor, snapshot, viewScale);
-        RenderMinimap();
+        if (IsLargeDocument)
+        {
+            if (markdownMayBeDirty)
+            {
+                ScheduleContentSync();
+            }
+            ApplyLargeDocumentBaseStyleIfNeeded();
+            RenderMinimap();
+        }
+        else
+        {
+            Markdown = ReadEditorText();
+            UpdateDocumentIndexes(Markdown);
+            var snapshot = styler.Snapshot(Markdown, [CurrentSelection()]);
+            formatter.Apply(Editor, snapshot, viewScale);
+            RenderMinimap();
+        }
         applying = false;
     }
 
@@ -299,6 +342,14 @@ public sealed partial class MarkdownEditorView : UserControl
         }
 
         styleUpdateTimer.Stop();
+        if (IsLargeDocument)
+        {
+            styleUpdateTimer.Interval = TimeSpan.FromMilliseconds(420);
+        }
+        else
+        {
+            styleUpdateTimer.Interval = TimeSpan.FromMilliseconds(120);
+        }
         styleUpdateTimer.Start();
     }
 
@@ -413,30 +464,117 @@ public sealed partial class MarkdownEditorView : UserControl
 
     private void RenderMinimap()
     {
-        var lines = Math.Max(1, Markdown.Split('\n').Length);
         var visibleLines = 28 / Math.Max(0.60, viewScale);
-        var currentLine = Markdown[..Math.Clamp(CurrentSelection().Start, 0, Markdown.Length)].Count(character => character == '\n');
-        var documentHeight = Math.Max(visibleLines, lines);
+        var currentLine = CurrentLineIndex();
+        var documentHeight = Math.Max(visibleLines, lineCount);
         var visibleMinY = Math.Min(Math.Max(0, currentLine - visibleLines / 2), Math.Max(0, documentHeight - visibleLines));
-        Minimap.Render(Markdown, visibleMinY, visibleLines, documentHeight);
+        if (IsLargeDocument)
+        {
+            Minimap.RenderLarge(lineCount, visibleMinY, visibleLines, documentHeight);
+        }
+        else
+        {
+            Minimap.Render(Markdown, visibleMinY, visibleLines, documentHeight);
+        }
     }
 
     private void ScrollToRatio(double ratio)
     {
-        var targetLine = (int)Math.Round(Math.Clamp(ratio, 0, 1) * Math.Max(0, Markdown.Split('\n').Length - 1));
-        var index = 0;
-        for (var line = 0; line < targetLine && index < Markdown.Length; line++)
-        {
-            var next = Markdown.IndexOf('\n', index);
-            if (next < 0)
-            {
-                break;
-            }
-
-            index = next + 1;
-        }
+        var targetLine = (int)Math.Round(Math.Clamp(ratio, 0, 1) * Math.Max(0, lineCount - 1));
+        var index = lineStarts[Math.Clamp(targetLine, 0, lineStarts.Length - 1)];
 
         Editor.Document.Selection.SetRange(index, index);
         Editor.Focus(Microsoft.UI.Xaml.FocusState.Programmatic);
+    }
+
+    private bool IsLargeDocument => Markdown.Length >= LargeDocumentThreshold;
+
+    private void ApplyLargeDocumentBaseStyleIfNeeded()
+    {
+        if (largeBaseStyleLength == Markdown.Length &&
+            Math.Abs(largeBaseStyleScale - viewScale) < 0.0001)
+        {
+            return;
+        }
+
+        Editor.FontSize = BaseBodyFontSize * viewScale;
+        largeBaseStyleLength = Markdown.Length;
+        largeBaseStyleScale = viewScale;
+    }
+
+    private void ScheduleContentSync()
+    {
+        contentSyncTimer.Stop();
+        contentSyncTimer.Start();
+    }
+
+    private void SyncMarkdownFromEditor()
+    {
+        if (applying || !isLoaded || !markdownMayBeDirty)
+        {
+            return;
+        }
+
+        var next = ReadEditorText();
+        markdownMayBeDirty = false;
+        if (string.Equals(next, Markdown, StringComparison.Ordinal))
+        {
+            return;
+        }
+
+        Markdown = next;
+        UpdateDocumentIndexes(Markdown);
+        MarkdownChanged?.Invoke(Markdown);
+        ScheduleMinimapUpdate();
+    }
+
+    private void ScheduleMinimapUpdate()
+    {
+        if (!isLoaded || applying)
+        {
+            return;
+        }
+
+        if (IsLargeDocument)
+        {
+            minimapUpdateTimer.Stop();
+            minimapUpdateTimer.Start();
+        }
+        else
+        {
+            RenderMinimap();
+        }
+    }
+
+    private int CurrentLineIndex()
+    {
+        if (lineStarts.Length == 0)
+        {
+            return 0;
+        }
+
+        var selectionStart = Math.Clamp(CurrentSelection().Start, 0, Math.Max(0, Markdown.Length));
+        var index = Array.BinarySearch(lineStarts, selectionStart);
+        if (index >= 0)
+        {
+            return Math.Clamp(index, 0, lineStarts.Length - 1);
+        }
+
+        return Math.Clamp(~index - 1, 0, lineStarts.Length - 1);
+    }
+
+    private void UpdateDocumentIndexes(string markdown)
+    {
+        var starts = new List<int> { 0 };
+        for (var index = 0; index < markdown.Length; index++)
+        {
+            if (markdown[index] == '\n' && index + 1 < markdown.Length)
+            {
+                starts.Add(index + 1);
+            }
+        }
+
+        lineStarts = starts.ToArray();
+        lineCount = Math.Max(1, lineStarts.Length);
     }
 }
