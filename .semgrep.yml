@@ -12,13 +12,13 @@ rules:
     languages: [swift]
     severity: ERROR
     message: Do not use try? in business logic; handle or throw the error explicitly.
-    pattern: try? $EXPR
+    pattern-regex: '\btry\?(?!\w)'
 
   - id: pitchai.swift.no-force-try
     languages: [swift]
     severity: ERROR
     message: Force try is forbidden in runtime code.
-    pattern: try! $EXPR
+    pattern-regex: '\btry!(?!\w)'
 
   - id: pitchai.swift.no-task-detached
     languages: [swift]
