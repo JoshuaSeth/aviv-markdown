@@ -23,17 +23,25 @@ ROOT = Path.cwd()
 DEFAULT_EXCLUDES = {
     ".build",
     ".git",
+    ".nox",
+    ".swiftpm",
+    ".tox",
+    ".venv",
     "DerivedData",
     "Pods",
     "Carthage",
+    "__pycache__",
     "fastlane/report.xml",
     "build",
+    "node_modules",
+    "venv",
 }
 
 
 @dataclass(frozen=True)
 class CheckConfig:
     root: Path
+    spm_path: str
     workspace: str
     project: str
     scheme: str
@@ -51,6 +59,7 @@ class CheckConfig:
     enable_semgrep: bool
     enable_gitleaks: bool
     enable_spm: bool
+    enable_spm_tests: bool
     enable_snapshots: bool
     generated_allowlist: tuple[str, ...]
     semgrep_config: str
@@ -85,6 +94,7 @@ def load_env_file(path: Path) -> None:
 
 def config_from_env(root: Path) -> CheckConfig:
     load_env_file(root / "scripts" / "ios_check.env")
+    spm_path = os.getenv("IOS_CHECK_SPM_PATH", ".").strip() or "."
     workspace = os.getenv("IOS_CHECK_WORKSPACE", "")
     project = os.getenv("IOS_CHECK_PROJECT", "")
     scheme = os.getenv("IOS_CHECK_SCHEME", "")
@@ -94,8 +104,13 @@ def config_from_env(root: Path) -> CheckConfig:
         for item in os.getenv("IOS_CHECK_GENERATED_ALLOWLIST", "").split(":")
         if item.strip()
     )
+    enable_spm = env_bool(
+        "IOS_CHECK_ENABLE_SPM",
+        (root / spm_path / "Package.swift").exists(),
+    )
     return CheckConfig(
         root=root,
+        spm_path=spm_path,
         workspace=workspace,
         project=project,
         scheme=scheme,
@@ -115,7 +130,8 @@ def config_from_env(root: Path) -> CheckConfig:
         enable_swiftlint=env_bool("IOS_CHECK_ENABLE_SWIFTLINT", True),
         enable_semgrep=env_bool("IOS_CHECK_ENABLE_SEMGREP", True),
         enable_gitleaks=env_bool("IOS_CHECK_ENABLE_GITLEAKS", True),
-        enable_spm=env_bool("IOS_CHECK_ENABLE_SPM", (root / "Package.swift").exists()),
+        enable_spm=enable_spm,
+        enable_spm_tests=env_bool("IOS_CHECK_ENABLE_SPM_TESTS", enable_spm),
         enable_snapshots=env_bool("IOS_CHECK_ENABLE_SNAPSHOTS", False),
         generated_allowlist=allowlist,
         semgrep_config=os.getenv("IOS_CHECK_SEMGREP_CONFIG", ".semgrep.yml"),
@@ -170,6 +186,16 @@ def should_skip(path: Path, root: Path) -> bool:
     return any(rel_text.startswith(prefix.rstrip("/") + "/") for prefix in DEFAULT_EXCLUDES)
 
 
+def spm_package_root(config: CheckConfig) -> Path | None:
+    root = config.root.resolve()
+    candidate = (root / config.spm_path).resolve()
+    try:
+        candidate.relative_to(root)
+    except ValueError:
+        return None
+    return candidate
+
+
 def project_args(config: CheckConfig) -> list[str]:
     if config.workspace:
         return ["-workspace", config.workspace]
@@ -218,6 +244,19 @@ def gate_preflight(config: CheckConfig) -> int:
             file=sys.stderr,
         )
         return 1
+    if config.enable_spm:
+        package_root = spm_package_root(config)
+        if package_root is None:
+            print("FAIL: IOS_CHECK_SPM_PATH must stay inside the repository root", file=sys.stderr)
+            return 1
+        if not (package_root / "Package.swift").is_file():
+            print(
+                f"FAIL: IOS_CHECK_ENABLE_SPM=1 but {config.spm_path}/Package.swift is missing",
+                file=sys.stderr,
+            )
+            return 1
+        relative_root = package_root.relative_to(config.root.resolve())
+        print(f"SwiftPM package root: {relative_root or Path('.')}")
     for rel in config.generated_allowlist:
         if not (config.root / rel).exists():
             print(f"FAIL: generated allowlist path does not exist: {rel}", file=sys.stderr)
@@ -265,17 +304,17 @@ def gate_swiftlint(config: CheckConfig) -> int:
 FORBIDDEN_PATTERNS: tuple[tuple[str, re.Pattern[str], str], ...] = (
     (
         "force-unwrap",
-        re.compile(r"(?<![=!])!(?![=])"),
+        re.compile(r"(?<=[A-Za-z0-9_)\]}])!(?!=)"),
         "force unwrap is forbidden in runtime code without a pitchai-allow marker",
     ),
     (
         "force-try",
-        re.compile(r"\btry!\b"),
+        re.compile(r"\btry!(?!\w)"),
         "force try is forbidden in runtime code",
     ),
     (
         "silent-try",
-        re.compile(r"\btry\?\b"),
+        re.compile(r"\btry\?(?!\w)"),
         "try? is forbidden outside an explicitly documented edge",
     ),
     (
@@ -320,6 +359,58 @@ def has_allow_marker(line: str, previous: str) -> bool:
     return "pitchai-allow-" in line or "pitchai-allow-" in previous
 
 
+def swift_code_without_literals(
+    line: str,
+    block_comment_depth: int,
+    in_multiline_string: bool,
+) -> tuple[str, int, bool]:
+    """Blank comments and strings while preserving source offsets for regex rules."""
+    output = [" "] * len(line)
+    index = 0
+    while index < len(line):
+        if in_multiline_string:
+            end = line.find('"""', index)
+            if end == -1:
+                return "".join(output), block_comment_depth, True
+            index = end + 3
+            in_multiline_string = False
+            continue
+        if block_comment_depth:
+            if line.startswith("/*", index):
+                block_comment_depth += 1
+                index += 2
+            elif line.startswith("*/", index):
+                block_comment_depth -= 1
+                index += 2
+            else:
+                index += 1
+            continue
+        if line.startswith("//", index):
+            break
+        if line.startswith("/*", index):
+            block_comment_depth = 1
+            index += 2
+            continue
+        if line.startswith('"""', index):
+            in_multiline_string = True
+            index += 3
+            continue
+        if line[index] == '"':
+            index += 1
+            while index < len(line):
+                if line[index] == "\\":
+                    index += 2
+                    continue
+                if line[index] == '"':
+                    index += 1
+                    break
+                index += 1
+            continue
+        output[index] = line[index]
+        index += 1
+    return "".join(output), block_comment_depth, in_multiline_string
+
+
 def gate_pitchai_patterns(config: CheckConfig) -> int:
     print_header("PitchAI Swift pattern rules")
     failures: list[str] = []
@@ -331,13 +422,19 @@ def gate_pitchai_patterns(config: CheckConfig) -> int:
             continue
         lines = path.read_text(encoding="utf-8").splitlines()
         previous = ""
+        block_comment_depth = 0
+        in_multiline_string = False
         for line_number, line in enumerate(lines, start=1):
-            stripped = line.strip()
-            if stripped.startswith("//") or has_allow_marker(line, previous):
+            code, block_comment_depth, in_multiline_string = swift_code_without_literals(
+                line,
+                block_comment_depth,
+                in_multiline_string,
+            )
+            if has_allow_marker(line, previous):
                 previous = line
                 continue
             for rule_id, pattern, message in FORBIDDEN_PATTERNS:
-                if pattern.search(line):
+                if pattern.search(code):
                     failures.append(f"{rel}:{line_number}: {rule_id}: {message}")
             previous = line
     if failures:
@@ -409,19 +506,52 @@ def gate_semgrep(config: CheckConfig) -> int:
 
 def gate_spm_resolve(config: CheckConfig) -> int:
     if not config.enable_spm:
-        print_header("SwiftPM resolve not applicable")
+        print_header("SwiftPM checks not applicable")
         return 0
-    print_header("SwiftPM resolve")
-    if not (config.root / "Package.swift").exists():
-        print("FAIL: IOS_CHECK_ENABLE_SPM=1 but Package.swift is missing", file=sys.stderr)
+    print_header("SwiftPM manifest, resolve, strict build, and test")
+    package_root = spm_package_root(config)
+    if package_root is None:
+        print("FAIL: IOS_CHECK_SPM_PATH must stay inside the repository root", file=sys.stderr)
+        return 1
+    if not (package_root / "Package.swift").is_file():
+        print(
+            f"FAIL: IOS_CHECK_ENABLE_SPM=1 but {config.spm_path}/Package.swift is missing",
+            file=sys.stderr,
+        )
         return 1
     if not tool_exists("swift"):
         print("FAIL: swift is required for SwiftPM checks but missing", file=sys.stderr)
         return 1
-    first = run_command(["swift", "package", "dump-package"], cwd=config.root)
-    if first != 0:
-        return first
-    return run_command(["swift", "package", "resolve"], cwd=config.root)
+    commands = [
+        ["swift", "package", "dump-package"],
+        ["swift", "package", "resolve"],
+        [
+            "swift",
+            "build",
+            "-Xswiftc",
+            "-warnings-as-errors",
+            "-Xswiftc",
+            "-strict-concurrency=complete",
+        ],
+    ]
+    if config.enable_spm_tests:
+        commands.append(
+            [
+                "swift",
+                "test",
+                "-Xswiftc",
+                "-warnings-as-errors",
+                "-Xswiftc",
+                "-strict-concurrency=complete",
+            ]
+        )
+    else:
+        print("SwiftPM tests explicitly disabled by IOS_CHECK_ENABLE_SPM_TESTS=0")
+    for command in commands:
+        code = run_command(command, cwd=package_root)
+        if code != 0:
+            return code
+    return 0
 
 
 def gate_xcode_build(config: CheckConfig) -> int:
@@ -511,7 +641,11 @@ def gates() -> list[Gate]:
         Gate("secrets-builtin", "built-in secret scan", gate_builtin_secrets),
         Gate("gitleaks", "Gitleaks secret scan", gate_gitleaks),
         Gate("semgrep", "Semgrep Swift/iOS rules", gate_semgrep),
-        Gate("spm-resolve", "SwiftPM dump-package and resolve", gate_spm_resolve),
+        Gate(
+            "spm-resolve",
+            "SwiftPM manifest, dependency, strict build, and test checks",
+            gate_spm_resolve,
+        ),
         Gate("xcode-build-for-testing", "xcodebuild build-for-testing with warnings as errors", gate_xcode_build),
         Gate("swiftlint-analyze", "SwiftLint analyzer rules from compiler log", gate_swiftlint_analyze),
         Gate("xcode-analyze", "xcodebuild static analyzer", gate_xcode_analyze),
@@ -567,11 +701,17 @@ let package = Package(
         encoding="utf-8",
     )
     (root / "Sources" / "ProbeApp" / "Probe.swift").write_text(
-        """public struct Probe {
+        """private func risky() throws -> String {
+    "ok"
+}
+
+public struct Probe {
     public init() {}
 
     public func value(_ input: String?) -> String {
         print("debug")
+        _ = try? risky()
+        _ = try! risky()
         return input!
     }
 }
@@ -591,7 +731,7 @@ final class ProbeTests: XCTestCase {
         encoding="utf-8",
     )
     (root / "Secrets.swift").write_text(
-        'let api_key = "abcdefghijklmnopqrstuvwxyz123456"\n',
+        'let api_key = "' + "abcdefghijklmnopqrstuvwxyz" + '123456"\n',
         encoding="utf-8",
     )
     (root / "scripts" / "ios_check.env").write_text(
@@ -600,6 +740,7 @@ IOS_CHECK_ENABLE_SWIFTLINT=0
 IOS_CHECK_ENABLE_SEMGREP=0
 IOS_CHECK_ENABLE_GITLEAKS=0
 IOS_CHECK_ENABLE_SPM=0
+IOS_CHECK_ENABLE_SPM_TESTS=0
 IOS_CHECK_ENABLE_XCODE=0
 IOS_CHECK_ENABLE_TESTS=0
 """,
@@ -626,9 +767,25 @@ def run_probe() -> int:
         if aggregate_code == 0:
             failures.append("aggregate command did not fail on injected violations")
         if tool_exists("swift"):
-            test_code = run_command(["swift", "test"], cwd=root)
+            old_spm = os.environ.get("IOS_CHECK_ENABLE_SPM")
+            old_spm_tests = os.environ.get("IOS_CHECK_ENABLE_SPM_TESTS")
+            os.environ["IOS_CHECK_ENABLE_SPM"] = "1"
+            os.environ["IOS_CHECK_ENABLE_SPM_TESTS"] = "1"
+            try:
+                test_code = gate_spm_resolve(config_from_env(root))
+            finally:
+                if old_spm is None:
+                    os.environ.pop("IOS_CHECK_ENABLE_SPM", None)
+                else:
+                    os.environ["IOS_CHECK_ENABLE_SPM"] = old_spm
+                if old_spm_tests is None:
+                    os.environ.pop("IOS_CHECK_ENABLE_SPM_TESTS", None)
+                else:
+                    os.environ["IOS_CHECK_ENABLE_SPM_TESTS"] = old_spm_tests
             if test_code == 0:
-                failures.append("swift test did not fail on injected XCTest violation")
+                failures.append(
+                    "SwiftPM strict build/test gate did not fail on injected XCTest violation"
+                )
         else:
             print("swift missing; XCTest failure probe requires macOS/Xcode or Swift toolchain")
         shim_code = run_probe_with_failing_tools(root)
@@ -664,6 +821,7 @@ def run_probe_with_failing_tools(root: Path) -> int:
     os.environ["IOS_CHECK_ENABLE_GITLEAKS"] = "1"
     os.environ["IOS_CHECK_ENABLE_SEMGREP"] = "1"
     os.environ["IOS_CHECK_ENABLE_SPM"] = "0"
+    os.environ["IOS_CHECK_ENABLE_SPM_TESTS"] = "0"
     os.environ["IOS_CHECK_ENABLE_XCODE"] = "1"
     os.environ["IOS_CHECK_REQUIRE_XCODE"] = "1"
     os.environ["IOS_CHECK_ENABLE_TESTS"] = "1"
