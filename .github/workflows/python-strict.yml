@@ -1,0 +1,50 @@
+name: Python strict gate
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - "**/*.py"
+      - ".github/workflows/python-strict.yml"
+      - ".semgrep.yml"
+      - ".semgrepignore"
+      - "docs/python-quality-gate.md"
+      - "pyproject.toml"
+      - "scripts/check*.py"
+      - "uv.lock"
+  push:
+    branches: [main]
+    paths:
+      - "**/*.py"
+      - ".github/workflows/python-strict.yml"
+      - ".semgrep.yml"
+      - ".semgrepignore"
+      - "docs/python-quality-gate.md"
+      - "pyproject.toml"
+      - "scripts/check*.py"
+      - "uv.lock"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: python-strict-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  python-strict:
+    runs-on: ubuntu-22.04
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.12"
+          enable-cache: false
+      - name: Install locked dependencies
+        run: uv sync --python 3.12 --frozen
+      - name: Run hyper-strict Python gate
+        run: uv run --python 3.12 check
