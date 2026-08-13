@@ -48,6 +48,7 @@ class CheckConfig:
     configuration: str
     destination: str
     derived_data: str
+    package_authorization_provider: str
     enable_xcode: bool
     require_xcode: bool
     enable_tests: bool
@@ -120,6 +121,10 @@ def config_from_env(root: Path) -> CheckConfig:
             "platform=iOS Simulator,name=iPhone 16,OS=latest",
         ),
         derived_data=os.getenv("IOS_CHECK_DERIVED_DATA", ".build/DerivedData/check"),
+        package_authorization_provider=os.getenv(
+            "IOS_CHECK_XCODE_PACKAGE_AUTHORIZATION_PROVIDER",
+            "",
+        ).strip(),
         enable_xcode=env_bool("IOS_CHECK_ENABLE_XCODE", has_xcode_target),
         require_xcode=env_bool("IOS_CHECK_REQUIRE_XCODE", has_xcode_target),
         enable_tests=env_bool("IOS_CHECK_ENABLE_TESTS", has_xcode_target),
@@ -205,6 +210,12 @@ def project_args(config: CheckConfig) -> list[str]:
 
 
 def xcode_common_args(config: CheckConfig) -> list[str]:
+    package_authorization_args: list[str] = []
+    if config.package_authorization_provider:
+        package_authorization_args = [
+            "-packageAuthorizationProvider",
+            config.package_authorization_provider,
+        ]
     return [
         *project_args(config),
         "-scheme",
@@ -215,6 +226,7 @@ def xcode_common_args(config: CheckConfig) -> list[str]:
         config.destination,
         "-derivedDataPath",
         config.derived_data,
+        *package_authorization_args,
         "SWIFT_TREAT_WARNINGS_AS_ERRORS=YES",
         "GCC_TREAT_WARNINGS_AS_ERRORS=YES",
         "CLANG_TREAT_WARNINGS_AS_ERRORS=YES",
@@ -241,6 +253,13 @@ def gate_preflight(config: CheckConfig) -> int:
         print(
             "FAIL: Xcode gates are enabled but IOS_CHECK_WORKSPACE/PROJECT and "
             "IOS_CHECK_SCHEME are not configured",
+            file=sys.stderr,
+        )
+        return 1
+    if config.package_authorization_provider not in {"", "keychain", "netrc"}:
+        print(
+            "FAIL: IOS_CHECK_XCODE_PACKAGE_AUTHORIZATION_PROVIDER must be "
+            "'keychain', 'netrc', or empty",
             file=sys.stderr,
         )
         return 1
@@ -273,7 +292,10 @@ def gate_swift_format(config: CheckConfig) -> int:
         print("FAIL: swift-format is required but missing", file=sys.stderr)
         return 1
     files = [str(path.relative_to(config.root)) for path in swift_files(config.root)]
-    return run_command(["swift-format", "lint", "--recursive", *files], cwd=config.root)
+    return run_command(
+        ["swift-format", "lint", "--strict", "--recursive", *files],
+        cwd=config.root,
+    )
 
 
 def gate_swiftformat(config: CheckConfig) -> int:
