@@ -1,28 +1,9 @@
-name: Python strict gate
+name: Python strict
 
 on:
   pull_request:
-    branches: [main]
-    paths:
-      - "**/*.py"
-      - ".github/workflows/python-strict.yml"
-      - ".semgrep.yml"
-      - ".semgrepignore"
-      - "docs/python-quality-gate.md"
-      - "pyproject.toml"
-      - "scripts/check*.py"
-      - "uv.lock"
   push:
-    branches: [main]
-    paths:
-      - "**/*.py"
-      - ".github/workflows/python-strict.yml"
-      - ".semgrep.yml"
-      - ".semgrepignore"
-      - "docs/python-quality-gate.md"
-      - "pyproject.toml"
-      - "scripts/check*.py"
-      - "uv.lock"
+  workflow_dispatch:
 
 permissions:
   contents: read
@@ -32,19 +13,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  python-strict:
+  check:
     runs-on: ubuntu-22.04
     timeout-minutes: 45
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
         with:
           persist-credentials: false
-      - name: Set up uv
-        uses: astral-sh/setup-uv@v6
+
+      - name: Verify the anti-bypass trust anchor
+        shell: bash
+        run: |
+          set -euo pipefail
+          verifier_path="quality/pitchai_quality/check_no_validation_bypasses.py"
+          expected_verifier_sha256="b6a61700350d951d80fb1a4f966928ffcfe7395533ec888f028436f14be9c2a8"
+          actual_verifier_sha256="$(sha256sum "$verifier_path" | awk '{print $1}')"
+          if [[ "$actual_verifier_sha256" != "$expected_verifier_sha256" ]]; then
+            printf '%s: SHA-256 trust anchor mismatch (expected %s, got %s)\n' \
+              "$verifier_path" "$expected_verifier_sha256" "$actual_verifier_sha256" >&2
+            exit 1
+          fi
+
+      - uses: astral-sh/setup-uv@11f9893b081a58869d3b5fccaea48c9e9e46f990
         with:
+          version: "0.10.0"
           python-version: "3.12"
-          enable-cache: false
-      - name: Install locked dependencies
-        run: uv sync --python 3.12 --frozen
-      - name: Run hyper-strict Python gate
-        run: uv run --python 3.12 check
+          enable-cache: true
+
+      - name: Install the locked quality environment
+        run: uv sync --project quality --python 3.12 --frozen
+
+      - name: Run every fail-closed Python gate
+        run: uv run --project quality --python 3.12 --frozen check

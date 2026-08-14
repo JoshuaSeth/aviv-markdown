@@ -1,0 +1,24 @@
+{
+  "schema": 1,
+  "files": {
+    "QUALITY.md": "1b8630e818d571bd472cfab3bd07588e1de726a2cc868b2b285deca29458d807",
+    "quality/.gitignore": "9c7bcd3943d0972b48a7484f6a2a3635bfaa89db04176068f3afab590ef7785e",
+    "quality/.semgrep.yml": "b3aa9b18b0993999899d45d704c44b516dd50e42634f00379d39ea5ddd1a647e",
+    "quality/.semgrepignore": "5ac837fad6ac50281eec4bafdbd801f53b86229d6b9d7789ad677a2c707630e1",
+    "quality/pitchai_quality/__init__.py": "9ff94adb5ef0caff64ea7874c7b27522114838259c3f9d3904c505fdc0ce80c5",
+    "quality/pitchai_quality/analysis_support.py": "2c43a12b0db62009cdf4cb482a37e6d39d554d2ed14936ed1d5be2152827524b",
+    "quality/pitchai_quality/check.py": "d89ca2bb261d4f7332005a0855c56214b644c964ed913ff31970078f94da17df",
+    "quality/pitchai_quality/check_nested_event_loops.py": "06c843bbf1c61f584cfab25fe497473a3cef3809ac22ced4735e16de22b2fb0f",
+    "quality/pitchai_quality/check_no_dense_inline_comprehensions.py": "6b92d27b231cff3627169c89b1cffc0a4e8807c19e47c7b76320211ac7c8da68",
+    "quality/pitchai_quality/check_no_pure_wrapper_functions.py": "41d04633ef98ce4dcd7c1167ef0722148571304ee26e0747147f743751360e0c",
+    "quality/pitchai_quality/check_no_single_use_one_line_functions.py": "a9dfbe78d539bb02e15f9f93e0d024077b9ed2e5cb8fee2b86632ce37a0a8edf",
+    "quality/pitchai_quality/check_no_vague_signatures.py": "73ea3156085de8c309f56ce1f890506b9737c9bebc1070ec84d9d264d343f1df",
+    "quality/pitchai_quality/pure_wrapper_index.py": "5b6224328c321af0a20f1e57f64cbfaac41ffba4c3e6cd770aa5658ee7a24691",
+    "quality/pitchai_quality/pure_wrapper_resolution.py": "0c42e1489804f28705a112658dbe9cbde4b6354e83083dadd063d9637c4dd3a4",
+    "quality/pitchai_quality/single_use_reporting.py": "15c3234eb503abeeac0844fa491ed2d2532ce009b28a47f14a1520af729cdadb",
+    "quality/pitchai_quality/source_files.py": "fb53f3871634d650ed3dcd3ffa3a8f435f1800eb8f1697c368f8377d9406dd26",
+    "quality/pitchai_quality/strict_policy.py": "e0712dc31ca5fbecf05da7aea14c9311355263ec0e964061f738876282c6d2e9",
+    "quality/pyproject.toml": "e3fab0ba7192bf73ea91a011a2a2f59044f4416a9122494c32a844ae3e3c329d",
+    "quality/uv.lock": "5902b8f54fdb6f8a6ebaa0e9e6ed585a6fa40af8bbbb74179965ce8c39a05565"
+  }
+}
