@@ -1,0 +1,89 @@
+rules:
+  - id: py-try-except-outside-edges
+    message: "try/except is only allowed at explicit IO/API/UI/CLI edges; business logic should fail loudly."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern: |
+          try:
+            ...
+          except ...:
+            ...
+      - pattern-not-inside: |
+          @router.$METHOD(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @router.$METHOD(...)
+          async def $F(...): ...
+      - pattern-not-inside: |
+          @app.$METHOD(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @app.$METHOD(...)
+          async def $F(...): ...
+      - pattern-not-inside: |
+          @blueprint.route(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @blueprint.route(...)
+          async def $F(...): ...
+      - pattern-not-inside: |
+          @click.command(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @app.command(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @typer.$CMD(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @celery.task(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          @shared_task(...)
+          def $F(...): ...
+      - pattern-not-inside: |
+          if __name__ == "__main__":
+            ...
+
+  - id: forbid-requests-outside-infra
+    message: "HTTP calls must go through an explicit infrastructure gateway."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: requests.$F(...)
+          - pattern: httpx.$F(...)
+          - pattern: aiohttp.$F(...)
+          - pattern: urllib.request.$F(...)
+          - pattern: urllib3.$F(...)
+          - pattern: socket.$F(...)
+
+  - id: forbid-aws-sdks-outside-infra
+    message: "Cloud SDKs must be wrapped in an explicit infrastructure gateway."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: boto3.$F(...)
+          - pattern: botocore.$F(...)
+          - pattern: aiobotocore.$F(...)
+
+  - id: no-handmade-paths
+    message: "Build keys and paths through a naming abstraction in application/interface code."
+    severity: ERROR
+    languages: [python]
+    patterns:
+      - pattern-either:
+          - pattern: Path($X) / $Y
+          - pattern: $P.mkdir(..., parents=$Z, ...)
+          - pattern: os.path.join($X, $Y, ...)
+          - pattern: f".../{...}/..."
+          - pattern: $A + "/" + $B
+          - pattern: '"/" + $X'
+    paths:
+      include:
+        - "**/app/application/**"
+        - "**/app/interfaces/**"
+        - "**/src/*/application/**"
+        - "**/src/*/interfaces/**"

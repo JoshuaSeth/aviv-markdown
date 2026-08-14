@@ -1,0 +1,92 @@
+[project]
+name = "pitchai-repository-quality"
+version = "1.0.0"
+description = "Fail-closed PitchAI Python quality gate"
+requires-python = ">=3.12,<3.13"
+dependencies = [
+  "anyio==4.13.0",
+  "basedpyright==1.39.8",
+  "pylint==4.0.5",
+  "ruff==0.15.17",
+  "semgrep==1.166.0",
+]
+
+[project.scripts]
+check = "pitchai_quality.check:main"
+
+[build-system]
+requires = ["setuptools==80.10.2"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools]
+packages = ["pitchai_quality"]
+
+[tool.uv]
+package = true
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+preview = true
+indent-width = 4
+
+[tool.ruff.lint]
+select = ["ALL"]
+preview = true
+fixable = ["ALL"]
+unfixable = []
+
+[tool.ruff.lint.mccabe]
+max-complexity = 20
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.lint.flake8-annotations]
+mypy-init-return = true
+
+[tool.ruff.lint.flake8-type-checking]
+quote-annotations = true
+strict = true
+
+[tool.ruff.lint.pylint]
+max-nested-blocks = 4
+max-locals = 30
+
+[tool.ruff.format]
+docstring-code-format = false
+
+[tool.basedpyright]
+typeCheckingMode = "strict"
+failOnWarnings = true
+include = [".."]
+pythonVersion = "3.12"
+pythonPlatform = "All"
+venvPath = "."
+venv = ".venv"
+allowedUntypedLibraries = []
+reportAny = "error"
+reportExplicitAny = "error"
+reportInvalidCast = "error"
+reportImplicitRelativeImport = "error"
+reportPrivateLocalImportUsage = "error"
+reportUnusedParameter = "error"
+reportImplicitAbstractClass = "error"
+reportInvalidAbstractMethod = "error"
+reportIncompatibleUnannotatedOverride = "error"
+reportUnannotatedClassAttribute = "error"
+
+[tool.pylint.main]
+jobs = 0
+reports = "no"
+load-plugins = [
+  "pylint.extensions.broad_try_clause",
+  "pylint.extensions.overlapping_exceptions",
+]
+
+[tool.pylint.similarities]
+min-similarity-lines = 6
+
+[tool.pylint.format]
+max-line-length = 120
+max-module-lines = 250
