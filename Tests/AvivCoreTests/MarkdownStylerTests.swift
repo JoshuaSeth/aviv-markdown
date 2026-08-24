@@ -1,14 +1,23 @@
 import AppKit
 import XCTest
+
 @testable import AvivCore
 
 final class MarkdownStylerTests: XCTestCase {
     func testHeadingSyntaxIsSuppressedButContentIsStyled() {
         let markdown = "# Title\n\nBody"
-        let attributed = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 9, length: 0)])
+        let attributed = MarkdownStyler().attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 9, length: 0)]
+        )
 
-        let syntaxColor = attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-        XCTAssertEqual(syntaxColor?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1, 0, accuracy: 0.001)
+        let syntaxColor =
+            attributed.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        XCTAssertEqual(
+            syntaxColor?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1,
+            0,
+            accuracy: 0.001
+        )
         let syntaxFont = attributed.attribute(.font, at: 0, effectiveRange: nil) as? NSFont
         XCTAssertLessThan(syntaxFont?.pointSize ?? 1, 1)
 
@@ -19,31 +28,67 @@ final class MarkdownStylerTests: XCTestCase {
     func testActiveHeadingHasNonLayoutAnnotationTokenWithoutChangingContentStyle() {
         let markdown = "# Title\n\nBody"
         let styler = MarkdownStyler()
-        let inactive = styler.attributedString(for: markdown, selectedRanges: [NSRange(location: 9, length: 0)])
-        let active = styler.attributedString(for: markdown, selectedRanges: [NSRange(location: 3, length: 0)])
+        let inactive = styler.attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 9, length: 0)]
+        )
+        let active = styler.attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 3, length: 0)]
+        )
 
-        let inactiveSyntax = inactive.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-        let activeSyntax = active.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
-        XCTAssertEqual(inactiveSyntax?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1, 0, accuracy: 0.001)
-        XCTAssertEqual(activeSyntax?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1, 0, accuracy: 0.001)
+        let inactiveSyntax =
+            inactive.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        let activeSyntax =
+            active.attribute(.foregroundColor, at: 0, effectiveRange: nil) as? NSColor
+        XCTAssertEqual(
+            inactiveSyntax?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1,
+            0,
+            accuracy: 0.001
+        )
+        XCTAssertEqual(
+            activeSyntax?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1,
+            0,
+            accuracy: 0.001
+        )
 
         XCTAssertEqual(fontKey(inactive, at: 2), fontKey(active, at: 2))
         XCTAssertEqual(colorKey(inactive, at: 2), colorKey(active, at: 2))
 
-        let tokens = MarkdownAnnotationParser.tokens(in: markdown, selectedRanges: [NSRange(location: 3, length: 0)])
-        XCTAssertTrue(tokens.contains(MarkdownAnnotationToken(range: NSRange(location: 0, length: 1), label: "#", role: .heading)))
+        let tokens = MarkdownAnnotationParser.tokens(
+            in: markdown,
+            selectedRanges: [NSRange(location: 3, length: 0)]
+        )
+        XCTAssertTrue(
+            tokens.contains(
+                MarkdownAnnotationToken(
+                    range: NSRange(location: 0, length: 1),
+                    label: "#",
+                    role: .heading
+                )
+            )
+        )
     }
 
     func testInlineSyntaxIsSuppressedAndActiveLineProducesAnnotations() {
         let markdown = "A **bold** word\nSecond line"
-        let inactive = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 20, length: 0)])
-        let active = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 4, length: 0)])
+        let inactive = MarkdownStyler().attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 20, length: 0)]
+        )
+        let active = MarkdownStyler().attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 4, length: 0)]
+        )
 
         XCTAssertEqual(alpha(inactive, at: 2), 0, accuracy: 0.001)
         XCTAssertEqual(alpha(active, at: 2), 0, accuracy: 0.001)
         XCTAssertEqual(fontKey(inactive, at: 5), fontKey(active, at: 5))
 
-        let tokens = MarkdownAnnotationParser.tokens(in: markdown, selectedRanges: [NSRange(location: 4, length: 0)])
+        let tokens = MarkdownAnnotationParser.tokens(
+            in: markdown,
+            selectedRanges: [NSRange(location: 4, length: 0)]
+        )
         XCTAssertTrue(tokens.contains { $0.label == "**" && $0.range.location == 2 })
         XCTAssertTrue(tokens.contains { $0.label == "**" && $0.range.location == 8 })
     }
@@ -51,10 +96,16 @@ final class MarkdownStylerTests: XCTestCase {
     func testMixedInlineOnlyRevealsFocusedSpan() {
         let markdown = "Mix **bold**, _italic_, `code`, and [link](https://example.com)."
         let ns = markdown as NSString
-        let boldTokens = MarkdownAnnotationParser.tokens(in: markdown, selectedRanges: [NSRange(location: ns.range(of: "bold").location, length: 0)])
+        let boldTokens = MarkdownAnnotationParser.tokens(
+            in: markdown,
+            selectedRanges: [NSRange(location: ns.range(of: "bold").location, length: 0)]
+        )
         XCTAssertEqual(boldTokens.map(\.label), ["**", "**"])
 
-        let linkTokens = MarkdownAnnotationParser.tokens(in: markdown, selectedRanges: [NSRange(location: ns.range(of: "link").location, length: 0)])
+        let linkTokens = MarkdownAnnotationParser.tokens(
+            in: markdown,
+            selectedRanges: [NSRange(location: ns.range(of: "link").location, length: 0)]
+        )
         XCTAssertEqual(linkTokens.map(\.label), ["[link](https://example.com)"])
     }
 
@@ -68,27 +119,41 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(images.first?.altText, "Alt text")
         XCTAssertEqual(images.first?.target, "photo.png")
 
-        let attributed = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 0, length: 0)])
+        let attributed = MarkdownStyler().attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 0, length: 0)]
+        )
         XCTAssertEqual(attributed.string, markdown)
         XCTAssertEqual(alpha(attributed, at: imageRange.location), 0, accuracy: 0.001)
         XCTAssertEqual(alpha(attributed, at: ns.range(of: "Alt text").location), 0, accuracy: 0.001)
 
-        let paragraph = attributed.attribute(.paragraphStyle, at: imageRange.location, effectiveRange: nil) as? NSParagraphStyle
+        let paragraph =
+            attributed.attribute(.paragraphStyle, at: imageRange.location, effectiveRange: nil)
+            as? NSParagraphStyle
         XCTAssertGreaterThan(paragraph?.minimumLineHeight ?? 0, 120)
     }
 
     func testInlineImageHidesOnlyImageSourceSpan() {
         let markdown = "Before ![Alt text](photo.png) after"
         let ns = markdown as NSString
-        let attributed = MarkdownStyler().attributedString(for: markdown, selectedRanges: [NSRange(location: 0, length: 0)])
+        let attributed = MarkdownStyler().attributedString(
+            for: markdown,
+            selectedRanges: [NSRange(location: 0, length: 0)]
+        )
 
         XCTAssertGreaterThan(alpha(attributed, at: ns.range(of: "Before").location), 0.9)
-        XCTAssertEqual(alpha(attributed, at: ns.range(of: "![Alt text](photo.png)").location), 0, accuracy: 0.001)
+        XCTAssertEqual(
+            alpha(attributed, at: ns.range(of: "![Alt text](photo.png)").location),
+            0,
+            accuracy: 0.001
+        )
         XCTAssertGreaterThan(alpha(attributed, at: ns.range(of: "after").location), 0.9)
     }
 
     func testLocalImageResolutionLoadsRelativeImageFromDocumentFolder() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let imageURL = directory.appendingPathComponent("photo.png")
         try writeTestPNG(to: imageURL)
@@ -104,12 +169,16 @@ final class MarkdownStylerTests: XCTestCase {
     }
 
     func testLocalSVGResolutionLoadsRelativeImageFromDocumentFolder() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let imageURL = directory.appendingPathComponent("diagram.svg")
         try writeTestSVG(to: imageURL)
 
-        let reference = try XCTUnwrap(MarkdownImageParser.images(in: "![Diagram](diagram.svg)").first)
+        let reference = try XCTUnwrap(
+            MarkdownImageParser.images(in: "![Diagram](diagram.svg)").first
+        )
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.markdownImageBaseURL = directory
 
@@ -122,11 +191,15 @@ final class MarkdownStylerTests: XCTestCase {
     }
 
     func testMissingLocalImageResolutionKeepsSourceURLForDiagnostics() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let missingURL = directory.appendingPathComponent("missing.svg")
 
-        let reference = try XCTUnwrap(MarkdownImageParser.images(in: "![Missing](missing.svg)").first)
+        let reference = try XCTUnwrap(
+            MarkdownImageParser.images(in: "![Missing](missing.svg)").first
+        )
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.markdownImageBaseURL = directory
 
@@ -139,7 +212,9 @@ final class MarkdownStylerTests: XCTestCase {
     func testUndoRevertsTextChangeWithoutStyleUndoStep() {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.loadMarkdown("Hello **world**")
-        textView.setSelectedRange(NSRange(location: (textView.string as NSString).length, length: 0))
+        textView.setSelectedRange(
+            NSRange(location: (textView.string as NSString).length, length: 0)
+        )
         textView.insertText("!", replacementRange: textView.selectedRange())
 
         XCTAssertEqual(textView.string, "Hello **world**!")
@@ -153,7 +228,11 @@ final class MarkdownStylerTests: XCTestCase {
         let zoomed = compact.zoomedIn()
 
         XCTAssertEqual(compact.viewScale, MarkdownTheme.defaultViewScale, accuracy: 0.001)
-        XCTAssertEqual(zoomed.viewScale, compact.viewScale * MarkdownTheme.zoomStep, accuracy: 0.001)
+        XCTAssertEqual(
+            zoomed.viewScale,
+            compact.viewScale * MarkdownTheme.zoomStep,
+            accuracy: 0.001
+        )
         XCTAssertLessThan(compact.bodyFont.pointSize, 17)
         XCTAssertGreaterThan(zoomed.bodyFont.pointSize, compact.bodyFont.pointSize)
 
@@ -172,11 +251,17 @@ final class MarkdownStylerTests: XCTestCase {
         textView.resetTextSize()
 
         XCTAssertEqual(textView.string, markdown)
-        XCTAssertEqual(textView.styler.theme.viewScale, MarkdownTheme.defaultViewScale, accuracy: 0.001)
+        XCTAssertEqual(
+            textView.styler.theme.viewScale,
+            MarkdownTheme.defaultViewScale,
+            accuracy: 0.001
+        )
     }
 
     func testDocumentIORoundTripUsesUTF8Markdown() throws {
-        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
+            UUID().uuidString
+        )
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         let url = directory.appendingPathComponent("sample.md")
         let markdown = "# Saved\n\nA **markdown** file."
@@ -186,7 +271,8 @@ final class MarkdownStylerTests: XCTestCase {
     }
 
     private func alpha(_ attributed: NSAttributedString, at index: Int) -> CGFloat {
-        let color = attributed.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor
+        let color =
+            attributed.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor
         return color?.usingColorSpace(.deviceRGB)?.alphaComponent ?? 1
     }
 
@@ -196,8 +282,16 @@ final class MarkdownStylerTests: XCTestCase {
     }
 
     private func colorKey(_ attributed: NSAttributedString, at index: Int) -> String {
-        let color = (attributed.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor)?.usingColorSpace(.deviceRGB)
-        return String(format: "%.3f-%.3f-%.3f-%.3f", color?.redComponent ?? 0, color?.greenComponent ?? 0, color?.blueComponent ?? 0, color?.alphaComponent ?? 0)
+        let color =
+            (attributed.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor)?
+            .usingColorSpace(.deviceRGB)
+        return String(
+            format: "%.3f-%.3f-%.3f-%.3f",
+            color?.redComponent ?? 0,
+            color?.greenComponent ?? 0,
+            color?.blueComponent ?? 0,
+            color?.alphaComponent ?? 0
+        )
     }
 
     private func writeTestPNG(to url: URL) throws {
@@ -210,8 +304,8 @@ final class MarkdownStylerTests: XCTestCase {
         image.unlockFocus()
 
         guard let tiff = image.tiffRepresentation,
-              let bitmap = NSBitmapImageRep(data: tiff),
-              let png = bitmap.representation(using: .png, properties: [:])
+            let bitmap = NSBitmapImageRep(data: tiff),
+            let png = bitmap.representation(using: .png, properties: [:])
         else {
             XCTFail("Could not create test PNG")
             return
@@ -221,12 +315,12 @@ final class MarkdownStylerTests: XCTestCase {
 
     private func writeTestSVG(to url: URL) throws {
         let svg = """
-        <svg xmlns="http://www.w3.org/2000/svg" width="180" height="90" viewBox="0 0 180 90">
-          <rect width="180" height="90" rx="12" fill="#0c74b8"/>
-          <circle cx="50" cy="45" r="22" fill="#f7d154"/>
-          <path d="M85 30h70v12H85zM85 52h48v10H85z" fill="#ffffff"/>
-        </svg>
-        """
+            <svg xmlns="http://www.w3.org/2000/svg" width="180" height="90" viewBox="0 0 180 90">
+              <rect width="180" height="90" rx="12" fill="#0c74b8"/>
+              <circle cx="50" cy="45" r="22" fill="#f7d154"/>
+              <path d="M85 30h70v12H85zM85 52h48v10H85z" fill="#ffffff"/>
+            </svg>
+            """
         try svg.write(to: url, atomically: true, encoding: .utf8)
     }
 }

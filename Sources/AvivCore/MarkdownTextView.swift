@@ -41,7 +41,8 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         field.wantsLayer = true
         field.layer?.cornerRadius = 5
         field.layer?.borderWidth = 1
-        field.layer?.borderColor = NSColor(calibratedRed: 0.840, green: 0.858, blue: 0.878, alpha: 1).cgColor
+        field.layer?.borderColor =
+            NSColor(calibratedRed: 0.840, green: 0.858, blue: 0.878, alpha: 1).cgColor
         return field
     }()
 
@@ -50,7 +51,9 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         let textStorage = NSTextStorage()
         let layoutManager = NSLayoutManager()
         layoutManager.allowsNonContiguousLayout = true
-        let textContainer = NSTextContainer(containerSize: NSSize(width: frameRect.width, height: .greatestFiniteMagnitude))
+        let textContainer = NSTextContainer(
+            containerSize: NSSize(width: frameRect.width, height: .greatestFiniteMagnitude)
+        )
         textContainer.widthTracksTextView = true
         textContainer.heightTracksTextView = false
         textContainer.lineFragmentPadding = 0
@@ -103,7 +106,11 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
             undoManager?.disableUndoRegistration()
         }
         styler.apply(to: textStorage, selectedRanges: ranges)
-        super.setSelectedRanges(ranges.map { NSValue(range: $0) }, affinity: .downstream, stillSelecting: false)
+        super.setSelectedRanges(
+            ranges.map { NSValue(range: $0) },
+            affinity: .downstream,
+            stillSelecting: false
+        )
         if undoWasEnabled {
             undoManager?.enableUndoRegistration()
         }
@@ -125,11 +132,19 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         updateSourceEditor()
     }
 
-    public override func shouldChangeText(in affectedCharRange: NSRange, replacementString: String?) -> Bool {
-        let shouldChange = super.shouldChangeText(in: affectedCharRange, replacementString: replacementString)
+    public override func shouldChangeText(
+        in affectedCharRange: NSRange,
+        replacementString: String?
+    ) -> Bool {
+        let shouldChange = super.shouldChangeText(
+            in: affectedCharRange,
+            replacementString: replacementString
+        )
         if shouldChange {
             let replacementLength = (replacementString ?? "").utf16.count
-            pendingEditedRanges.append(NSRange(location: affectedCharRange.location, length: replacementLength))
+            pendingEditedRanges.append(
+                NSRange(location: affectedCharRange.location, length: replacementLength)
+            )
             if affectedCharRange.length > 0 {
                 pendingEditedRanges.append(NSRange(location: affectedCharRange.location, length: 0))
             }
@@ -147,7 +162,11 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         onSelectionChange?()
     }
 
-    public override func setSelectedRanges(_ ranges: [NSValue], affinity: NSSelectionAffinity, stillSelecting stillSelectingFlag: Bool) {
+    public override func setSelectedRanges(
+        _ ranges: [NSValue],
+        affinity: NSSelectionAffinity,
+        stillSelecting stillSelectingFlag: Bool
+    ) {
         let previousRanges = lastStyledSelectionRanges
         super.setSelectedRanges(ranges, affinity: affinity, stillSelecting: stillSelectingFlag)
         guard !isApplyingMarkdownStyle else { return }
@@ -169,7 +188,9 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
             if shouldChangeText(in: selected, replacementString: replacement) {
                 replaceCharacters(in: selected, with: replacement)
                 didChangeText()
-                setSelectedRange(NSRange(location: selected.location + prefix.count, length: selected.length))
+                setSelectedRange(
+                    NSRange(location: selected.location + prefix.count, length: selected.length)
+                )
             }
         } else {
             let replacement = prefix + suffix
@@ -200,7 +221,15 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         if shouldChangeText(in: contentRange, replacementString: newLine) {
             replaceCharacters(in: contentRange, with: newLine)
             didChangeText()
-            setSelectedRange(NSRange(location: min(contentRange.location + hashes.count, (string as NSString).length), length: 0))
+            setSelectedRange(
+                NSRange(
+                    location: min(
+                        contentRange.location + hashes.count,
+                        (string as NSString).length
+                    ),
+                    length: 0
+                )
+            )
         }
     }
 
@@ -226,26 +255,38 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         font = styler.theme.bodyFont
         updateSourceEditorAppearance()
         applyMarkdownStyle()
-        setSelectedRange(NSRange(location: min(selected.location, (string as NSString).length), length: selected.length))
+        setSelectedRange(
+            NSRange(
+                location: min(selected.location, (string as NSString).length),
+                length: selected.length
+            )
+        )
         needsLayout = true
         needsDisplay = true
         onViewScaleChange?()
     }
 
-    public func resolvedMarkdownImage(for reference: MarkdownImageReference) -> MarkdownResolvedImage {
+    public func resolvedMarkdownImage(
+        for reference: MarkdownImageReference
+    ) -> MarkdownResolvedImage {
         let cacheKey = "\(markdownImageBaseURL?.path ?? "")|\(reference.target)"
         if let cached = imageCache[cacheKey] {
             return cached
         }
 
-        let url = MarkdownImageResolver.fileURL(for: reference.target, baseURL: markdownImageBaseURL)
+        let url = MarkdownImageResolver.fileURL(
+            for: reference.target,
+            baseURL: markdownImageBaseURL
+        )
         let displayName = url?.lastPathComponent ?? reference.target
         let resolved: MarkdownResolvedImage
         if let url,
-           let image = MarkdownImageLoader.image(contentsOf: url) {
+            let image = MarkdownImageLoader.image(contentsOf: url)
+        {
             resolved = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
         } else if let url,
-                  MarkdownImageLoader.canGenerateThumbnail(for: url) {
+            MarkdownImageLoader.canGenerateThumbnail(for: url)
+        {
             resolved = MarkdownResolvedImage(image: nil, displayName: displayName, sourceURL: url)
             startThumbnailLoad(for: url, cacheKey: cacheKey, displayName: displayName)
         } else {
@@ -263,7 +304,11 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         if undoWasEnabled {
             undoManager?.disableUndoRegistration()
         }
-        styler.apply(to: textStorage, selectedRanges: ranges, affectedRanges: affectedRanges + ranges)
+        styler.apply(
+            to: textStorage,
+            selectedRanges: ranges,
+            affectedRanges: affectedRanges + ranges
+        )
         if undoWasEnabled {
             undoManager?.enableUndoRegistration()
         }
@@ -274,7 +319,9 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
     private func applyMarkdownStyleAfterSelectionChange(previousRanges: [NSRange]) {
         if shouldDeferLiveStyling {
-            applyMarkdownStyle(affectedRanges: previousRanges + selectedRanges.compactMap { $0.rangeValue })
+            applyMarkdownStyle(
+                affectedRanges: previousRanges + selectedRanges.compactMap { $0.rangeValue }
+            )
         } else {
             applyMarkdownStyle()
         }
@@ -315,15 +362,17 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         pendingImageLoads.insert(cacheKey)
 
         MarkdownImageLoader.generateThumbnail(for: url) { [weak self] image in
-            DispatchQueue.main.async {
-                guard let self else { return }
-                self.pendingImageLoads.remove(cacheKey)
-                self.imageCache[cacheKey] = MarkdownResolvedImage(image: image, displayName: displayName, sourceURL: url)
-                guard image != nil else { return }
-                self.needsDisplay = true
-                self.subviews.forEach { $0.needsDisplay = true }
-                self.onImageResolutionChange?()
-            }
+            guard let self else { return }
+            self.pendingImageLoads.remove(cacheKey)
+            self.imageCache[cacheKey] = MarkdownResolvedImage(
+                image: image,
+                displayName: displayName,
+                sourceURL: url
+            )
+            guard image != nil else { return }
+            self.needsDisplay = true
+            self.subviews.forEach { $0.needsDisplay = true }
+            self.onImageResolutionChange?()
         }
     }
 
@@ -347,11 +396,17 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         font = styler.theme.bodyFont
         textColor = styler.theme.textColor
         minSize = NSSize(width: 0, height: 0)
-        maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         isVerticallyResizable = true
         isHorizontallyResizable = false
         autoresizingMask = [.width]
-        textContainerInset = NSSize(width: styler.theme.scaledMetric(28), height: styler.theme.scaledMetric(72))
+        textContainerInset = NSSize(
+            width: styler.theme.scaledMetric(28),
+            height: styler.theme.scaledMetric(72)
+        )
         textContainer?.lineFragmentPadding = 0
     }
 
@@ -363,9 +418,12 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
         let selection = selectedRange()
         guard selection.length == 0,
-              let span = MarkdownSourceSpanParser.editableSpan(containing: selection.location, in: string),
-              let layoutManager,
-              let textContainer
+            let span = MarkdownSourceSpanParser.editableSpan(
+                containing: selection.location,
+                in: string
+            ),
+            let layoutManager,
+            let textContainer
         else {
             sourceEditor.isHidden = true
             activeEditableSourceRange = nil
@@ -373,8 +431,17 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         }
 
         layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: span.range, actualCharacterRange: nil)
-        let effectiveGlyphRange = glyphRange.length > 0 ? glyphRange : NSRange(location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)), length: 1)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: span.range,
+            actualCharacterRange: nil
+        )
+        let effectiveGlyphRange =
+            glyphRange.length > 0
+            ? glyphRange
+            : NSRange(
+                location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)),
+                length: 1
+            )
         var rect = layoutManager.boundingRect(forGlyphRange: effectiveGlyphRange, in: textContainer)
         rect.origin.x += textContainerOrigin.x
         rect.origin.y += textContainerOrigin.y
@@ -384,8 +451,14 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         ]
         let sourceSize = (span.source as NSString).size(withAttributes: attributes)
         let width = min(
-            max(styler.theme.scaledMetric(170, minimum: 122), ceil(sourceSize.width) + styler.theme.scaledMetric(18, minimum: 12)),
-            max(styler.theme.scaledMetric(240, minimum: 170), bounds.width - rect.minX - styler.theme.scaledMetric(26, minimum: 18))
+            max(
+                styler.theme.scaledMetric(170, minimum: 122),
+                ceil(sourceSize.width) + styler.theme.scaledMetric(18, minimum: 12)
+            ),
+            max(
+                styler.theme.scaledMetric(240, minimum: 170),
+                bounds.width - rect.minX - styler.theme.scaledMetric(26, minimum: 18)
+            )
         )
         let height: CGFloat = styler.theme.scaledMetric(23, minimum: 17)
 
@@ -410,7 +483,9 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
     public override func doCommand(by selector: Selector) {
         if window?.firstResponder === sourceEditor.currentEditor(),
-           selector == #selector(NSResponder.insertNewline(_:)) || selector == #selector(NSResponder.cancelOperation(_:)) {
+            selector == #selector(NSResponder.insertNewline(_:))
+                || selector == #selector(NSResponder.cancelOperation(_:))
+        {
             if selector == #selector(NSResponder.insertNewline(_:)) {
                 commitSourceEditorIfNeeded()
             } else {
@@ -436,7 +511,15 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         if shouldChangeText(in: range, replacementString: replacement) {
             replaceCharacters(in: range, with: replacement)
             didChangeText()
-            setSelectedRange(NSRange(location: min(range.location + replacement.utf16.count, (string as NSString).length), length: 0))
+            setSelectedRange(
+                NSRange(
+                    location: min(
+                        range.location + replacement.utf16.count,
+                        (string as NSString).length
+                    ),
+                    length: 0
+                )
+            )
         }
         window?.makeFirstResponder(self)
     }
@@ -448,18 +531,20 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 
     private var sourceEditorFont: NSFont {
-        NSFont.monospacedSystemFont(ofSize: styler.theme.scaledMetric(11.5, minimum: 8.5), weight: .medium)
+        NSFont.monospacedSystemFont(
+            ofSize: styler.theme.scaledMetric(11.5, minimum: 8.5),
+            weight: .medium
+        )
     }
 
     private func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {
         var length = lineRange.length
         while length > 0 {
             let character = nsString.character(at: lineRange.location + length - 1)
-            if character == 10 || character == 13 {
-                length -= 1
-            } else {
+            guard character == 10 || character == 13 else {
                 break
             }
+            length -= 1
         }
         return NSRange(location: lineRange.location, length: length)
     }
@@ -471,11 +556,13 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 }
 
+@MainActor
 private enum MarkdownImageLoader {
     static func image(contentsOf url: URL) -> NSImage? {
         if let image = NSImage(contentsOf: url),
-           image.size.width > 0,
-           image.size.height > 0 {
+            image.size.width > 0,
+            image.size.height > 0
+        {
             return image
         }
 
@@ -486,7 +573,10 @@ private enum MarkdownImageLoader {
         url.pathExtension.lowercased() == "svg" && FileManager.default.fileExists(atPath: url.path)
     }
 
-    static func generateThumbnail(for url: URL, completion: @escaping (NSImage?) -> Void) {
+    static func generateThumbnail(
+        for url: URL,
+        completion: @escaping @MainActor @Sendable (NSImage?) -> Void
+    ) {
         let request = QLThumbnailGenerator.Request(
             fileAt: url,
             size: CGSize(width: 1600, height: 1600),
@@ -495,7 +585,10 @@ private enum MarkdownImageLoader {
         )
 
         QLThumbnailGenerator.shared.generateBestRepresentation(for: request) { representation, _ in
-            completion(representation?.nsImage)
+            let imageData = representation?.nsImage.tiffRepresentation
+            Task { @MainActor in
+                completion(imageData.flatMap(NSImage.init(data:)))
+            }
         }
     }
 }

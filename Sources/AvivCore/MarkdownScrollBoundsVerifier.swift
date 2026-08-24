@@ -7,13 +7,16 @@ public struct MarkdownScrollBoundsVerificationResult {
     public let measuredFixtures: Int
 }
 
+@MainActor
 public enum MarkdownScrollBoundsVerifier {
     public static func verify() -> MarkdownScrollBoundsVerificationResult {
         var failures: [String] = []
         var measuredFixtures = 0
 
         for fixture in fixtures {
-            let workspace = EditorWorkspaceView(frame: NSRect(x: 0, y: 0, width: fixture.width, height: fixture.height))
+            let workspace = EditorWorkspaceView(
+                frame: NSRect(x: 0, y: 0, width: fixture.width, height: fixture.height)
+            )
             workspace.documentFormat = fixture.format
             if let viewScale = fixture.viewScale {
                 workspace.textView.setTextScale(viewScale)
@@ -80,46 +83,70 @@ public enum MarkdownScrollBoundsVerifier {
             height: 540,
             format: .blog,
             viewScale: 1.18
-        )
+        ),
     ]
 
-    private static func verifyScrollInsets(_ workspace: EditorWorkspaceView, fixtureName: String) -> [String] {
+    private static func verifyScrollInsets(
+        _ workspace: EditorWorkspaceView,
+        fixtureName: String
+    ) -> [String] {
         var failures: [String] = []
 
         if workspace.scrollView.automaticallyAdjustsContentInsets {
             failures.append("\(fixtureName): scroll view automatically adjusts content insets")
         }
         if !isZero(workspace.scrollView.contentInsets) {
-            failures.append("\(fixtureName): scroll view has nonzero contentInsets \(workspace.scrollView.contentInsets)")
+            failures.append(
+                "\(fixtureName): scroll view has nonzero contentInsets \(workspace.scrollView.contentInsets)"
+            )
         }
         if !isZero(workspace.scrollView.scrollerInsets) {
-            failures.append("\(fixtureName): scroll view has nonzero scrollerInsets \(workspace.scrollView.scrollerInsets)")
+            failures.append(
+                "\(fixtureName): scroll view has nonzero scrollerInsets \(workspace.scrollView.scrollerInsets)"
+            )
         }
 
         return failures
     }
 
-    private static func verifyTopReachability(_ workspace: EditorWorkspaceView, fixtureName: String) -> [String] {
+    private static func verifyTopReachability(
+        _ workspace: EditorWorkspaceView,
+        fixtureName: String
+    ) -> [String] {
         var failures: [String] = []
 
         scroll(workspace, toY: bottomY(in: workspace))
         settle(workspace)
         scroll(workspace, toY: 0)
         settle(workspace)
-        failures.append(contentsOf: verifyCurrentTop(workspace, fixtureName: fixtureName, mode: "bottom-to-top"))
+        failures.append(
+            contentsOf: verifyCurrentTop(workspace, fixtureName: fixtureName, mode: "bottom-to-top")
+        )
 
         scroll(workspace, toY: bottomY(in: workspace))
         settle(workspace)
         scroll(workspace, toY: -500)
         settle(workspace)
-        failures.append(contentsOf: verifyCurrentTop(workspace, fixtureName: fixtureName, mode: "negative-overscroll"))
+        failures.append(
+            contentsOf: verifyCurrentTop(
+                workspace,
+                fixtureName: fixtureName,
+                mode: "negative-overscroll"
+            )
+        )
 
         scroll(workspace, toY: bottomY(in: workspace))
         settle(workspace)
         if let metrics = workspace.minimapForTesting.viewportMetrics() {
             workspace.minimapForTesting.scrollForTesting(thumbMinY: metrics.trackRect.minY)
             settle(workspace)
-            failures.append(contentsOf: verifyCurrentTop(workspace, fixtureName: fixtureName, mode: "minimap-thumb-top"))
+            failures.append(
+                contentsOf: verifyCurrentTop(
+                    workspace,
+                    fixtureName: fixtureName,
+                    mode: "minimap-thumb-top"
+                )
+            )
         } else {
             failures.append("\(fixtureName): missing minimap metrics for top-scroll verification")
         }
@@ -136,7 +163,9 @@ public enum MarkdownScrollBoundsVerifier {
         var failures: [String] = []
 
         if abs(visibleRect.minY) > 0.5 {
-            failures.append("\(fixtureName)@\(mode): visible top is \(visibleRect.minY), expected 0")
+            failures.append(
+                "\(fixtureName)@\(mode): visible top is \(visibleRect.minY), expected 0"
+            )
         }
 
         guard let firstRect = rect(forNeedle: "Top Scroll Fixture", in: workspace.textView) else {
@@ -147,15 +176,22 @@ public enum MarkdownScrollBoundsVerifier {
         let topGap = firstRect.minY - visibleRect.minY
         let expectedTopInset = workspace.textView.textContainerInset.height
         if topGap < -0.5 {
-            failures.append("\(fixtureName)@\(mode): first heading is clipped above the visible top by \(abs(topGap)) pt")
+            failures.append(
+                "\(fixtureName)@\(mode): first heading is clipped above the visible top by \(abs(topGap)) pt"
+            )
         }
         if topGap > expectedTopInset + 24 {
-            failures.append("\(fixtureName)@\(mode): first heading has extra top gap \(topGap) pt; expected near inset \(expectedTopInset) pt")
+            failures.append(
+                "\(fixtureName)@\(mode): first heading has extra top gap \(topGap) pt; expected near inset \(expectedTopInset) pt"
+            )
         }
 
         if let metrics = workspace.minimapForTesting.viewportMetrics(),
-           abs(metrics.visibleMinY) > 0.5 {
-            failures.append("\(fixtureName)@\(mode): minimap visibleMinY is \(metrics.visibleMinY), expected 0")
+            abs(metrics.visibleMinY) > 0.5
+        {
+            failures.append(
+                "\(fixtureName)@\(mode): minimap visibleMinY is \(metrics.visibleMinY), expected 0"
+            )
         }
 
         return failures
@@ -165,14 +201,17 @@ public enum MarkdownScrollBoundsVerifier {
         let nsString = textView.string as NSString
         let range = nsString.range(of: needle)
         guard range.location != NSNotFound,
-              let layoutManager = textView.layoutManager,
-              let textContainer = textView.textContainer
+            let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer
         else {
             return nil
         }
 
         layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: range,
+            actualCharacterRange: nil
+        )
         guard glyphRange.length > 0 else { return nil }
 
         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
@@ -200,10 +239,8 @@ public enum MarkdownScrollBoundsVerifier {
     }
 
     private static func isZero(_ insets: NSEdgeInsets) -> Bool {
-        abs(insets.top) <= 0.01 &&
-            abs(insets.left) <= 0.01 &&
-            abs(insets.bottom) <= 0.01 &&
-            abs(insets.right) <= 0.01
+        abs(insets.top) <= 0.01 && abs(insets.left) <= 0.01 && abs(insets.bottom) <= 0.01
+            && abs(insets.right) <= 0.01
     }
 
     private static var topScrollFixture: String {

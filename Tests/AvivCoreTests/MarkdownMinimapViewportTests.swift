@@ -1,4 +1,5 @@
 import XCTest
+
 @testable import AvivCore
 
 final class MarkdownMinimapViewportTests: XCTestCase {
@@ -21,7 +22,11 @@ final class MarkdownMinimapViewportTests: XCTestCase {
             visibleRect: CGRect(x: 0, y: 900, width: 900, height: visibleHeight)
         )
         XCTAssertEqual(middle.thumbRect.minY, 225, accuracy: 0.001)
-        XCTAssertEqual(middle.documentOffset(forThumbMinY: middle.thumbRect.minY), 900, accuracy: 0.001)
+        XCTAssertEqual(
+            middle.documentOffset(forThumbMinY: middle.thumbRect.minY),
+            900,
+            accuracy: 0.001
+        )
 
         let bottom = MarkdownMinimapViewport.metrics(
             trackBounds: track,
@@ -29,7 +34,11 @@ final class MarkdownMinimapViewportTests: XCTestCase {
             visibleRect: CGRect(x: 0, y: 1_800, width: 900, height: visibleHeight)
         )
         XCTAssertEqual(bottom.thumbRect.maxY, track.maxY, accuracy: 0.001)
-        XCTAssertEqual(bottom.documentOffset(forThumbMinY: bottom.thumbRect.minY), 1_800, accuracy: 0.001)
+        XCTAssertEqual(
+            bottom.documentOffset(forThumbMinY: bottom.thumbRect.minY),
+            1_800,
+            accuracy: 0.001
+        )
     }
 
     func testPureViewportProjectionHandlesVeryLongDocumentsWithCenteredMinimumThumb() {
@@ -41,9 +50,14 @@ final class MarkdownMinimapViewportTests: XCTestCase {
         )
 
         XCTAssertEqual(metrics.thumbRect.height, 2, accuracy: 0.001)
-        XCTAssertEqual(metrics.thumbRect.midY, metrics.projectedY(forDocumentY: 250_250), accuracy: 0.75)
+        XCTAssertEqual(
+            metrics.thumbRect.midY,
+            metrics.projectedY(forDocumentY: 250_250),
+            accuracy: 0.75
+        )
     }
 
+    @MainActor
     func testWorkspaceMinimapTracksRealScrollOffsetsAcrossFixtures() {
         let result = MarkdownMinimapVerifier.verify()
         XCTAssertTrue(result.passed, result.failures.joined(separator: "\n"))

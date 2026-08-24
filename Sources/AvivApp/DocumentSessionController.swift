@@ -1,18 +1,19 @@
 import AppKit
 import AvivCore
 
+@MainActor
 final class DocumentSessionController {
     private(set) var controllers: [DocumentWindowController] = []
-    private let printServiceFactory: () -> DocumentPrintService
+    private let printServiceFactory: @MainActor () -> DocumentPrintService
     let recentDocuments: RecentDocumentManaging
 
     init(
         initialController: DocumentWindowController? = nil,
-        printServiceFactory: @escaping () -> DocumentPrintService = { AppKitDocumentPrintService() },
-        recentDocuments: RecentDocumentManaging = AppKitRecentDocumentManager()
+        printServiceFactory: (@MainActor () -> DocumentPrintService)? = nil,
+        recentDocuments: RecentDocumentManaging? = nil
     ) {
-        self.printServiceFactory = printServiceFactory
-        self.recentDocuments = recentDocuments
+        self.printServiceFactory = printServiceFactory ?? { AppKitDocumentPrintService() }
+        self.recentDocuments = recentDocuments ?? AppKitRecentDocumentManager()
         if let initialController {
             adopt(initialController)
         }
@@ -20,7 +21,8 @@ final class DocumentSessionController {
 
     var activeController: DocumentWindowController? {
         if let keyWindow = NSApp.keyWindow ?? NSApp.mainWindow,
-           let controller = controllers.first(where: { $0.window === keyWindow }) {
+            let controller = controllers.first(where: { $0.window === keyWindow })
+        {
             return controller
         }
 

@@ -2,6 +2,7 @@ import AppKit
 import AvivCore
 import UniformTypeIdentifiers
 
+@MainActor
 final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
     let workspace = EditorWorkspaceView()
     var onRequestNewDocument: ((Any?) -> Void)?
@@ -17,7 +18,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     var canReuseForOpenedDocument: Bool {
-        documentURL == nil && !isEdited && (workspace.textView.string.isEmpty || workspace.textView.string == MarkdownSamples.starter)
+        documentURL == nil && !isEdited
+            && (workspace.textView.string.isEmpty
+                || workspace.textView.string == MarkdownSamples.starter)
     }
 
     private let printService: DocumentPrintService
@@ -31,8 +34,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
     }
 
-    init(printService: DocumentPrintService = AppKitDocumentPrintService()) {
-        self.printService = printService
+    init(printService: DocumentPrintService? = nil) {
+        self.printService = printService ?? AppKitDocumentPrintService()
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1080, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -251,14 +254,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2]
+        [
+            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
+            .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+        ]
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
-        [.newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2]
+        [
+            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
+            .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+        ]
     }
 
-    func toolbar(_ toolbar: NSToolbar, itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier, willBeInsertedIntoToolbar flag: Bool) -> NSToolbarItem? {
+    func toolbar(
+        _ toolbar: NSToolbar,
+        itemForItemIdentifier itemIdentifier: NSToolbarItem.Identifier,
+        willBeInsertedIntoToolbar flag: Bool
+    ) -> NSToolbarItem? {
         let item = NSToolbarItem(itemIdentifier: itemIdentifier)
         item.target = self
 
@@ -272,19 +285,34 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.label = "Open"
             item.action = #selector(openDocument(_:))
         case .saveDocument:
-            item.image = NSImage(systemSymbolName: "square.and.arrow.down", accessibilityDescription: "Save")
+            item.image = NSImage(
+                systemSymbolName: "square.and.arrow.down",
+                accessibilityDescription: "Save"
+            )
             item.label = "Save"
             item.action = #selector(saveDocument(_:))
         case .zoomOut:
-            item.image = toolbarImage(named: "minus.magnifyingglass", fallback: "textformat.size.smaller", description: "Zoom Out")
+            item.image = toolbarImage(
+                named: "minus.magnifyingglass",
+                fallback: "textformat.size.smaller",
+                description: "Zoom Out"
+            )
             item.label = "Zoom Out"
             item.action = #selector(decreaseTextSize(_:))
         case .actualSize:
-            item.image = toolbarImage(named: "1.magnifyingglass", fallback: "text.magnifyingglass", description: "Actual Size")
+            item.image = toolbarImage(
+                named: "1.magnifyingglass",
+                fallback: "text.magnifyingglass",
+                description: "Actual Size"
+            )
             item.label = "Actual Size"
             item.action = #selector(resetTextSize(_:))
         case .zoomIn:
-            item.image = toolbarImage(named: "plus.magnifyingglass", fallback: "textformat.size.larger", description: "Zoom In")
+            item.image = toolbarImage(
+                named: "plus.magnifyingglass",
+                fallback: "textformat.size.larger",
+                description: "Zoom In"
+            )
             item.label = "Zoom In"
             item.action = #selector(increaseTextSize(_:))
         case .bold:
@@ -296,15 +324,24 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.label = "Italic"
             item.action = #selector(toggleItalic(_:))
         case .code:
-            item.image = NSImage(systemSymbolName: "chevron.left.forwardslash.chevron.right", accessibilityDescription: "Code")
+            item.image = NSImage(
+                systemSymbolName: "chevron.left.forwardslash.chevron.right",
+                accessibilityDescription: "Code"
+            )
             item.label = "Code"
             item.action = #selector(toggleCode(_:))
         case .heading1:
-            item.image = NSImage(systemSymbolName: "h.square", accessibilityDescription: "Heading 1")
+            item.image = NSImage(
+                systemSymbolName: "h.square",
+                accessibilityDescription: "Heading 1"
+            )
             item.label = "Heading 1"
             item.action = #selector(heading1(_:))
         case .heading2:
-            item.image = NSImage(systemSymbolName: "textformat.size", accessibilityDescription: "Heading 2")
+            item.image = NSImage(
+                systemSymbolName: "textformat.size",
+                accessibilityDescription: "Heading 2"
+            )
             item.label = "Heading 2"
             item.action = #selector(heading2(_:))
         default:
@@ -315,7 +352,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         return item
     }
 
-    private func toolbarImage(named name: String, fallback: String, description: String) -> NSImage? {
+    private func toolbarImage(named name: String, fallback: String, description: String) -> NSImage?
+    {
         NSImage(systemSymbolName: name, accessibilityDescription: description)
             ?? NSImage(systemSymbolName: fallback, accessibilityDescription: description)
     }
@@ -341,18 +379,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 }
 
-private extension NSToolbarItem.Identifier {
-    static let newDocument = NSToolbarItem.Identifier("Aviv.Toolbar.New")
-    static let openDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Open")
-    static let saveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Save")
-    static let zoomOut = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomOut")
-    static let actualSize = NSToolbarItem.Identifier("Aviv.Toolbar.ActualSize")
-    static let zoomIn = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomIn")
-    static let bold = NSToolbarItem.Identifier("Aviv.Toolbar.Bold")
-    static let italic = NSToolbarItem.Identifier("Aviv.Toolbar.Italic")
-    static let code = NSToolbarItem.Identifier("Aviv.Toolbar.Code")
-    static let heading1 = NSToolbarItem.Identifier("Aviv.Toolbar.Heading1")
-    static let heading2 = NSToolbarItem.Identifier("Aviv.Toolbar.Heading2")
+extension NSToolbarItem.Identifier {
+    fileprivate static let newDocument = NSToolbarItem.Identifier("Aviv.Toolbar.New")
+    fileprivate static let openDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Open")
+    fileprivate static let saveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Save")
+    fileprivate static let zoomOut = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomOut")
+    fileprivate static let actualSize = NSToolbarItem.Identifier("Aviv.Toolbar.ActualSize")
+    fileprivate static let zoomIn = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomIn")
+    fileprivate static let bold = NSToolbarItem.Identifier("Aviv.Toolbar.Bold")
+    fileprivate static let italic = NSToolbarItem.Identifier("Aviv.Toolbar.Italic")
+    fileprivate static let code = NSToolbarItem.Identifier("Aviv.Toolbar.Code")
+    fileprivate static let heading1 = NSToolbarItem.Identifier("Aviv.Toolbar.Heading1")
+    fileprivate static let heading2 = NSToolbarItem.Identifier("Aviv.Toolbar.Heading2")
 }
 
 extension DocumentWindowController {
@@ -371,7 +409,7 @@ extension DocumentWindowController {
             "mmd",
             "rmd",
             "rmarkdown",
-            "qmd"
+            "qmd",
         ]
         var types = markdownExtensions.compactMap { UTType(filenameExtension: $0) }
         types.append(.plainText)

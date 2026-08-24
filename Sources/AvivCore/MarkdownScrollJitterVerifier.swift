@@ -10,12 +10,28 @@ public struct MarkdownScrollJitterVerificationResult {
     public let maxMinimapThumbDelta: CGFloat
 }
 
+@MainActor
 public enum MarkdownScrollJitterVerifier {
     public static func verify() -> MarkdownScrollJitterVerificationResult {
         let fixtures = [
-            Fixture(name: "same-length-overwrite", mode: .sameLengthOverwrite, editCount: 16, visibleFraction: 0.45),
-            Fixture(name: "same-length-overwrite-lower-viewport", mode: .sameLengthOverwrite, editCount: 16, visibleFraction: 0.86),
-            Fixture(name: "short-insertions-lower-viewport", mode: .shortInsertions, editCount: 12, visibleFraction: 0.86)
+            Fixture(
+                name: "same-length-overwrite",
+                mode: .sameLengthOverwrite,
+                editCount: 16,
+                visibleFraction: 0.45
+            ),
+            Fixture(
+                name: "same-length-overwrite-lower-viewport",
+                mode: .sameLengthOverwrite,
+                editCount: 16,
+                visibleFraction: 0.86
+            ),
+            Fixture(
+                name: "short-insertions-lower-viewport",
+                mode: .shortInsertions,
+                editCount: 12,
+                visibleFraction: 0.86
+            ),
         ]
 
         var failures: [String] = []
@@ -72,7 +88,12 @@ public enum MarkdownScrollJitterVerifier {
     }
 
     public static func renderSnapshot(to url: URL) throws {
-        let fixture = Fixture(name: "snapshot", mode: .shortInsertions, editCount: 12, visibleFraction: 0.86)
+        let fixture = Fixture(
+            name: "snapshot",
+            mode: .shortInsertions,
+            editCount: 12,
+            visibleFraction: 0.86
+        )
         let workspace = makeWorkspace()
         let anchor = prepare(workspace: workspace, for: fixture)
         performEdits(in: workspace, fixture: fixture, anchorLocation: anchor)
@@ -125,9 +146,18 @@ public enum MarkdownScrollJitterVerifier {
         let maxVisibleOriginDelta = spread(visibleOriginValues)
         let maxDocumentHeightDelta = spread(documentHeightValues)
         let maxMinimapThumbDelta = spread(minimapThumbValues)
-        let maxOriginFromBaseline = maxDelta(from: baseline.visibleMinY, values: measurements.map(\.visibleMinY))
-        let maxHeightFromBaseline = maxDelta(from: baseline.documentHeight, values: measurements.map(\.documentHeight))
-        let maxThumbFromBaseline = maxDelta(from: baseline.minimapThumbMinY, values: measurements.map(\.minimapThumbMinY))
+        let maxOriginFromBaseline = maxDelta(
+            from: baseline.visibleMinY,
+            values: measurements.map(\.visibleMinY)
+        )
+        let maxHeightFromBaseline = maxDelta(
+            from: baseline.documentHeight,
+            values: measurements.map(\.documentHeight)
+        )
+        let maxThumbFromBaseline = maxDelta(
+            from: baseline.minimapThumbMinY,
+            values: measurements.map(\.minimapThumbMinY)
+        )
 
         var failures: [String] = []
         if maxVisibleOriginDelta > 0.75 || maxOriginFromBaseline > 0.75 {
@@ -180,27 +210,35 @@ public enum MarkdownScrollJitterVerifier {
         let lineRange = nsString.lineRange(for: targetRange)
 
         workspace.textView.setSelectedRange(NSRange(location: lineRange.location, length: 0))
-        center(workspace, around: NSRange(location: lineRange.location, length: 1), visibleFraction: 0.82)
+        center(
+            workspace,
+            around: NSRange(location: lineRange.location, length: 1),
+            visibleFraction: 0.82
+        )
         settle(workspace)
 
-        var notificationMeasurement: Measurement?
-        let observer = NotificationCenter.default.addObserver(
-            forName: NSText.didChangeNotification,
-            object: workspace.textView,
-            queue: nil
-        ) { _ in
-            notificationMeasurement = measure(workspace)
-        }
+        let measurementObserver = TextChangeMeasurementObserver(workspace: workspace)
+        NotificationCenter.default.addObserver(
+            measurementObserver,
+            selector: #selector(TextChangeMeasurementObserver.recordMeasurement(_:)),
+            name: NSText.didChangeNotification,
+            object: workspace.textView
+        )
 
-        workspace.textView.replaceCharacters(in: NSRange(location: lineRange.location, length: 0), with: "# ")
+        workspace.textView.replaceCharacters(
+            in: NSRange(location: lineRange.location, length: 0),
+            with: "# "
+        )
         workspace.textView.didChangeText()
-        NotificationCenter.default.removeObserver(observer)
+        NotificationCenter.default.removeObserver(measurementObserver)
         settle(workspace)
 
-        guard let notified = notificationMeasurement else {
+        guard let notified = measurementObserver.measurement else {
             return MarkdownScrollJitterVerificationResult(
                 passed: false,
-                failures: ["style-transition-notification: missing text change notification measurement"],
+                failures: [
+                    "style-transition-notification: missing text change notification measurement"
+                ],
                 measuredEdits: 1,
                 maxVisibleOriginDelta: 0,
                 maxDocumentHeightDelta: 0,
@@ -217,7 +255,8 @@ public enum MarkdownScrollJitterVerifier {
         if documentHeightDelta > 1.0 || minimapThumbDelta > 0.75 {
             failures.append(
                 String(
-                    format: "style-transition-notification: text change notification used intermediate geometry (height %.3f pt, minimap %.3f pt)",
+                    format:
+                        "style-transition-notification: text change notification used intermediate geometry (height %.3f pt, minimap %.3f pt)",
                     documentHeightDelta,
                     minimapThumbDelta
                 )
@@ -227,7 +266,8 @@ public enum MarkdownScrollJitterVerifier {
         if visibleOriginDelta > 0.75 {
             failures.append(
                 String(
-                    format: "style-transition-notification: visible origin shifted between notification and final styled layout by %.3f pt",
+                    format:
+                        "style-transition-notification: visible origin shifted between notification and final styled layout by %.3f pt",
                     visibleOriginDelta
                 )
             )
@@ -246,7 +286,10 @@ public enum MarkdownScrollJitterVerifier {
     private static func makeWorkspace() -> EditorWorkspaceView {
         let workspace = EditorWorkspaceView(frame: NSRect(x: 0, y: 0, width: 1040, height: 740))
         workspace.loadMarkdown(scrollStabilityFixture)
-        workspace.updateDocumentTitle(url: URL(fileURLWithPath: "Scroll Stability.md"), isEdited: false)
+        workspace.updateDocumentTitle(
+            url: URL(fileURLWithPath: "Scroll Stability.md"),
+            isEdited: false
+        )
         settle(workspace)
         return workspace
     }
@@ -259,9 +302,15 @@ public enum MarkdownScrollJitterVerifier {
         let anchor = targetRange.location + targetRange.length
 
         workspace.textView.setSelectedRange(NSRange(location: anchor, length: 0))
-        center(workspace, around: NSRange(location: anchor, length: 1), visibleFraction: fixture.visibleFraction)
+        center(
+            workspace,
+            around: NSRange(location: anchor, length: 1),
+            visibleFraction: fixture.visibleFraction
+        )
         settle(workspace)
-        workspace.textView.setSelectedRange(NSRange(location: anchor, length: fixture.mode == .sameLengthOverwrite ? 1 : 0))
+        workspace.textView.setSelectedRange(
+            NSRange(location: anchor, length: fixture.mode == .sameLengthOverwrite ? 1 : 0)
+        )
         settle(workspace)
         return anchor
     }
@@ -298,7 +347,11 @@ public enum MarkdownScrollJitterVerifier {
         }
     }
 
-    private static func center(_ workspace: EditorWorkspaceView, around range: NSRange, visibleFraction: CGFloat) {
+    private static func center(
+        _ workspace: EditorWorkspaceView,
+        around range: NSRange,
+        visibleFraction: CGFloat
+    ) {
         guard
             let layoutManager = workspace.textView.layoutManager,
             let textContainer = workspace.textView.textContainer
@@ -307,7 +360,10 @@ public enum MarkdownScrollJitterVerifier {
         }
 
         layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: range,
+            actualCharacterRange: nil
+        )
         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
         rect.origin.x += workspace.textView.textContainerOrigin.x
         rect.origin.y += workspace.textView.textContainerOrigin.y
@@ -327,6 +383,20 @@ public enum MarkdownScrollJitterVerifier {
             documentHeight: rounded(workspace.textView.frame.height),
             minimapThumbMinY: rounded(metrics?.thumbRect.minY ?? 0)
         )
+    }
+
+    @MainActor
+    private final class TextChangeMeasurementObserver: NSObject {
+        private let workspace: EditorWorkspaceView
+        private(set) var measurement: Measurement?
+
+        init(workspace: EditorWorkspaceView) {
+            self.workspace = workspace
+        }
+
+        @objc func recordMeasurement(_ notification: Notification) {
+            measurement = MarkdownScrollJitterVerifier.measure(workspace)
+        }
     }
 
     private static func settle(_ workspace: EditorWorkspaceView) {

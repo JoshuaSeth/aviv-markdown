@@ -21,7 +21,10 @@ public struct MarkdownTableBlock: Equatable {
         guard let first = rows.first, let last = rows.last else {
             return NSRange(location: 0, length: 0)
         }
-        return NSRange(location: first.lineRange.location, length: NSMaxRange(last.lineRange) - first.lineRange.location)
+        return NSRange(
+            location: first.lineRange.location,
+            length: NSMaxRange(last.lineRange) - first.lineRange.location
+        )
     }
 }
 
@@ -52,19 +55,26 @@ public enum MarkdownTableParser {
             }
 
             if index + 1 < lines.count,
-               isPotentialTableLine(text),
-               isSeparatorLine(nsString.substring(with: lines[index + 1].contentRange)) {
+                isPotentialTableLine(text),
+                isSeparatorLine(nsString.substring(with: lines[index + 1].contentRange))
+            {
                 var rows: [MarkdownTableRow] = []
                 rows.append(row(from: line, in: nsString, isHeader: true, isSeparator: false))
-                rows.append(row(from: lines[index + 1], in: nsString, isHeader: false, isSeparator: true))
+                rows.append(
+                    row(from: lines[index + 1], in: nsString, isHeader: false, isSeparator: true)
+                )
                 index += 2
 
                 while index < lines.count {
                     let candidate = nsString.substring(with: lines[index].contentRange)
-                    guard isPotentialTableLine(candidate), !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                    guard isPotentialTableLine(candidate),
+                        !candidate.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+                    else {
                         break
                     }
-                    rows.append(row(from: lines[index], in: nsString, isHeader: false, isSeparator: false))
+                    rows.append(
+                        row(from: lines[index], in: nsString, isHeader: false, isSeparator: false)
+                    )
                     index += 1
                 }
 
@@ -91,7 +101,9 @@ public enum MarkdownTableParser {
     }
 
     public static func block(containing location: Int, in markdown: String) -> MarkdownTableBlock? {
-        blocks(in: markdown).first { NSLocationInRange(location, $0.range) || location == NSMaxRange($0.range) }
+        blocks(in: markdown).first {
+            NSLocationInRange(location, $0.range) || location == NSMaxRange($0.range)
+        }
     }
 
     private struct DocumentLine {
@@ -105,18 +117,33 @@ public enum MarkdownTableParser {
 
         while index < nsString.length {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
-            lines.append(DocumentLine(lineRange: lineRange, contentRange: rangeWithoutLineEnding(lineRange, in: nsString)))
+            lines.append(
+                DocumentLine(
+                    lineRange: lineRange,
+                    contentRange: rangeWithoutLineEnding(lineRange, in: nsString)
+                )
+            )
             index = NSMaxRange(lineRange)
         }
 
         if nsString.length == 0 {
-            lines.append(DocumentLine(lineRange: NSRange(location: 0, length: 0), contentRange: NSRange(location: 0, length: 0)))
+            lines.append(
+                DocumentLine(
+                    lineRange: NSRange(location: 0, length: 0),
+                    contentRange: NSRange(location: 0, length: 0)
+                )
+            )
         }
 
         return lines
     }
 
-    private static func row(from line: DocumentLine, in nsString: NSString, isHeader: Bool, isSeparator: Bool) -> MarkdownTableRow {
+    private static func row(
+        from line: DocumentLine,
+        in nsString: NSString,
+        isHeader: Bool,
+        isSeparator: Bool
+    ) -> MarkdownTableRow {
         let cells = parseCells(in: nsString, contentRange: line.contentRange)
         return MarkdownTableRow(
             lineRange: line.lineRange,
@@ -127,7 +154,10 @@ public enum MarkdownTableParser {
         )
     }
 
-    private static func parseCells(in nsString: NSString, contentRange: NSRange) -> [MarkdownTableCell] {
+    private static func parseCells(
+        in nsString: NSString,
+        contentRange: NSRange
+    ) -> [MarkdownTableCell] {
         guard contentRange.length > 0 else { return [] }
 
         var segments: [NSRange] = []
@@ -137,7 +167,8 @@ public enum MarkdownTableParser {
 
         while location < end {
             let character = nsString.character(at: location)
-            let isEscaped = location > contentRange.location && nsString.character(at: location - 1) == 92
+            let isEscaped =
+                location > contentRange.location && nsString.character(at: location - 1) == 92
             if character == 124, !isEscaped {
                 segments.append(NSRange(location: segmentStart, length: location - segmentStart))
                 segmentStart = location + 1
@@ -146,10 +177,16 @@ public enum MarkdownTableParser {
         }
         segments.append(NSRange(location: segmentStart, length: end - segmentStart))
 
-        if let first = segments.first, nsString.substring(with: first).trimmingCharacters(in: .whitespaces).isEmpty, contentRange.length > 0, nsString.character(at: contentRange.location) == 124 {
+        if let first = segments.first,
+            nsString.substring(with: first).trimmingCharacters(in: .whitespaces).isEmpty,
+            contentRange.length > 0, nsString.character(at: contentRange.location) == 124
+        {
             segments.removeFirst()
         }
-        if let last = segments.last, nsString.substring(with: last).trimmingCharacters(in: .whitespaces).isEmpty, contentRange.length > 0, nsString.character(at: end - 1) == 124 {
+        if let last = segments.last,
+            nsString.substring(with: last).trimmingCharacters(in: .whitespaces).isEmpty,
+            contentRange.length > 0, nsString.character(at: end - 1) == 124
+        {
             segments.removeLast()
         }
 
@@ -164,12 +201,14 @@ public enum MarkdownTableParser {
     }
 
     private static func isPotentialTableLine(_ line: String) -> Bool {
-        line.contains("|") && line.split(separator: "|", omittingEmptySubsequences: false).count >= 2
+        line.contains("|")
+            && line.split(separator: "|", omittingEmptySubsequences: false).count >= 2
     }
 
     private static func isSeparatorLine(_ line: String) -> Bool {
         guard isPotentialTableLine(line) else { return false }
-        let parts = line
+        let parts =
+            line
             .split(separator: "|", omittingEmptySubsequences: false)
             .map { $0.trimmingCharacters(in: .whitespaces) }
             .filter { !$0.isEmpty }
@@ -192,34 +231,34 @@ public enum MarkdownTableParser {
 
         while location < end {
             let character = nsString.character(at: location)
-            if character == 32 || character == 9 {
-                location += 1
-            } else {
+            guard character == 32 || character == 9 else {
                 break
             }
+            location += 1
         }
 
         while end > location {
             let character = nsString.character(at: end - 1)
-            if character == 32 || character == 9 {
-                end -= 1
-            } else {
+            guard character == 32 || character == 9 else {
                 break
             }
+            end -= 1
         }
 
         return NSRange(location: location, length: end - location)
     }
 
-    private static func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {
+    private static func rangeWithoutLineEnding(
+        _ lineRange: NSRange,
+        in nsString: NSString
+    ) -> NSRange {
         var length = lineRange.length
         while length > 0 {
             let character = nsString.character(at: lineRange.location + length - 1)
-            if character == 10 || character == 13 {
-                length -= 1
-            } else {
+            guard character == 10 || character == 13 else {
                 break
             }
+            length -= 1
         }
         return NSRange(location: lineRange.location, length: length)
     }

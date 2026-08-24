@@ -1,13 +1,14 @@
 import AppKit
 import AvivCore
 
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, NSMenuDelegate {
     let documentSession: DocumentSessionController
     private weak var openRecentMenu: NSMenu?
 
     init(
         documentController: DocumentWindowController? = nil,
-        recentDocuments: RecentDocumentManaging = AppKitRecentDocumentManager()
+        recentDocuments: RecentDocumentManaging? = nil
     ) {
         self.documentSession = DocumentSessionController(
             initialController: documentController,
@@ -27,7 +28,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         }
         NSApp.activate(ignoringOtherApps: true)
         DispatchQueue.main.async { [weak self] in
-            MarkdownDefaultAppService.presentPromptIfNeeded(window: self?.documentSession.activeController?.window)
+            MarkdownDefaultAppService.presentPromptIfNeeded(
+                window: self?.documentSession.activeController?.window
+            )
         }
     }
 
@@ -63,7 +66,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     @objc func openRecentDocument(_ sender: Any?) {
-        guard let item = sender as? NSMenuItem, let url = item.representedObject as? URL else { return }
+        guard let item = sender as? NSMenuItem, let url = item.representedObject as? URL else {
+            return
+        }
         documentSession.open(urls: [url])
     }
 

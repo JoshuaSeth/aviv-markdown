@@ -1,0 +1,130 @@
+# Aviv Operations
+
+## Source of truth
+
+Aviv is the native macOS and Windows Markdown editor in
+`https://github.com/JoshuaSeth/aviv-markdown.git`. The repository is public under the MIT license, so no replacement
+private repository is needed. GitHub is authoritative; the PitchAI development server uses this checkout:
+
+```text
+/code/aviv-markdown
+```
+
+`main` is the default/release branch. `staging` is the integration branch. Start work from `staging`, use a dedicated
+branch, and land it through a pull request.
+
+The project is registered in the PitchAI PM database as `AVIV` (`Aviv Editor`), owned by Seth. Operationalization work
+is recorded in task `AVIV-OPS-20260824`.
+
+## Source inventory
+
+The 2026-08-24 inventory found three relevant locations on the travel Mac:
+
+- `/Users/sethvanderbijl/code/Aviv_new` — native Swift/AppKit and C#/WinUI repository, connected to the GitHub remote.
+  Its local `main` was at `1ed3e9d64027c1937dd1555fab9772a86c771b86`, behind GitHub, with 18 unstaged deletions
+  under `Windows/src/Aviv.Windows.App`. Those deletions were preserved but are not part of the authoritative source.
+- `/Users/sethvanderbijl/PitchAI Code/typora_clone` — older Electron prototype with no Git metadata. It is historical
+  lineage, not the active Aviv codebase.
+- `/Users/sethvanderbijl/code/pitchai_net` — separate publishing-site repository containing the Aviv download page and
+  packaged installers. It is not the editor source.
+
+Before the server checkout was normalized, all three relevant source surfaces were archived without changing the Mac.
+The root-only preservation set is stored on the development server at:
+
+```text
+/mnt/pitchai-dev-data/cold-validation-archives/aviv-travel-mac-preservation-20260824T133000Z
+```
+
+`SHA256SUMS` verifies the three gzip archives. The native archive also passed `git fsck --full` after macOS AppleDouble
+metadata was excluded from a disposable validation extraction. Do not delete or mutate the Mac checkout; it remains a
+historical recovery source.
+
+## Requirements and local use
+
+### macOS
+
+- macOS 13 or newer
+- Swift 5.9 or newer; Xcode is required for AppKit runtime, UI, packaging, and installer checks
+- Python 3.9 or newer for `scripts/ios_check.py`
+- The optional formatter, linter, and security tools enabled in `scripts/ios_check.env`
+
+Run the app and core tests from the repository root:
+
+```sh
+swift run Aviv
+swift test
+swift build -Xswiftc -warnings-as-errors -Xswiftc -strict-concurrency=complete
+```
+
+Packaging and end-to-end UI verification remain explicit operations:
+
+```sh
+Scripts/run_ui_verification.sh
+Scripts/package_app.sh
+Scripts/package_dmg.sh
+```
+
+### Windows
+
+The native Windows app requires Windows, .NET 10, PowerShell, and the Windows App SDK described in
+`Windows/README.md`. Run core tests with:
+
+```powershell
+dotnet test Windows/tests/Aviv.Windows.Core.Tests/Aviv.Windows.Core.Tests.csproj --configuration Release
+```
+
+Use `Windows/scripts/publish-win-x64.ps1` or `Windows/scripts/publish-win-arm64.ps1` for self-contained builds. App
+build, UI interaction, and screenshot verification must run on Windows.
+
+### Repository quality
+
+Run the native gate where its configured tools are installed:
+
+```sh
+make check
+make check-probe
+```
+
+Run the complete repository Python gate with its frozen Python 3.12 environment:
+
+```sh
+uv run --project quality --python 3.12 --frozen check
+```
+
+The Python environment under `quality/.venv` is generated and must not be committed.
+
+### Known validation debt
+
+As of 2026-08-24, the strict Swift build, test suite, production package, command and layout verifiers, UI snapshots,
+scroll-stability checks, and typing-performance checks pass in a disposable clone on the travel Mac. The configured
+`swift-format` check also passes.
+
+The composite native policy gate is not yet clean: it still reports legacy force-unwrap, regex, CLI-output, and
+best-effort cleanup patterns that predate the development-server registration. The travel Mac also does not have the
+standalone SwiftLint, Semgrep, or Gitleaks executables required by that composite gate. Do not weaken or bypass those
+checks. Resolve the legacy findings and install the missing tools in a dedicated quality task; until then, use the
+passing runtime evidence above together with the repository-wide Python gate, and report the native policy-gate debt
+in every release handoff.
+
+## Travel-Mac validation
+
+The SSH alias `travel-macbook` is managed outside this repository. Do not record the underlying address or credentials
+here. Treat `/Users/sethvanderbijl/code/Aviv_new` as read-only.
+
+For Apple-platform validation:
+
+1. Confirm the server branch is committed and pushed.
+2. Connect with `ssh travel-macbook`.
+3. Create a temporary directory and clone the GitHub branch into it. Do not reuse the historical checkout.
+4. Run the required Swift build, tests, application, UI verifier, or packaging command in the temporary clone.
+5. Record the commit SHA and command result, then remove the temporary clone.
+
+If new local-only work is ever found on the Mac, archive the complete tree first, inspect `git status`, branches,
+remotes, and diffs, and import only reviewed changes on a new server branch. Never reset or clean the Mac to make its
+state match GitHub.
+
+## Release boundary
+
+This repository builds the editor and installers. The download page and published files live in the separate
+`JoshuaSeth/pitchai_net` repository. Building an artifact does not authorize publishing it; verify checksums and follow
+the publishing repository's release process.

@@ -1,7 +1,9 @@
 import XCTest
+
 @testable import AvivCore
 
 final class TypingPerformanceTests: XCTestCase {
+    @MainActor
     func testLargeDocumentTypingStaysInteractive() {
         let result = MarkdownTypingPerformanceVerifier.verify()
         XCTAssertTrue(result.passed, result.failures.joined(separator: "\n"))

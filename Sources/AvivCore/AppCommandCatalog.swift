@@ -1,6 +1,6 @@
 import AppKit
 
-public struct AppMenuSpec: Equatable {
+public struct AppMenuSpec: Equatable, Sendable {
     public let title: String
     public let entries: [AppMenuEntry]
 
@@ -10,14 +10,14 @@ public struct AppMenuSpec: Equatable {
     }
 }
 
-public enum AppMenuEntry: Equatable {
+public enum AppMenuEntry: Equatable, Sendable {
     case command(AppCommandSpec)
     case separator
     case submenu(title: String, entries: [AppMenuEntry])
 }
 
-public struct AppCommandSpec: Equatable {
-    public enum TargetRoute: Equatable {
+public struct AppCommandSpec: Equatable, Sendable {
+    public enum TargetRoute: Equatable, Sendable {
         case application
         case appDelegate
         case firstResponder
@@ -52,81 +52,240 @@ public struct AppCommandSpec: Equatable {
 
 public enum AppCommandCatalog {
     public static let menus: [AppMenuSpec] = [
-        AppMenuSpec(title: "Aviv", entries: [
-            .command(appCommand("about", "About Aviv", "orderFrontStandardAboutPanel:")),
-            .separator,
-            .command(appCommand("hide", "Hide Aviv", "hide:", key: "h", modifiers: [.command])),
-            .command(appCommand("hideOthers", "Hide Others", "hideOtherApplications:", key: "h", modifiers: [.command, .option])),
-            .command(appCommand("showAll", "Show All", "unhideAllApplications:")),
-            .separator,
-            .command(appCommand("quit", "Quit Aviv", "terminate:", key: "q", modifiers: [.command]))
-        ]),
-        AppMenuSpec(title: "File", entries: [
-            .command(delegateCommand("new", "New", "newDocument:", key: "n")),
-            .command(delegateCommand("newTab", "New Tab", "newTab:", key: "t")),
-            .command(delegateCommand("open", "Open...", "openDocument:", key: "o")),
-            .submenu(title: "Open Recent", entries: [
-                .command(delegateCommand("clearRecentDocuments", "Clear Menu", "clearRecentDocuments:"))
-            ]),
-            .separator,
-            .command(delegateCommand("close", "Close", "closeDocument:", key: "w")),
-            .separator,
-            .command(delegateCommand("save", "Save", "saveDocument:", key: "s")),
-            .command(delegateCommand("saveAs", "Save As...", "saveDocumentAs:", key: "S", modifiers: [.command, .shift])),
-            .command(delegateCommand("revert", "Revert to Saved", "revertDocumentToSaved:")),
-            .separator,
-            .command(delegateCommand("pageSetup", "Page Setup...", "pageSetup:", key: "P", modifiers: [.command, .shift])),
-            .command(delegateCommand("print", "Print...", "printDocument:", key: "p"))
-        ]),
-        AppMenuSpec(title: "Edit", entries: [
-            .command(responderCommand("undo", "Undo", "undo:", key: "z")),
-            .command(responderCommand("redo", "Redo", "redo:", key: "Z", modifiers: [.command, .shift])),
-            .separator,
-            .command(responderCommand("cut", "Cut", "cut:", key: "x")),
-            .command(responderCommand("copy", "Copy", "copy:", key: "c")),
-            .command(responderCommand("paste", "Paste", "paste:", key: "v")),
-            .command(responderCommand("pasteAndMatchStyle", "Paste and Match Style", "pasteAsPlainText:", key: "V", modifiers: [.command, .option, .shift])),
-            .command(responderCommand("delete", "Delete", "delete:")),
-            .separator,
-            .command(responderCommand("selectAll", "Select All", "selectAll:", key: "a")),
-            .separator,
-            .submenu(title: "Find", entries: [
-                .command(findCommand("find", "Find...", NSTextFinder.Action.showFindInterface, key: "f")),
-                .command(findCommand("findAndReplace", "Find and Replace...", NSTextFinder.Action.showReplaceInterface, key: "f", modifiers: [.command, .option])),
-                .command(findCommand("findNext", "Find Next", NSTextFinder.Action.nextMatch, key: "g")),
-                .command(findCommand("findPrevious", "Find Previous", NSTextFinder.Action.previousMatch, key: "G", modifiers: [.command, .shift])),
-                .command(findCommand("useSelectionForFind", "Use Selection for Find", NSTextFinder.Action.setSearchString, key: "e")),
-                .command(responderCommand("jumpToSelection", "Jump to Selection", "centerSelectionInVisibleArea:", key: "j"))
-            ]),
-            .submenu(title: "Spelling and Grammar", entries: [
-                .command(responderCommand("showSpelling", "Show Spelling and Grammar", "showGuessPanel:", key: ":", modifiers: [.command])),
-                .command(responderCommand("checkSpelling", "Check Document Now", "checkSpelling:", key: ";", modifiers: [.command]))
-            ])
-        ]),
-        AppMenuSpec(title: "View", entries: [
-            .command(delegateCommand("actualSize", "Actual Size", "resetTextSize:", key: "0")),
-            .command(delegateCommand("zoomIn", "Zoom In", "increaseTextSize:", key: "+")),
-            .command(delegateCommand("zoomOut", "Zoom Out", "decreaseTextSize:", key: "-"))
-        ]),
-        AppMenuSpec(title: "Format", entries: [
-            .command(delegateCommand("bold", "Bold", "toggleBold:", key: "b")),
-            .command(delegateCommand("italic", "Italic", "toggleItalic:", key: "i")),
-            .command(delegateCommand("code", "Code", "toggleCode:", key: "`")),
-            .separator,
-            .command(delegateCommand("heading1", "Heading 1", "heading1:", key: "1")),
-            .command(delegateCommand("heading2", "Heading 2", "heading2:", key: "2"))
-        ]),
-        AppMenuSpec(title: "Window", entries: [
-            .command(responderCommand("minimize", "Minimize", "performMiniaturize:", key: "m")),
-            .command(responderCommand("zoomWindow", "Zoom", "performZoom:")),
-            .separator,
-            .command(responderCommand("showPreviousTab", "Show Previous Tab", "selectPreviousTab:", key: "{", modifiers: [.command, .shift])),
-            .command(responderCommand("showNextTab", "Show Next Tab", "selectNextTab:", key: "}", modifiers: [.command, .shift])),
-            .command(responderCommand("moveTabToNewWindow", "Move Tab to New Window", "moveTabToNewWindow:")),
-            .command(responderCommand("mergeAllWindows", "Merge All Windows", "mergeAllWindows:")),
-            .separator,
-            .command(appCommand("bringAllToFront", "Bring All to Front", "arrangeInFront:"))
-        ])
+        AppMenuSpec(
+            title: "Aviv",
+            entries: [
+                .command(appCommand("about", "About Aviv", "orderFrontStandardAboutPanel:")),
+                .separator,
+                .command(appCommand("hide", "Hide Aviv", "hide:", key: "h", modifiers: [.command])),
+                .command(
+                    appCommand(
+                        "hideOthers",
+                        "Hide Others",
+                        "hideOtherApplications:",
+                        key: "h",
+                        modifiers: [.command, .option]
+                    )
+                ),
+                .command(appCommand("showAll", "Show All", "unhideAllApplications:")),
+                .separator,
+                .command(
+                    appCommand("quit", "Quit Aviv", "terminate:", key: "q", modifiers: [.command])
+                ),
+            ]
+        ),
+        AppMenuSpec(
+            title: "File",
+            entries: [
+                .command(delegateCommand("new", "New", "newDocument:", key: "n")),
+                .command(delegateCommand("newTab", "New Tab", "newTab:", key: "t")),
+                .command(delegateCommand("open", "Open...", "openDocument:", key: "o")),
+                .submenu(
+                    title: "Open Recent",
+                    entries: [
+                        .command(
+                            delegateCommand(
+                                "clearRecentDocuments",
+                                "Clear Menu",
+                                "clearRecentDocuments:"
+                            )
+                        )
+                    ]
+                ),
+                .separator,
+                .command(delegateCommand("close", "Close", "closeDocument:", key: "w")),
+                .separator,
+                .command(delegateCommand("save", "Save", "saveDocument:", key: "s")),
+                .command(
+                    delegateCommand(
+                        "saveAs",
+                        "Save As...",
+                        "saveDocumentAs:",
+                        key: "S",
+                        modifiers: [.command, .shift]
+                    )
+                ),
+                .command(delegateCommand("revert", "Revert to Saved", "revertDocumentToSaved:")),
+                .separator,
+                .command(
+                    delegateCommand(
+                        "pageSetup",
+                        "Page Setup...",
+                        "pageSetup:",
+                        key: "P",
+                        modifiers: [.command, .shift]
+                    )
+                ),
+                .command(delegateCommand("print", "Print...", "printDocument:", key: "p")),
+            ]
+        ),
+        AppMenuSpec(
+            title: "Edit",
+            entries: [
+                .command(responderCommand("undo", "Undo", "undo:", key: "z")),
+                .command(
+                    responderCommand(
+                        "redo",
+                        "Redo",
+                        "redo:",
+                        key: "Z",
+                        modifiers: [.command, .shift]
+                    )
+                ),
+                .separator,
+                .command(responderCommand("cut", "Cut", "cut:", key: "x")),
+                .command(responderCommand("copy", "Copy", "copy:", key: "c")),
+                .command(responderCommand("paste", "Paste", "paste:", key: "v")),
+                .command(
+                    responderCommand(
+                        "pasteAndMatchStyle",
+                        "Paste and Match Style",
+                        "pasteAsPlainText:",
+                        key: "V",
+                        modifiers: [.command, .option, .shift]
+                    )
+                ),
+                .command(responderCommand("delete", "Delete", "delete:")),
+                .separator,
+                .command(responderCommand("selectAll", "Select All", "selectAll:", key: "a")),
+                .separator,
+                .submenu(
+                    title: "Find",
+                    entries: [
+                        .command(
+                            findCommand(
+                                "find",
+                                "Find...",
+                                NSTextFinder.Action.showFindInterface,
+                                key: "f"
+                            )
+                        ),
+                        .command(
+                            findCommand(
+                                "findAndReplace",
+                                "Find and Replace...",
+                                NSTextFinder.Action.showReplaceInterface,
+                                key: "f",
+                                modifiers: [.command, .option]
+                            )
+                        ),
+                        .command(
+                            findCommand(
+                                "findNext",
+                                "Find Next",
+                                NSTextFinder.Action.nextMatch,
+                                key: "g"
+                            )
+                        ),
+                        .command(
+                            findCommand(
+                                "findPrevious",
+                                "Find Previous",
+                                NSTextFinder.Action.previousMatch,
+                                key: "G",
+                                modifiers: [.command, .shift]
+                            )
+                        ),
+                        .command(
+                            findCommand(
+                                "useSelectionForFind",
+                                "Use Selection for Find",
+                                NSTextFinder.Action.setSearchString,
+                                key: "e"
+                            )
+                        ),
+                        .command(
+                            responderCommand(
+                                "jumpToSelection",
+                                "Jump to Selection",
+                                "centerSelectionInVisibleArea:",
+                                key: "j"
+                            )
+                        ),
+                    ]
+                ),
+                .submenu(
+                    title: "Spelling and Grammar",
+                    entries: [
+                        .command(
+                            responderCommand(
+                                "showSpelling",
+                                "Show Spelling and Grammar",
+                                "showGuessPanel:",
+                                key: ":",
+                                modifiers: [.command]
+                            )
+                        ),
+                        .command(
+                            responderCommand(
+                                "checkSpelling",
+                                "Check Document Now",
+                                "checkSpelling:",
+                                key: ";",
+                                modifiers: [.command]
+                            )
+                        ),
+                    ]
+                ),
+            ]
+        ),
+        AppMenuSpec(
+            title: "View",
+            entries: [
+                .command(delegateCommand("actualSize", "Actual Size", "resetTextSize:", key: "0")),
+                .command(delegateCommand("zoomIn", "Zoom In", "increaseTextSize:", key: "+")),
+                .command(delegateCommand("zoomOut", "Zoom Out", "decreaseTextSize:", key: "-")),
+            ]
+        ),
+        AppMenuSpec(
+            title: "Format",
+            entries: [
+                .command(delegateCommand("bold", "Bold", "toggleBold:", key: "b")),
+                .command(delegateCommand("italic", "Italic", "toggleItalic:", key: "i")),
+                .command(delegateCommand("code", "Code", "toggleCode:", key: "`")),
+                .separator,
+                .command(delegateCommand("heading1", "Heading 1", "heading1:", key: "1")),
+                .command(delegateCommand("heading2", "Heading 2", "heading2:", key: "2")),
+            ]
+        ),
+        AppMenuSpec(
+            title: "Window",
+            entries: [
+                .command(responderCommand("minimize", "Minimize", "performMiniaturize:", key: "m")),
+                .command(responderCommand("zoomWindow", "Zoom", "performZoom:")),
+                .separator,
+                .command(
+                    responderCommand(
+                        "showPreviousTab",
+                        "Show Previous Tab",
+                        "selectPreviousTab:",
+                        key: "{",
+                        modifiers: [.command, .shift]
+                    )
+                ),
+                .command(
+                    responderCommand(
+                        "showNextTab",
+                        "Show Next Tab",
+                        "selectNextTab:",
+                        key: "}",
+                        modifiers: [.command, .shift]
+                    )
+                ),
+                .command(
+                    responderCommand(
+                        "moveTabToNewWindow",
+                        "Move Tab to New Window",
+                        "moveTabToNewWindow:"
+                    )
+                ),
+                .command(
+                    responderCommand("mergeAllWindows", "Merge All Windows", "mergeAllWindows:")
+                ),
+                .separator,
+                .command(appCommand("bringAllToFront", "Bring All to Front", "arrangeInFront:")),
+            ]
+        ),
     ]
 
     public static var commands: [AppCommandSpec] {

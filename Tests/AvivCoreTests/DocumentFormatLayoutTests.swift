@@ -1,5 +1,6 @@
 import AppKit
 import XCTest
+
 @testable import AvivCore
 
 final class DocumentFormatLayoutTests: XCTestCase {
@@ -19,7 +20,8 @@ final class DocumentFormatLayoutTests: XCTestCase {
 
     func testA4PrintViewUsesPaperContentWidthWithoutEditorInsets() {
         let margins = MarkdownDocumentFormat.a4.printMargins
-        let printableWidth = MarkdownDocumentFormat.a4.paperSize.width - margins.left - margins.right
+        let printableWidth =
+            MarkdownDocumentFormat.a4.paperSize.width - margins.left - margins.right
         let printView = MarkdownPrintView(
             markdown: MarkdownSamples.starter,
             printableWidth: printableWidth,
@@ -28,7 +30,11 @@ final class DocumentFormatLayoutTests: XCTestCase {
 
         printView.layoutSubtreeIfNeeded()
         XCTAssertEqual(printView.textView.textContainerInset.width, 0, accuracy: 0.01)
-        XCTAssertEqual(printView.textView.textContainer?.containerSize.width ?? 0, printableWidth, accuracy: 0.01)
+        XCTAssertEqual(
+            printView.textView.textContainer?.containerSize.width ?? 0,
+            printableWidth,
+            accuracy: 0.01
+        )
         XCTAssertGreaterThan(printView.frame.height, 200)
     }
 }

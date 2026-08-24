@@ -15,8 +15,14 @@ public final class MarkdownPrintView: NSView {
     ) {
         self.printableWidth = max(320, printableWidth)
         let printTheme = theme.withViewScale(format.printViewScale)
-        self.textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: self.printableWidth, height: 1), styler: MarkdownStyler(theme: printTheme))
-        self.annotationOverlay = MarkdownAnnotationOverlayView(textView: textView, theme: printTheme)
+        self.textView = MarkdownTextView(
+            frame: NSRect(x: 0, y: 0, width: self.printableWidth, height: 1),
+            styler: MarkdownStyler(theme: printTheme)
+        )
+        self.annotationOverlay = MarkdownAnnotationOverlayView(
+            textView: textView,
+            theme: printTheme
+        )
         super.init(frame: NSRect(x: 0, y: 0, width: self.printableWidth, height: 1))
 
         wantsLayer = false
@@ -27,7 +33,10 @@ public final class MarkdownPrintView: NSView {
         textView.isSelectable = false
         textView.textContainerInset = .zero
         textView.textContainer?.lineFragmentPadding = 0
-        textView.textContainer?.containerSize = NSSize(width: self.printableWidth, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.containerSize = NSSize(
+            width: self.printableWidth,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         textView.textContainer?.widthTracksTextView = false
         textView.markdownImageBaseURL = baseURL
         textView.loadMarkdownForPrint(markdown)
@@ -51,7 +60,10 @@ public final class MarkdownPrintView: NSView {
     public override func layout() {
         super.layout()
         textView.frame.size.width = printableWidth
-        textView.textContainer?.containerSize = NSSize(width: printableWidth, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.containerSize = NSSize(
+            width: printableWidth,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         updateDocumentHeight()
     }
 
@@ -61,7 +73,8 @@ public final class MarkdownPrintView: NSView {
     }
 
     private func updateDocumentHeight() {
-        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer
+        else { return }
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
         let height = max(1, ceil(usedRect.maxY + textView.textContainerInset.height * 2))

@@ -15,10 +15,10 @@ jobs:
 
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262
 
       - name: Setup .NET 10
-        uses: actions/setup-dotnet@v5
+        uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1
         with:
           dotnet-version: "10.0.x"
 
@@ -52,14 +52,14 @@ jobs:
           Compress-Archive -Path Windows/dist/win-x64/* -DestinationPath Windows/dist/artifacts/Aviv-Windows-win-x64.zip -Force
 
       - name: Upload Windows app artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Aviv-Windows-win-x64
           path: Windows/dist/artifacts/Aviv-Windows-win-x64.zip
 
       - name: Upload Windows UI screenshots
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02
         with:
           name: Aviv-Windows-ui-screenshots
           path: Windows/dist/screenshots/*.png

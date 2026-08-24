@@ -1,5 +1,4 @@
 #!/usr/bin/env swift
-
 import CoreServices
 import Foundation
 import UniformTypeIdentifiers
@@ -10,18 +9,18 @@ private let mode = CommandLine.arguments.dropFirst().first { !$0.hasPrefix("--")
 private let roles: [(name: String, mask: LSRolesMask)] = [
     ("all", .all),
     ("editor", .editor),
-    ("viewer", .viewer)
+    ("viewer", .viewer),
 ]
 private let markdownContentTypes = [
     "net.daringfireball.markdown",
-    "io.typora.markdown"
+    "io.typora.markdown",
 ]
 private let genericTextContentTypes = Set([
     "public.plain-text",
     "public.text",
     "public.data",
     "public.item",
-    "public.content"
+    "public.content",
 ])
 private let markdownExtensions = [
     "md",
@@ -35,7 +34,7 @@ private let markdownExtensions = [
     "mmd",
     "rmd",
     "rmarkdown",
-    "qmd"
+    "qmd",
 ]
 
 switch mode {
@@ -49,7 +48,10 @@ case "status":
     printStatus()
     exit(0)
 default:
-    fputs("usage: launch_services_markdown_default.swift [set|force-preferences|verify|status] [--bundle-id local.aviv.markdown]\n", stderr)
+    fputs(
+        "usage: launch_services_markdown_default.swift [set|force-preferences|verify|status] [--bundle-id local.aviv.markdown]\n",
+        stderr
+    )
     exit(64)
 }
 
@@ -58,10 +60,17 @@ private func setDefaults() -> Int32 {
 
     for contentType in defaultableContentTypes() {
         for role in roles {
-            let status = LSSetDefaultRoleHandlerForContentType(contentType as CFString, role.mask, expectedBundleID as CFString)
+            let status = LSSetDefaultRoleHandlerForContentType(
+                contentType as CFString,
+                role.mask,
+                expectedBundleID as CFString
+            )
             if status != noErr {
                 failed = true
-                fputs("failed to set \(contentType) role \(role.name): OSStatus \(status)\n", stderr)
+                fputs(
+                    "failed to set \(contentType) role \(role.name): OSStatus \(status)\n",
+                    stderr
+                )
             }
         }
     }
@@ -76,16 +85,20 @@ private func setDefaults() -> Int32 {
 
 private func forcePreferenceDefaults() -> Int32 {
     let url = URL(fileURLWithPath: NSHomeDirectory())
-        .appendingPathComponent("Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist")
+        .appendingPathComponent(
+            "Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist"
+        )
 
     do {
         let data = try Data(contentsOf: url)
         var format = PropertyListSerialization.PropertyListFormat.binary
-        guard var root = try PropertyListSerialization.propertyList(
-            from: data,
-            options: [.mutableContainersAndLeaves],
-            format: &format
-        ) as? [String: Any] else {
+        guard
+            var root = try PropertyListSerialization.propertyList(
+                from: data,
+                options: [.mutableContainersAndLeaves],
+                format: &format
+            ) as? [String: Any]
+        else {
             fputs("Launch Services preferences root is not a dictionary\n", stderr)
             return 1
         }
@@ -97,11 +110,16 @@ private func forcePreferenceDefaults() -> Int32 {
         let contentTypesToSet = defaultableContentTypes()
         for index in handlers.indices {
             guard let contentType = handlers[index]["LSHandlerContentType"] as? String,
-                  contentTypesToSet.contains(contentType) else {
+                contentTypesToSet.contains(contentType)
+            else {
                 continue
             }
 
-            handlers[index] = handler(contentType: contentType, modifiedAt: now, preserving: handlers[index])
+            handlers[index] = handler(
+                contentType: contentType,
+                modifiedAt: now,
+                preserving: handlers[index]
+            )
             seen.insert(contentType)
         }
 
@@ -110,7 +128,11 @@ private func forcePreferenceDefaults() -> Int32 {
         }
 
         root["LSHandlers"] = handlers
-        let output = try PropertyListSerialization.data(fromPropertyList: root, format: .binary, options: 0)
+        let output = try PropertyListSerialization.data(
+            fromPropertyList: root,
+            format: .binary,
+            options: 0
+        )
         try output.write(to: url, options: [.atomic])
         print("launch-services: forced Markdown defaults in \(url.path)")
         return 0
@@ -127,7 +149,9 @@ private func verifyDefaults() -> Int32 {
         for role in roles {
             let handler = defaultHandler(for: contentType, role: role.mask)
             if handler != expectedBundleID {
-                failures.append("\(contentType) role \(role.name) is \(handler ?? "nil"), expected \(expectedBundleID)")
+                failures.append(
+                    "\(contentType) role \(role.name) is \(handler ?? "nil"), expected \(expectedBundleID)"
+                )
             }
         }
     }
@@ -140,7 +164,9 @@ private func verifyDefaults() -> Int32 {
 
         let handler = defaultHandler(for: type.identifier, role: .all)
         if !genericTextContentTypes.contains(type.identifier), handler != expectedBundleID {
-            failures.append(".\(ext) resolves to \(type.identifier), whose default handler is \(handler ?? "nil")")
+            failures.append(
+                ".\(ext) resolves to \(type.identifier), whose default handler is \(handler ?? "nil")"
+            )
         }
     }
 
@@ -160,7 +186,9 @@ private func printStatus() {
     print("bundle: \(expectedBundleID)")
     for contentType in defaultableContentTypes() {
         for role in roles {
-            print("\(contentType) [\(role.name)]: \(defaultHandler(for: contentType, role: role.mask) ?? "nil")")
+            print(
+                "\(contentType) [\(role.name)]: \(defaultHandler(for: contentType, role: role.mask) ?? "nil")"
+            )
         }
     }
     for ext in markdownExtensions {
@@ -170,7 +198,8 @@ private func printStatus() {
 }
 
 private func defaultHandler(for contentType: String, role: LSRolesMask) -> String? {
-    guard let unmanaged = LSCopyDefaultRoleHandlerForContentType(contentType as CFString, role) else {
+    guard let unmanaged = LSCopyDefaultRoleHandlerForContentType(contentType as CFString, role)
+    else {
         return nil
     }
     let value = unmanaged.takeRetainedValue()
@@ -179,7 +208,9 @@ private func defaultHandler(for contentType: String, role: LSRolesMask) -> Strin
 
 private func defaultableContentTypes() -> [String] {
     var result: [String] = []
-    for contentType in markdownContentTypes + markdownExtensions.compactMap({ UTType(filenameExtension: $0)?.identifier }) {
+    for contentType in markdownContentTypes
+        + markdownExtensions.compactMap({ UTType(filenameExtension: $0)?.identifier })
+    {
         guard !genericTextContentTypes.contains(contentType), !result.contains(contentType) else {
             continue
         }
@@ -188,7 +219,11 @@ private func defaultableContentTypes() -> [String] {
     return result
 }
 
-private func handler(contentType: String, modifiedAt: Int, preserving existing: [String: Any]) -> [String: Any] {
+private func handler(
+    contentType: String,
+    modifiedAt: Int,
+    preserving existing: [String: Any]
+) -> [String: Any] {
     var handler = existing
     handler["LSHandlerContentType"] = contentType
     handler["LSHandlerRoleAll"] = expectedBundleID
@@ -198,7 +233,7 @@ private func handler(contentType: String, modifiedAt: Int, preserving existing: 
     handler["LSHandlerPreferredVersions"] = [
         "LSHandlerRoleAll": "-",
         "LSHandlerRoleEditor": "-",
-        "LSHandlerRoleViewer": "-"
+        "LSHandlerRoleViewer": "-",
     ]
     return handler
 }

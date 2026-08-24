@@ -7,11 +7,15 @@ public struct MarkdownLayoutVerificationResult {
     public let measuredSelections: Int
 }
 
+@MainActor
 public enum MarkdownLayoutVerifier {
     public static func verify() -> MarkdownLayoutVerificationResult {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 920, height: 1500))
         textView.textContainerInset = NSSize(width: 42, height: 42)
-        textView.textContainer?.containerSize = NSSize(width: 760, height: CGFloat.greatestFiniteMagnitude)
+        textView.textContainer?.containerSize = NSSize(
+            width: 760,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         textView.textContainer?.widthTracksTextView = false
         textView.loadMarkdown(MarkdownSamples.layoutFixture)
 
@@ -30,12 +34,15 @@ public enum MarkdownLayoutVerifier {
             let contentAttributes = attributesForContent(probes: probes, in: textView)
 
             for probe in probes {
-                guard let baseline = baselineFrames[probe.name], let current = frames[probe.name] else {
+                guard let baseline = baselineFrames[probe.name], let current = frames[probe.name]
+                else {
                     failures.append("Missing frame for \(probe.name) at cursor \(location)")
                     continue
                 }
                 if !rectsMatch(baseline, current) {
-                    failures.append("Frame moved for \(probe.name) at cursor \(location): \(baseline.debugDescription) -> \(current.debugDescription)")
+                    failures.append(
+                        "Frame moved for \(probe.name) at cursor \(location): \(baseline.debugDescription) -> \(current.debugDescription)"
+                    )
                 }
                 if baselineContentAttributes[probe.name] != contentAttributes[probe.name] {
                     failures.append("Content style shifted for \(probe.name) at cursor \(location)")
@@ -83,7 +90,7 @@ public enum MarkdownLayoutVerifier {
             "quote keeps",
             "Alpha",
             "positions",
-            "doNotMove"
+            "doNotMove",
         ]
 
         return needles.compactMap { needle in
@@ -108,7 +115,7 @@ public enum MarkdownLayoutVerifier {
             "> A quote",
             "| One",
             "```swift",
-            "assert"
+            "assert",
         ]
         var locations = needles.compactMap { needle -> Int? in
             let range = ns.range(of: needle)
@@ -119,11 +126,15 @@ public enum MarkdownLayoutVerifier {
     }
 
     private static func measure(probes: [Probe], in textView: NSTextView) -> [String: CGRect] {
-        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return [:] }
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer
+        else { return [:] }
         layoutManager.ensureLayout(for: textContainer)
         var frames: [String: CGRect] = [:]
         for probe in probes {
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: probe.range, actualCharacterRange: nil)
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: probe.range,
+                actualCharacterRange: nil
+            )
             var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
             rect.origin.x += textView.textContainerOrigin.x
             rect.origin.y += textView.textContainerOrigin.y
@@ -132,21 +143,27 @@ public enum MarkdownLayoutVerifier {
         return frames
     }
 
-    private static func attributesForContent(probes: [Probe], in textView: NSTextView) -> [String: String] {
+    private static func attributesForContent(
+        probes: [Probe],
+        in textView: NSTextView
+    ) -> [String: String] {
         guard let storage = textView.textStorage else { return [:] }
         var output: [String: String] = [:]
         for probe in probes {
             let index = min(probe.range.location, max(0, storage.length - 1))
             let font = storage.attribute(.font, at: index, effectiveRange: nil) as? NSFont
-            let color = storage.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor
-            let underline = storage.attribute(.underlineStyle, at: index, effectiveRange: nil) as? Int ?? 0
-            let strike = storage.attribute(.strikethroughStyle, at: index, effectiveRange: nil) as? Int ?? 0
+            let color =
+                storage.attribute(.foregroundColor, at: index, effectiveRange: nil) as? NSColor
+            let underline =
+                storage.attribute(.underlineStyle, at: index, effectiveRange: nil) as? Int ?? 0
+            let strike =
+                storage.attribute(.strikethroughStyle, at: index, effectiveRange: nil) as? Int ?? 0
             output[probe.name] = [
                 font?.fontName ?? "nil",
                 String(format: "%.2f", font?.pointSize ?? 0),
                 colorKey(color),
                 "\(underline)",
-                "\(strike)"
+                "\(strike)",
             ].joined(separator: "|")
         }
         return output
@@ -154,14 +171,19 @@ public enum MarkdownLayoutVerifier {
 
     private static func colorKey(_ color: NSColor?) -> String {
         guard let rgb = color?.usingColorSpace(.deviceRGB) else { return "nil" }
-        return String(format: "%.3f,%.3f,%.3f,%.3f", rgb.redComponent, rgb.greenComponent, rgb.blueComponent, rgb.alphaComponent)
+        return String(
+            format: "%.3f,%.3f,%.3f,%.3f",
+            rgb.redComponent,
+            rgb.greenComponent,
+            rgb.blueComponent,
+            rgb.alphaComponent
+        )
     }
 
     private static func rectsMatch(_ lhs: CGRect, _ rhs: CGRect) -> Bool {
-        abs(lhs.origin.x - rhs.origin.x) <= 0.5 &&
-        abs(lhs.origin.y - rhs.origin.y) <= 0.5 &&
-        abs(lhs.size.width - rhs.size.width) <= 0.5 &&
-        abs(lhs.size.height - rhs.size.height) <= 0.5
+        abs(lhs.origin.x - rhs.origin.x) <= 0.5 && abs(lhs.origin.y - rhs.origin.y) <= 0.5
+            && abs(lhs.size.width - rhs.size.width) <= 0.5
+            && abs(lhs.size.height - rhs.size.height) <= 0.5
     }
 
     private static func rounded(_ rect: CGRect) -> CGRect {

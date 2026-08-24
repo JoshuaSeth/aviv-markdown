@@ -35,7 +35,8 @@ public struct MarkdownMinimapViewportMetrics: Equatable {
     public func documentOffset(centeredAtTrackY trackY: CGFloat) -> CGFloat {
         guard scrollableDocumentHeight > 0 else { return 0 }
         let clampedTrackY = min(max(trackRect.minY, trackY), trackRect.maxY)
-        let documentCenterY = ((clampedTrackY - trackRect.minY) / max(1, trackRect.height)) * documentHeight
+        let documentCenterY =
+            ((clampedTrackY - trackRect.minY) / max(1, trackRect.height)) * documentHeight
         return min(max(0, documentCenterY - visibleHeight / 2), scrollableDocumentHeight)
     }
 }
@@ -60,8 +61,10 @@ public enum MarkdownMinimapViewport {
         let visibleMinY = min(max(0, visibleRect.minY), maxVisibleMinY)
         let visibleMaxY = visibleMinY + visibleHeight
 
-        let projectedMinY = trackRect.minY + (visibleMinY / resolvedDocumentHeight) * trackRect.height
-        let projectedMaxY = trackRect.minY + (visibleMaxY / resolvedDocumentHeight) * trackRect.height
+        let projectedMinY =
+            trackRect.minY + (visibleMinY / resolvedDocumentHeight) * trackRect.height
+        let projectedMaxY =
+            trackRect.minY + (visibleMaxY / resolvedDocumentHeight) * trackRect.height
         let exactHeight = max(0, projectedMaxY - projectedMinY)
         let resolvedMinimumHeight = min(trackRect.height, max(0, minimumThumbHeight))
 
