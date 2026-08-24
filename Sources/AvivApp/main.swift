@@ -26,6 +26,20 @@ MainActor.assumeIsolated {
         exit(MarkdownTypingPerformanceVerifier.runCLI())
     }
 
+    if let restorationIndex = arguments.firstIndex(of: "--verify-table-restoration") {
+        let evidenceDirectory: URL?
+        if arguments.indices.contains(restorationIndex + 1) {
+            evidenceDirectory = URL(fileURLWithPath: arguments[restorationIndex + 1])
+        } else {
+            evidenceDirectory = nil
+        }
+        exit(
+            MarkdownTableRestorationVerifier.runCLI(
+                evidenceDirectory: evidenceDirectory
+            )
+        )
+    }
+
     if arguments.contains("--verify-commands") {
         exit(AppCommandVerifier.runCLI())
     }
