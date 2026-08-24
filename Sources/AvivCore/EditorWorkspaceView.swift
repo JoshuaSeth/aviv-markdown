@@ -32,6 +32,10 @@ public final class EditorWorkspaceView: NSView {
     )
     private let titleLabel = NSTextField(labelWithString: "Untitled")
     private let statusLabel = NSTextField(labelWithString: "")
+    private let remoteSyncIndicatorView = RemoteSyncIndicatorView()
+    private let remoteEdgePulseView = RemoteEdgePulseView()
+    private let remoteChangedLineMarkerView: RemoteChangedLineMarkerView
+    private let remoteSyncToastView = RemoteSyncToastView()
     private let formatLabel = NSTextField(labelWithString: "Format")
     private let formatButton = NSPopUpButton(frame: .zero, pullsDown: false)
     private let rule = NSBox()
@@ -65,6 +69,7 @@ public final class EditorWorkspaceView: NSView {
         self.scrollView = NSScrollView(frame: .zero)
         self.annotationOverlay = MarkdownAnnotationOverlayView(textView: textView, theme: theme)
         self.minimapView = MarkdownMinimapView(textView: textView, theme: theme)
+        self.remoteChangedLineMarkerView = RemoteChangedLineMarkerView(textView: textView)
         self.documentFormat = MarkdownDocumentFormat.stored()
         super.init(frame: frameRect)
         setup()
@@ -82,13 +87,81 @@ public final class EditorWorkspaceView: NSView {
     }
 
     public func setDocumentURL(_ url: URL?) {
-        textView.markdownImageBaseURL = url?.deletingLastPathComponent()
+        textView.markdownImageBaseURL =
+            url?.isFileURL == true
+            ? url?.deletingLastPathComponent() : nil
         textView.needsDisplay = true
     }
 
     public func updateDocumentTitle(url: URL?, isEdited: Bool) {
         let base = url?.lastPathComponent ?? "Untitled"
         titleLabel.stringValue = isEdited ? "\(base) *" : base
+    }
+
+    public func updateRemoteSyncPresentation(_ presentation: RemoteSyncPresentation?) {
+        guard let presentation else {
+            remoteSyncIndicatorView.isHidden = true
+            remoteChangedLineMarkerView.lineRanges = []
+            remoteSyncToastView.alphaValue = 0
+            return
+        }
+        remoteSyncIndicatorView.update(presentation, theme: currentTheme)
+    }
+
+    public func announceRemoteChange(
+        lineRanges: [NSRange],
+        message: String,
+        conflict: Bool = false
+    ) {
+        remoteChangedLineMarkerView.lineRanges = lineRanges
+        remoteEdgePulseView.pulse(
+            color: conflict
+                ? NSColor(calibratedRed: 0.78, green: 0.23, blue: 0.18, alpha: 1)
+                : currentTheme.accentColor
+        )
+        remoteSyncToastView.show(message: message, conflict: conflict)
+    }
+
+    public func applyExternalMarkdown(
+        _ markdown: String,
+        using plan: RemoteMarkdownChangePlan
+    ) -> ExternalMarkdownUpdateResult {
+        let originalSelections = textView.selectedRanges.compactMap { $0.rangeValue }
+        let mappedSelections = originalSelections.map { plan.map(range: $0, newMarkdown: markdown) }
+        let originalContainerWidth = textView.textContainer?.containerSize.width ?? 0
+        let anchor = captureVisibleTextAnchor()
+
+        cancelDeferredViewUpdates()
+        textView.loadMarkdown(markdown)
+        textView.setSelectedRanges(
+            mappedSelections.map { NSValue(range: $0) },
+            affinity: .downstream,
+            stillSelecting: false
+        )
+        updateTextInsets(preserveVisibleOrigin: false)
+        let anchorDelta = restoreVisibleTextAnchor(anchor, using: plan, newMarkdown: markdown)
+        updateMetrics()
+        remoteChangedLineMarkerView.lineRanges = plan.changedLineRanges(in: markdown)
+        remoteChangedLineMarkerView.needsDisplay = true
+        let newContainerWidth = textView.textContainer?.containerSize.width ?? 0
+        return ExternalMarkdownUpdateResult(
+            mappedSelections: mappedSelections,
+            visibleAnchorCharacter: anchor.map { plan.map(location: $0.characterLocation) },
+            visibleAnchorDelta: anchorDelta,
+            textContainerWidthDelta: newContainerWidth - originalContainerWidth
+        )
+    }
+
+    public var remoteIndicatorIdentifiersForTesting: [String] {
+        RemoteSyncIndicatorView.indicatorIdentifiers + [
+            "remote-edge-pulse",
+            "remote-changed-lines",
+            "remote-sync-toast",
+        ]
+    }
+
+    public var remoteChangedLineCountForTesting: Int {
+        remoteChangedLineMarkerView.lineRanges.count
     }
 
     public func updateMetrics() {
@@ -134,6 +207,10 @@ public final class EditorWorkspaceView: NSView {
     }
 
     private func setup() {
+        // The current Aviv theme is intentionally light and uses fixed palette
+        // colors. Pin AppKit controls and visual-effect chrome to Aqua so a
+        // system-wide Dark Mode cannot invert only part of the workspace.
+        appearance = NSAppearance(named: .aqua)
         wantsLayer = true
         layer?.backgroundColor = theme.backgroundColor.cgColor
 
@@ -166,6 +243,11 @@ public final class EditorWorkspaceView: NSView {
         statusLabel.textColor = theme.secondaryTextColor
         statusLabel.alignment = .right
         statusLabel.lineBreakMode = .byTruncatingTail
+
+        remoteSyncIndicatorView.translatesAutoresizingMaskIntoConstraints = false
+        remoteEdgePulseView.translatesAutoresizingMaskIntoConstraints = false
+        remoteChangedLineMarkerView.translatesAutoresizingMaskIntoConstraints = false
+        remoteSyncToastView.translatesAutoresizingMaskIntoConstraints = false
 
         formatBackdropView.translatesAutoresizingMaskIntoConstraints = false
         formatLabel.translatesAutoresizingMaskIntoConstraints = false
@@ -201,6 +283,10 @@ public final class EditorWorkspaceView: NSView {
         addSubview(formatLabel)
         addSubview(formatButton)
         addSubview(rule)
+        addSubview(remoteChangedLineMarkerView)
+        addSubview(remoteEdgePulseView)
+        addSubview(remoteSyncIndicatorView)
+        addSubview(remoteSyncToastView)
 
         NotificationCenter.default.addObserver(
             self,
@@ -300,6 +386,26 @@ public final class EditorWorkspaceView: NSView {
             rule.trailingAnchor.constraint(equalTo: trailingAnchor),
             ruleTopConstraint!,
             rule.heightAnchor.constraint(equalToConstant: 1),
+
+            remoteChangedLineMarkerView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            remoteChangedLineMarkerView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            remoteChangedLineMarkerView.topAnchor.constraint(equalTo: topAnchor),
+            remoteChangedLineMarkerView.bottomAnchor.constraint(equalTo: bottomAnchor),
+
+            remoteEdgePulseView.leadingAnchor.constraint(equalTo: leadingAnchor),
+            remoteEdgePulseView.trailingAnchor.constraint(equalTo: trailingAnchor),
+            remoteEdgePulseView.topAnchor.constraint(equalTo: topAnchor),
+            remoteEdgePulseView.heightAnchor.constraint(equalToConstant: 2),
+
+            remoteSyncIndicatorView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            remoteSyncIndicatorView.topAnchor.constraint(equalTo: topAnchor, constant: 9),
+            remoteSyncIndicatorView.heightAnchor.constraint(equalToConstant: 28),
+            remoteSyncIndicatorView.widthAnchor.constraint(equalToConstant: 270),
+
+            remoteSyncToastView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22),
+            remoteSyncToastView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -46),
+            remoteSyncToastView.widthAnchor.constraint(equalToConstant: 286),
+            remoteSyncToastView.heightAnchor.constraint(equalToConstant: 40),
         ])
 
         textView.onViewScaleChange = { [weak self] in
@@ -461,6 +567,70 @@ public final class EditorWorkspaceView: NSView {
         }
     }
 
+    private func captureVisibleTextAnchor() -> VisibleTextAnchor? {
+        guard let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer,
+            layoutManager.numberOfGlyphs > 0
+        else { return nil }
+        let visibleRect = textView.convert(
+            scrollView.contentView.bounds,
+            from: scrollView.contentView
+        )
+        var containerRect = visibleRect
+        containerRect.origin.x -= textView.textContainerOrigin.x
+        containerRect.origin.y -= textView.textContainerOrigin.y
+        let visibleGlyphs = layoutManager.glyphRange(
+            forBoundingRect: containerRect,
+            in: textContainer
+        )
+        guard visibleGlyphs.location < layoutManager.numberOfGlyphs else { return nil }
+        let characterLocation = layoutManager.characterIndexForGlyph(at: visibleGlyphs.location)
+        var glyphRect = layoutManager.boundingRect(
+            forGlyphRange: NSRange(location: visibleGlyphs.location, length: 1),
+            in: textContainer
+        )
+        glyphRect.origin.x += textView.textContainerOrigin.x
+        glyphRect.origin.y += textView.textContainerOrigin.y
+        return VisibleTextAnchor(
+            characterLocation: characterLocation,
+            offsetFromVisibleTop: glyphRect.minY - visibleRect.minY
+        )
+    }
+
+    private func restoreVisibleTextAnchor(
+        _ anchor: VisibleTextAnchor?,
+        using plan: RemoteMarkdownChangePlan,
+        newMarkdown: String
+    ) -> CGFloat {
+        guard let anchor, let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer, layoutManager.numberOfGlyphs > 0
+        else { return 0 }
+        let documentLength = (newMarkdown as NSString).length
+        let mappedCharacter = min(
+            max(0, plan.map(location: anchor.characterLocation)),
+            documentLength
+        )
+        let layoutCharacter = min(mappedCharacter, max(0, documentLength - 1))
+        layoutManager.ensureLayout(forCharacterRange: NSRange(location: layoutCharacter, length: 1))
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: NSRange(location: layoutCharacter, length: 1),
+            actualCharacterRange: nil
+        )
+        guard glyphRange.location < layoutManager.numberOfGlyphs else { return 0 }
+        var glyphRect = layoutManager.boundingRect(
+            forGlyphRange: NSRange(location: glyphRange.location, length: 1),
+            in: textContainer
+        )
+        glyphRect.origin.y += textView.textContainerOrigin.y
+        let clipView = scrollView.contentView
+        let maximumY = max(0, textView.frame.height - clipView.bounds.height)
+        let targetY = min(max(0, glyphRect.minY - anchor.offsetFromVisibleTop), maximumY)
+        clipView.scroll(to: NSPoint(x: clipView.bounds.origin.x, y: targetY))
+        scrollView.reflectScrolledClipView(clipView)
+        let restoredVisibleRect = textView.convert(clipView.bounds, from: clipView)
+        return glyphRect.minY - restoredVisibleRect.minY - anchor.offsetFromVisibleTop
+    }
+
     private func updateScaledChrome() {
         let theme = currentTheme
         titleLabel.font = theme.smallFont
@@ -534,6 +704,11 @@ public final class EditorWorkspaceView: NSView {
                 && abs(verticalInset - other.verticalInset) <= epsilon
                 && abs(containerWidth - other.containerWidth) <= epsilon
         }
+    }
+
+    private struct VisibleTextAnchor {
+        let characterLocation: Int
+        let offsetFromVisibleTop: CGFloat
     }
 }
 

@@ -1,0 +1,26 @@
+[Unit]
+Description=Aviv authenticated live Markdown bridge
+After=network.target
+
+[Service]
+Type=simple
+User=aviv-live
+Group=aviv-live
+Environment=AVIV_LIVE_HOST=127.0.0.1
+Environment=AVIV_LIVE_PORT=8793
+Environment=AVIV_LIVE_DATA_ROOT=/var/lib/aviv-live
+Environment=AVIV_LIVE_MANIFEST=/etc/aviv-live/sources.json
+Environment=AVIV_LIVE_WRITE_TOKEN_FILE=/etc/aviv-live/write-token
+Environment=AVIV_LIVE_PUBLIC_BASE_URL=https://pitchai.net/aviv-live
+Environment=AVIV_LIVE_WRITE_BASE_URL=https://pitchai.net/api/aviv-live
+ExecStart=/usr/bin/node /opt/aviv-live/server.mjs
+Restart=on-failure
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/var/lib/aviv-live
+
+[Install]
+WantedBy=multi-user.target

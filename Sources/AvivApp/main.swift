@@ -66,6 +66,15 @@ MainActor.assumeIsolated {
         exit(MarkdownDefaultAppService.verifyPromptLogicForCLI())
     }
 
+    if arguments.contains("--verify-remote-live") {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in
+            exit(await RemoteMarkdownLiveVerifier.runCLI(arguments: arguments))
+        }
+        app.run()
+    }
+
     if let snapshotIndex = arguments.firstIndex(of: "--snapshot"),
         arguments.indices.contains(snapshotIndex + 1)
     {
