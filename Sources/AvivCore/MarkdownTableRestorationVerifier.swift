@@ -12,6 +12,8 @@ public struct MarkdownTableRestorationResult {
     public let sourcePreserved: Bool
     public let selectionPreserved: Bool
     public let attributesRestored: Bool
+    public let editedContentRestorationPixelDifference: Int
+    public let editedContentAttributesRestored: Bool
 }
 
 @MainActor
@@ -29,6 +31,7 @@ public enum MarkdownTableRestorationVerifier {
         center(workspace, around: tableCellRange)
         settle(workspace)
 
+        _ = snapshot(workspace, tableCellRange: tableCellRange)
         let baseline = snapshot(workspace, tableCellRange: tableCellRange)
         write(baseline.pngData, named: "table-normal.png", to: evidenceDirectory)
 
@@ -47,9 +50,13 @@ public enum MarkdownTableRestorationVerifier {
         let maximumFrameDelta = rectDelta(baseline.tableFrame, restored.tableFrame)
         let scrollDelta = pointDelta(baseline.visibleOrigin, restored.visibleOrigin)
         let sourcePreserved = workspace.textView.string == markdown
-        let selectionPreserved = workspace.textView.selectedRange()
+        let selectionPreserved =
+            workspace.textView.selectedRange()
             == NSRange(location: outsideRange.location, length: 0)
         let attributesRestored = baseline.tableAttributes.isEqual(to: restored.tableAttributes)
+        let editedContentRestoration = verifyEditedContentRestoration(
+            evidenceDirectory: evidenceDirectory
+        )
 
         var failures: [String] = []
         if normalToEditing == 0 {
@@ -61,7 +68,9 @@ public enum MarkdownTableRestorationVerifier {
             )
         }
         if !attributesRestored {
-            failures.append("Post-edit table text attributes did not return to the normal attributes")
+            failures.append(
+                "Post-edit table text attributes did not return to the normal attributes"
+            )
         }
         if maximumFrameDelta > 0.01 {
             failures.append(
@@ -82,6 +91,17 @@ public enum MarkdownTableRestorationVerifier {
         if !sourcePreserved {
             failures.append("Table focus transition changed the Markdown source")
         }
+        if editedContentRestoration.pixelDifference != 0 {
+            failures.append(
+                "Immediate click-away after editing differs from a fully refreshed rendering by "
+                    + "\(editedContentRestoration.pixelDifference) pixel bytes"
+            )
+        }
+        if !editedContentRestoration.attributesRestored {
+            failures.append(
+                "Immediate click-away after editing did not restore fully refreshed attributes"
+            )
+        }
 
         let result = MarkdownTableRestorationResult(
             passed: failures.isEmpty,
@@ -93,7 +113,9 @@ public enum MarkdownTableRestorationVerifier {
             scrollOriginDelta: scrollDelta,
             sourcePreserved: sourcePreserved,
             selectionPreserved: selectionPreserved,
-            attributesRestored: attributesRestored
+            attributesRestored: attributesRestored,
+            editedContentRestorationPixelDifference: editedContentRestoration.pixelDifference,
+            editedContentAttributesRestored: editedContentRestoration.attributesRestored
         )
         writeSummary(result, to: evidenceDirectory)
         return result
@@ -103,21 +125,25 @@ public enum MarkdownTableRestorationVerifier {
         let result = verify(evidenceDirectory: evidenceDirectory)
         let summary = String(
             format:
-                "%d chars, editing delta %d, restored delta %d, frame %.3f pt, scroll %.3f pt",
+                "%d chars, editing delta %d, restored delta %d, edited-content delta %d, frame %.3f pt, scroll %.3f pt",
             result.documentLength,
             result.normalToEditingPixelDifference,
             result.normalToRestoredPixelDifference,
+            result.editedContentRestorationPixelDifference,
             result.maximumTableFrameDelta,
             result.scrollOriginDelta
         )
 
         if result.passed {
+            // pitchai-allow-cli-output: this explicit verifier CLI edge reports its result.
             print("table-restoration-verifier: PASS (\(summary))")
             return 0
         }
 
+        // pitchai-allow-cli-output: this explicit verifier CLI edge reports its result.
         print("table-restoration-verifier: FAIL (\(summary))")
         for failure in result.failures {
+            // pitchai-allow-cli-output: this explicit verifier CLI edge reports failures.
             print("- \(failure)")
         }
         return 1
@@ -183,6 +209,60 @@ public enum MarkdownTableRestorationVerifier {
             tableAttributes: textStorage.attributedSubstring(from: tableBlock.range),
             tableFrame: frame(for: tableBlock.range, in: workspace.textView),
             visibleOrigin: workspace.scrollView.contentView.bounds.origin
+        )
+    }
+
+    private static func verifyEditedContentRestoration(
+        evidenceDirectory: URL?
+    ) -> (
+        pixelDifference: Int,
+        attributesRestored: Bool
+    ) {
+        let workspace = makeWorkspace()
+        let nsString = workspace.textView.string as NSString
+        let oldValue = "Visual restoration target"
+        let newValue = "Edited restoration target"
+        let editRange = nsString.range(of: oldValue)
+        let outsideRange = nsString.range(of: "Focus destination outside the table")
+        precondition(editRange.location != NSNotFound, "missing editable restoration target")
+        precondition(outsideRange.location != NSNotFound, "missing edited restoration destination")
+
+        workspace.textView.setSelectedRange(editRange)
+        center(workspace, around: editRange)
+        settle(workspace)
+        guard
+            workspace.textView.shouldChangeText(
+                in: editRange,
+                replacementString: newValue
+            )
+        else {
+            preconditionFailure("table restoration edit was rejected")
+        }
+        workspace.textView.replaceCharacters(in: editRange, with: newValue)
+        workspace.textView.didChangeText()
+        workspace.textView.setSelectedRange(NSRange(location: outsideRange.location, length: 0))
+        settle(workspace)
+
+        let updatedRange = (workspace.textView.string as NSString).range(of: newValue)
+        precondition(updatedRange.location != NSNotFound, "missing updated restoration target")
+        _ = snapshot(workspace, tableCellRange: updatedRange)
+        let immediate = snapshot(workspace, tableCellRange: updatedRange)
+        write(immediate.pngData, named: "table-edited-immediate.png", to: evidenceDirectory)
+
+        workspace.textView.applyMarkdownStyle()
+        settle(workspace)
+        let fullyRefreshed = snapshot(workspace, tableCellRange: updatedRange)
+        write(
+            fullyRefreshed.pngData,
+            named: "table-edited-fully-refreshed.png",
+            to: evidenceDirectory
+        )
+
+        return (
+            pixelDifference: pixelDifference(immediate, fullyRefreshed),
+            attributesRestored: immediate.tableAttributes.isEqual(
+                to: fullyRefreshed.tableAttributes
+            )
         )
     }
 
@@ -277,6 +357,9 @@ public enum MarkdownTableRestorationVerifier {
             "sourcePreserved": result.sourcePreserved,
             "selectionPreserved": result.selectionPreserved,
             "attributesRestored": result.attributesRestored,
+            "editedContentRestorationPixelDifference":
+                result.editedContentRestorationPixelDifference,
+            "editedContentAttributesRestored": result.editedContentAttributesRestored,
             "failures": result.failures,
         ]
         do {

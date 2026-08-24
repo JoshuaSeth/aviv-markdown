@@ -4,6 +4,7 @@ import XCTest
 @testable import AvivCore
 
 final class DocumentFormatLayoutTests: XCTestCase {
+    @MainActor
     func testDocumentFormatsUseExpectedScreenWidths() {
         let workspace = EditorWorkspaceView(frame: NSRect(x: 0, y: 0, width: 1180, height: 920))
         workspace.loadMarkdown(MarkdownSamples.starter)
@@ -18,6 +19,7 @@ final class DocumentFormatLayoutTests: XCTestCase {
         XCTAssertGreaterThan(930, 820)
     }
 
+    @MainActor
     func testA4PrintViewUsesPaperContentWidthWithoutEditorInsets() {
         let margins = MarkdownDocumentFormat.a4.printMargins
         let printableWidth =

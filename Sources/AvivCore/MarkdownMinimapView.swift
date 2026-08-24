@@ -4,6 +4,23 @@ public final class MarkdownMinimapView: NSView {
     public weak var textView: MarkdownTextView?
     private let fallbackTheme: MarkdownTheme
     private var activeThumbDragOffset: CGFloat?
+    private var cachedStructureSignature: StructureSignature?
+    private var cachedStructureImage: NSImage?
+
+    private struct StructureSignature: Equatable {
+        let revision: Int
+        let boundsWidth: CGFloat
+        let boundsHeight: CGFloat
+        let containerWidth: CGFloat
+        let documentHeight: CGFloat
+        let viewScale: CGFloat
+        let backingScale: CGFloat
+    }
+
+    private struct StructureEntry {
+        let line: MarkdownMinimapLine
+        let documentRect: NSRect
+    }
 
     public init(textView: MarkdownTextView, theme: MarkdownTheme = .clean) {
         self.textView = textView
@@ -38,25 +55,19 @@ public final class MarkdownMinimapView: NSView {
         border.lineWidth = 1
         border.stroke()
 
-        let insetX = theme.scaledMetric(7, minimum: 5)
-        let maxLineWidth = max(8, bounds.width - insetX * 2)
-        let lines = MarkdownMinimapStructure.lines(in: textView.string)
-        let lineRanges = sourceLineRanges(in: textView.string)
-
-        for (index, line) in lines.enumerated() where index < lineRanges.count {
-            let fragments = visualLineFragments(forCharacterRange: lineRanges[index], in: textView)
-            for fragment in fragments {
-                let y = metrics.projectedY(forDocumentY: fragment.minY)
-                guard y >= bounds.minY - 1, y <= bounds.maxY + 1 else { continue }
-                let lineStep = max(1.2, metrics.projectedHeight(forDocumentHeight: fragment.height))
-                draw(line, at: y, lineStep: lineStep, insetX: insetX, maxLineWidth: maxLineWidth)
-            }
-        }
+        let structureImage = structureImage(in: textView, metrics: metrics)
+        structureImage.draw(
+            in: bounds,
+            from: NSRect(origin: .zero, size: structureImage.size),
+            operation: .sourceOver,
+            fraction: 1,
+            respectFlipped: true,
+            hints: nil
+        )
 
         if let selected = selectedLineMarker(in: textView, metrics: metrics) {
             drawSelectionMarker(at: selected.y, lineStep: selected.lineStep)
         }
-
         drawViewportThumb(metrics)
     }
 
@@ -101,6 +112,113 @@ public final class MarkdownMinimapView: NSView {
     func scrollForTesting(thumbMinY y: CGFloat) {
         guard let metrics = viewportMetrics() else { return }
         scrollTextView(toThumbMinY: y, metrics: metrics)
+    }
+
+    private func structureImage(
+        in textView: MarkdownTextView,
+        metrics: MarkdownMinimapViewportMetrics
+    ) -> NSImage {
+        let signature = StructureSignature(
+            revision: textView.documentRenderRevision,
+            boundsWidth: bounds.width,
+            boundsHeight: bounds.height,
+            containerWidth: textView.textContainer?.containerSize.width ?? 0,
+            documentHeight: metrics.documentHeight,
+            viewScale: currentTheme.viewScale,
+            backingScale: 1 / backingScaleAdjustedPixel
+        )
+        if signature == cachedStructureSignature, let cachedStructureImage {
+            return cachedStructureImage
+        }
+
+        let image = NSImage(size: bounds.size)
+        NSGraphicsContext.saveGraphicsState()
+        image.lockFocusFlipped(true)
+        drawStructure(
+            entries: structureEntries(in: textView),
+            metrics: metrics
+        )
+        image.unlockFocus()
+        NSGraphicsContext.restoreGraphicsState()
+        cachedStructureSignature = signature
+        cachedStructureImage = image
+        return image
+    }
+
+    private func structureEntries(in textView: MarkdownTextView) -> [StructureEntry] {
+        guard let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer
+        else { return [] }
+        let lines = textView.minimapLinesForRendering
+        let sourceRanges = textView.sourceLineRangesForRendering
+        guard !lines.isEmpty, lines.count == sourceRanges.count else { return [] }
+
+        layoutManager.ensureLayout(for: textContainer)
+        let glyphRange = layoutManager.glyphRange(for: textContainer)
+        var entries: [StructureEntry] = []
+        entries.reserveCapacity(lines.count)
+        var sourceLineIndex = 0
+
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) {
+            _,
+            usedRect,
+            _,
+            fragmentGlyphRange,
+            _ in
+            let characterRange = layoutManager.characterRange(
+                forGlyphRange: fragmentGlyphRange,
+                actualGlyphRange: nil
+            )
+            while sourceLineIndex + 1 < sourceRanges.count,
+                characterRange.location >= sourceRanges[sourceLineIndex + 1].location
+            {
+                sourceLineIndex += 1
+            }
+            guard sourceLineIndex < lines.count else { return }
+            var documentRect = usedRect
+            documentRect.origin.x += textView.textContainerOrigin.x
+            documentRect.origin.y += textView.textContainerOrigin.y
+            entries.append(
+                StructureEntry(
+                    line: lines[sourceLineIndex],
+                    documentRect: documentRect
+                )
+            )
+        }
+        return entries
+    }
+
+    private func drawStructure(
+        entries: [StructureEntry],
+        metrics: MarkdownMinimapViewportMetrics
+    ) {
+        let insetX = currentTheme.scaledMetric(7, minimum: 5)
+        let maxLineWidth = max(8, bounds.width - insetX * 2)
+        let backingScale = 1 / backingScaleAdjustedPixel
+        var lastPixelRow: Int?
+        var lastKind: MarkdownMinimapLine.Kind?
+
+        for entry in entries {
+            let y = metrics.projectedY(forDocumentY: entry.documentRect.minY)
+            guard y >= bounds.minY - 1, y <= bounds.maxY + 1 else { continue }
+            let pixelRow = Int((y * backingScale).rounded(.down))
+            if pixelRow == lastPixelRow, entry.line.kind == lastKind {
+                continue
+            }
+            let lineStep = max(
+                1.2,
+                metrics.projectedHeight(forDocumentHeight: entry.documentRect.height)
+            )
+            draw(
+                entry.line,
+                at: y,
+                lineStep: lineStep,
+                insetX: insetX,
+                maxLineWidth: maxLineWidth
+            )
+            lastPixelRow = pixelRow
+            lastKind = entry.line.kind
+        }
     }
 
     private func drawViewportThumb(_ metrics: MarkdownMinimapViewportMetrics) {
@@ -464,39 +582,6 @@ public final class MarkdownMinimapView: NSView {
         )
     }
 
-    private func visualLineFragments(
-        forCharacterRange range: NSRange,
-        in textView: NSTextView
-    ) -> [NSRect] {
-        guard
-            range.length > 0,
-            let layoutManager = textView.layoutManager,
-            let textContainer = textView.textContainer
-        else { return [] }
-
-        layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(
-            forCharacterRange: range,
-            actualCharacterRange: nil
-        )
-        guard glyphRange.length > 0 else { return [] }
-
-        var fragments: [NSRect] = []
-        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) {
-            _,
-            usedRect,
-            _,
-            fragmentGlyphRange,
-            _ in
-            guard NSIntersectionRange(fragmentGlyphRange, glyphRange).length > 0 else { return }
-            var rect = usedRect
-            rect.origin.x += textView.textContainerOrigin.x
-            rect.origin.y += textView.textContainerOrigin.y
-            fragments.append(rect)
-        }
-        return fragments
-    }
-
     private func selectedLineMarker(
         in textView: NSTextView,
         metrics: MarkdownMinimapViewportMetrics
@@ -516,40 +601,6 @@ public final class MarkdownMinimapView: NSView {
             y: metrics.projectedY(forDocumentY: rect.minY),
             lineStep: max(1.2, metrics.projectedHeight(forDocumentHeight: rect.height))
         )
-    }
-
-    private func sourceLineRanges(in text: String) -> [NSRange] {
-        let nsString = text as NSString
-        guard nsString.length > 0 else { return [NSRange(location: 0, length: 0)] }
-
-        var ranges: [NSRange] = []
-        var start = 0
-        while start <= nsString.length {
-            var end = start
-            while end < nsString.length {
-                let character = nsString.character(at: end)
-                if character == 10 || character == 13 {
-                    break
-                }
-                end += 1
-            }
-            ranges.append(NSRange(location: start, length: end - start))
-
-            if end >= nsString.length {
-                break
-            }
-            let newlineCharacter = nsString.character(at: end)
-            end += 1
-            if newlineCharacter == 13, end < nsString.length, nsString.character(at: end) == 10 {
-                end += 1
-            }
-            start = end
-            if start == nsString.length {
-                ranges.append(NSRange(location: start, length: 0))
-                break
-            }
-        }
-        return ranges
     }
 
     private var backingScaleAdjustedPixel: CGFloat {

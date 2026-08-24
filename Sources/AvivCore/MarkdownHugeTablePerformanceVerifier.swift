@@ -10,6 +10,7 @@ public struct MarkdownHugeTablePerformanceResult {
     public let loadLatency: TimeInterval
     public let initialRenderLatency: TimeInterval
     public let scrollLatencies: [TimeInterval]
+    public let scrollRenderLatencies: [TimeInterval]
     public let averageEditLatency: TimeInterval
     public let maximumEditLatency: TimeInterval
     public let residentMemoryBeforeLoad: UInt64
@@ -17,11 +18,14 @@ public struct MarkdownHugeTablePerformanceResult {
     public let residentMemoryAfterInteractions: UInt64
     public let sourcePreserved: Bool
     public let searchPreserved: Bool
+    public let copyPreserved: Bool
+    public let pastePreserved: Bool
 }
 
 @MainActor
 public enum MarkdownHugeTablePerformanceVerifier {
-    private static let scrollFrameBudget: TimeInterval = 1.0 / 30.0
+    private static let scrollUpdateBudget: TimeInterval = 1.0 / 60.0
+    private static let scrollRenderBudget: TimeInterval = 0.100
 
     public static func verify(
         rowCount: Int = 4_000,
@@ -52,29 +56,44 @@ public enum MarkdownHugeTablePerformanceVerifier {
         bitmap.size = workspace.bounds.size
 
         let initialRenderLatency = render(workspace, into: bitmap)
-        let scrollLatencies = measureScrollFrames(workspace, bitmap: bitmap)
+        let scrollMeasurements = measureScrollFrames(workspace, bitmap: bitmap)
         centerOnEditTarget(workspace, rowCount: rowCount)
         _ = render(workspace, into: bitmap)
 
         let editResult = measureEdits(workspace, rowCount: rowCount)
+        let copyPasteResult = verifyCopyPaste(
+            workspace,
+            rowCount: rowCount,
+            expectedSource: editResult.expectedSource
+        )
         drainDeferredUpdates()
         _ = render(workspace, into: bitmap)
         let residentMemoryAfterInteractions = residentMemory()
 
-        let sourcePreserved = workspace.textView.string == editResult.expectedSource
+        let sourcePreserved = workspace.textView.string == copyPasteResult.expectedSource
         let searchNeedle = "Search preservation sentinel row \(rowCount - 9)"
-        let searchPreserved = (workspace.textView.string as NSString).range(of: searchNeedle)
+        let searchPreserved =
+            (workspace.textView.string as NSString).range(of: searchNeedle)
             .location != NSNotFound
 
         centerOnEditTarget(workspace, rowCount: rowCount)
         _ = render(workspace, into: bitmap)
         writeScreenshot(bitmap, to: evidenceDirectory)
 
+        let scrollLatencies = scrollMeasurements.updateLatencies
+        let scrollRenderLatencies = scrollMeasurements.renderLatencies
         let sortedScrollLatencies = scrollLatencies.sorted()
+        let sortedScrollRenderLatencies = scrollRenderLatencies.sorted()
         let p95ScrollLatency = percentile(sortedScrollLatencies, percentile: 0.95)
         let maximumScrollLatency = sortedScrollLatencies.last ?? 0
-        let jankyFrameCount = scrollLatencies.filter { $0 > scrollFrameBudget }.count
-        let memoryGrowth = residentMemoryAfterInteractions > residentMemoryBeforeLoad
+        let p95ScrollRenderLatency = percentile(
+            sortedScrollRenderLatencies,
+            percentile: 0.95
+        )
+        let maximumScrollRenderLatency = sortedScrollRenderLatencies.last ?? 0
+        let jankyFrameCount = scrollLatencies.filter { $0 > scrollUpdateBudget }.count
+        let memoryGrowth =
+            residentMemoryAfterInteractions > residentMemoryBeforeLoad
             ? residentMemoryAfterInteractions - residentMemoryBeforeLoad
             : 0
 
@@ -92,26 +111,42 @@ public enum MarkdownHugeTablePerformanceVerifier {
                 )
             )
         }
-        if p95ScrollLatency > scrollFrameBudget {
+        if p95ScrollLatency > scrollUpdateBudget {
             failures.append(
                 String(
-                    format: "p95 scroll latency %.1f ms exceeded %.1f ms",
+                    format: "p95 scroll update latency %.1f ms exceeded %.1f ms",
                     p95ScrollLatency * 1_000,
-                    scrollFrameBudget * 1_000
+                    scrollUpdateBudget * 1_000
                 )
             )
         }
-        if maximumScrollLatency > 0.100 {
+        if maximumScrollLatency > 0.050 {
             failures.append(
                 String(
-                    format: "maximum scroll latency %.1f ms exceeded 100 ms",
+                    format: "maximum scroll update latency %.1f ms exceeded 50 ms",
                     maximumScrollLatency * 1_000
                 )
             )
         }
         if jankyFrameCount > 1 {
             failures.append(
-                "\(jankyFrameCount) of \(scrollLatencies.count) measured scroll frames missed 30 fps"
+                "\(jankyFrameCount) of \(scrollLatencies.count) scroll updates missed 60 fps"
+            )
+        }
+        if p95ScrollRenderLatency > scrollRenderBudget {
+            failures.append(
+                String(
+                    format: "p95 scroll raster latency %.1f ms exceeded 100 ms",
+                    p95ScrollRenderLatency * 1_000
+                )
+            )
+        }
+        if maximumScrollRenderLatency > 0.150 {
+            failures.append(
+                String(
+                    format: "maximum scroll raster latency %.1f ms exceeded 150 ms",
+                    maximumScrollRenderLatency * 1_000
+                )
             )
         }
         if editResult.averageLatency > 0.035 {
@@ -144,6 +179,12 @@ public enum MarkdownHugeTablePerformanceVerifier {
         if !searchPreserved {
             failures.append("search could not find a sentinel near the end of the huge table")
         }
+        if !copyPasteResult.copyPreserved {
+            failures.append("copy did not preserve the selected source text in the huge table")
+        }
+        if !copyPasteResult.pastePreserved {
+            failures.append("paste did not insert exact source text into the huge table")
+        }
 
         let result = MarkdownHugeTablePerformanceResult(
             passed: failures.isEmpty,
@@ -153,13 +194,16 @@ public enum MarkdownHugeTablePerformanceVerifier {
             loadLatency: loadLatency,
             initialRenderLatency: initialRenderLatency,
             scrollLatencies: scrollLatencies,
+            scrollRenderLatencies: scrollRenderLatencies,
             averageEditLatency: editResult.averageLatency,
             maximumEditLatency: editResult.maximumLatency,
             residentMemoryBeforeLoad: residentMemoryBeforeLoad,
             residentMemoryAfterLoad: residentMemoryAfterLoad,
             residentMemoryAfterInteractions: residentMemoryAfterInteractions,
             sourcePreserved: sourcePreserved,
-            searchPreserved: searchPreserved
+            searchPreserved: searchPreserved,
+            copyPreserved: copyPasteResult.copyPreserved,
+            pastePreserved: copyPasteResult.pastePreserved
         )
         writeSummary(result, to: evidenceDirectory)
         return result
@@ -170,30 +214,39 @@ public enum MarkdownHugeTablePerformanceVerifier {
         let sortedScrollLatencies = result.scrollLatencies.sorted()
         let p95 = percentile(sortedScrollLatencies, percentile: 0.95)
         let maximumScroll = sortedScrollLatencies.last ?? 0
-        let memoryGrowth = result.residentMemoryAfterInteractions > result.residentMemoryBeforeLoad
+        let sortedScrollRenderLatencies = result.scrollRenderLatencies.sorted()
+        let p95ScrollRender = percentile(sortedScrollRenderLatencies, percentile: 0.95)
+        let maximumScrollRender = sortedScrollRenderLatencies.last ?? 0
+        let memoryGrowth =
+            result.residentMemoryAfterInteractions > result.residentMemoryBeforeLoad
             ? result.residentMemoryAfterInteractions - result.residentMemoryBeforeLoad
             : 0
         let summary = String(
             format:
-                "%d rows/%d chars, load %.1f ms, first %.1f ms, scroll p95/max %.1f/%.1f ms, edit avg/max %.1f/%.1f ms, memory +%.1f MiB",
+                "%d rows/%d chars, load %.1f ms, first %.1f ms, scroll update p95/max %.1f/%.1f ms, raster p95/max %.1f/%.1f ms, edit avg/max %.1f/%.1f ms, memory +%.1f MiB",
             result.rowCount,
             result.documentLength,
             result.loadLatency * 1_000,
             result.initialRenderLatency * 1_000,
             p95 * 1_000,
             maximumScroll * 1_000,
+            p95ScrollRender * 1_000,
+            maximumScrollRender * 1_000,
             result.averageEditLatency * 1_000,
             result.maximumEditLatency * 1_000,
             mebibytes(memoryGrowth)
         )
 
         if result.passed {
+            // pitchai-allow-cli-output: this explicit verifier CLI edge reports its result.
             print("huge-table-performance-verifier: PASS (\(summary))")
             return 0
         }
 
+        // pitchai-allow-cli-output: this explicit verifier CLI edge reports its result.
         print("huge-table-performance-verifier: FAIL (\(summary))")
         for failure in result.failures {
+            // pitchai-allow-cli-output: this explicit verifier CLI edge reports failures.
             print("- \(failure)")
         }
         return 1
@@ -205,10 +258,21 @@ public enum MarkdownHugeTablePerformanceVerifier {
         let expectedSource: String
     }
 
+    private struct ScrollMeasurements {
+        let updateLatencies: [TimeInterval]
+        let renderLatencies: [TimeInterval]
+    }
+
+    private struct CopyPasteResult {
+        let copyPreserved: Bool
+        let pastePreserved: Bool
+        let expectedSource: String
+    }
+
     private static func measureScrollFrames(
         _ workspace: EditorWorkspaceView,
         bitmap: NSBitmapImageRep
-    ) -> [TimeInterval] {
+    ) -> ScrollMeasurements {
         let ratios: [CGFloat] = [
             0.08, 0.24, 0.42, 0.61, 0.79, 0.96,
             0.82, 0.64, 0.45, 0.27, 0.10,
@@ -217,16 +281,29 @@ public enum MarkdownHugeTablePerformanceVerifier {
         let clipView = workspace.scrollView.contentView
         let maximumY = max(0, workspace.textView.frame.height - clipView.bounds.height)
 
-        return ratios.map { ratio in
+        var updateLatencies: [TimeInterval] = []
+        var renderLatencies: [TimeInterval] = []
+        updateLatencies.reserveCapacity(ratios.count)
+        renderLatencies.reserveCapacity(ratios.count)
+
+        for ratio in ratios {
             let start = CFAbsoluteTimeGetCurrent()
             clipView.scroll(to: NSPoint(x: 0, y: maximumY * ratio))
             workspace.scrollView.reflectScrolledClipView(clipView)
             workspace.layoutSubtreeIfNeeded()
+            updateLatencies.append(CFAbsoluteTimeGetCurrent() - start)
+
             workspace.needsDisplay = true
             workspace.textView.needsDisplay = true
+            let renderStart = CFAbsoluteTimeGetCurrent()
             workspace.cacheDisplay(in: workspace.bounds, to: bitmap)
-            return CFAbsoluteTimeGetCurrent() - start
+            renderLatencies.append(CFAbsoluteTimeGetCurrent() - renderStart)
         }
+
+        return ScrollMeasurements(
+            updateLatencies: updateLatencies,
+            renderLatencies: renderLatencies
+        )
     }
 
     private static func measureEdits(
@@ -246,10 +323,12 @@ public enum MarkdownHugeTablePerformanceVerifier {
             workspace.textView.setSelectedRange(editRange)
 
             let start = CFAbsoluteTimeGetCurrent()
-            guard workspace.textView.shouldChangeText(
-                in: editRange,
-                replacementString: replacement
-            ) else {
+            guard
+                workspace.textView.shouldChangeText(
+                    in: editRange,
+                    replacementString: replacement
+                )
+            else {
                 preconditionFailure("huge-table benchmark edit was rejected")
             }
             workspace.textView.replaceCharacters(in: editRange, with: replacement)
@@ -272,6 +351,50 @@ public enum MarkdownHugeTablePerformanceVerifier {
             averageLatency: average,
             maximumLatency: measurements.max() ?? 0,
             expectedSource: expectedSource
+        )
+    }
+
+    private static func verifyCopyPaste(
+        _ workspace: EditorWorkspaceView,
+        rowCount: Int,
+        expectedSource: String
+    ) -> CopyPasteResult {
+        let copiedText = "Search preservation sentinel row \(rowCount - 9)"
+        let source = workspace.textView.string as NSString
+        let copyRange = source.range(of: copiedText)
+        let editNeedle = "editable-value-\(rowCount / 2)-typing-marker-"
+        let editTarget = source.range(of: editNeedle)
+        precondition(copyRange.location != NSNotFound, "missing huge-table copy target")
+        precondition(editTarget.location != NSNotFound, "missing huge-table paste target")
+
+        let pasteboard = NSPasteboard.withUniqueName()
+        defer { pasteboard.releaseGlobally() }
+        let plainTextType = NSPasteboard.PasteboardType("NSStringPboardType")
+        pasteboard.declareTypes([plainTextType], owner: nil)
+
+        workspace.textView.setSelectedRange(copyRange)
+        let copied = workspace.textView.writeSelection(
+            to: pasteboard,
+            type: plainTextType
+        )
+        let copyPreserved = copied && pasteboard.string(forType: plainTextType) == copiedText
+
+        let insertionRange = NSRange(location: NSMaxRange(editTarget) + 1, length: 0)
+        workspace.textView.setSelectedRange(insertionRange)
+        let pasted = workspace.textView.readSelection(
+            from: pasteboard,
+            type: plainTextType
+        )
+        let expectedAfterPaste = (expectedSource as NSString).replacingCharacters(
+            in: insertionRange,
+            with: copiedText
+        )
+        let pastePreserved = pasted && workspace.textView.string == expectedAfterPaste
+
+        return CopyPasteResult(
+            copyPreserved: copyPreserved,
+            pastePreserved: pastePreserved,
+            expectedSource: expectedAfterPaste
         )
     }
 
@@ -342,10 +465,12 @@ public enum MarkdownHugeTablePerformanceVerifier {
         ]
         lines.reserveCapacity(rowCount + 6)
         for row in 0..<rowCount {
-            let editValue = row == rowCount / 2
+            let editValue =
+                row == rowCount / 2
                 ? "editable-value-\(row)-typing-marker-X"
                 : "stable-value-\(row)"
-            let searchValue = row == rowCount - 9
+            let searchValue =
+                row == rowCount - 9
                 ? "Search preservation sentinel row \(row)"
                 : "Indexed record \(row)"
             lines.append(
@@ -390,6 +515,7 @@ public enum MarkdownHugeTablePerformanceVerifier {
     ) {
         guard let directory else { return }
         let sorted = result.scrollLatencies.sorted()
+        let sortedRenderLatencies = result.scrollRenderLatencies.sorted()
         let summary: [String: Any] = [
             "passed": result.passed,
             "failures": result.failures,
@@ -401,8 +527,14 @@ public enum MarkdownHugeTablePerformanceVerifier {
             "scrollP95Milliseconds": percentile(sorted, percentile: 0.95) * 1_000,
             "scrollMaximumMilliseconds": (sorted.last ?? 0) * 1_000,
             "jankyScrollFrameCount": result.scrollLatencies.filter {
-                $0 > scrollFrameBudget
+                $0 > scrollUpdateBudget
             }.count,
+            "scrollRasterMilliseconds": result.scrollRenderLatencies.map { $0 * 1_000 },
+            "scrollRasterP95Milliseconds": percentile(
+                sortedRenderLatencies,
+                percentile: 0.95
+            ) * 1_000,
+            "scrollRasterMaximumMilliseconds": (sortedRenderLatencies.last ?? 0) * 1_000,
             "averageEditMilliseconds": result.averageEditLatency * 1_000,
             "maximumEditMilliseconds": result.maximumEditLatency * 1_000,
             "residentMemoryBeforeLoadBytes": result.residentMemoryBeforeLoad,
@@ -410,6 +542,8 @@ public enum MarkdownHugeTablePerformanceVerifier {
             "residentMemoryAfterInteractionsBytes": result.residentMemoryAfterInteractions,
             "sourcePreserved": result.sourcePreserved,
             "searchPreserved": result.searchPreserved,
+            "copyPreserved": result.copyPreserved,
+            "pastePreserved": result.pastePreserved,
         ]
         do {
             try FileManager.default.createDirectory(

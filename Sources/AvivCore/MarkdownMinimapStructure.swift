@@ -30,9 +30,15 @@ public struct MarkdownMinimapLine: Equatable {
 
 public enum MarkdownMinimapStructure {
     public static func lines(in markdown: String) -> [MarkdownMinimapLine] {
+        lines(in: markdown, tableRowsByLocation: tableRowsByLocation(in: markdown))
+    }
+
+    static func lines(
+        in markdown: String,
+        tableRowsByLocation tableRows: [Int: MarkdownTableRow]
+    ) -> [MarkdownMinimapLine] {
         let nsString = markdown as NSString
         let documentLines = DocumentLine.lines(in: nsString)
-        let tableRows = tableRowsByLocation(in: markdown)
         var insideFence = false
         var result: [MarkdownMinimapLine] = []
 

@@ -16,5 +16,7 @@ final class TableRestorationTests: XCTestCase {
         XCTAssertTrue(result.sourcePreserved)
         XCTAssertTrue(result.selectionPreserved)
         XCTAssertTrue(result.attributesRestored)
+        XCTAssertEqual(result.editedContentRestorationPixelDifference, 0)
+        XCTAssertTrue(result.editedContentAttributesRestored)
     }
 }
