@@ -150,6 +150,7 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertGreaterThan(alpha(attributed, at: ns.range(of: "after").location), 0.9)
     }
 
+    @MainActor
     func testLocalImageResolutionLoadsRelativeImageFromDocumentFolder() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString
@@ -168,6 +169,7 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(resolved.displayName, "photo.png")
     }
 
+    @MainActor
     func testLocalSVGResolutionLoadsRelativeImageFromDocumentFolder() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString
@@ -190,6 +192,7 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(resolved.displayName, "diagram.svg")
     }
 
+    @MainActor
     func testMissingLocalImageResolutionKeepsSourceURLForDiagnostics() throws {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(
             UUID().uuidString
@@ -209,6 +212,7 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertEqual(resolved.displayName, "missing.svg")
     }
 
+    @MainActor
     func testUndoRevertsTextChangeWithoutStyleUndoStep() {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         textView.loadMarkdown("Hello **world**")
@@ -242,6 +246,7 @@ final class MarkdownStylerTests: XCTestCase {
         XCTAssertGreaterThan(zoomedParagraph.paragraphSpacing, compactParagraph.paragraphSpacing)
     }
 
+    @MainActor
     func testViewZoomDoesNotChangeMarkdownSource() {
         let textView = MarkdownTextView(frame: NSRect(x: 0, y: 0, width: 500, height: 300))
         let markdown = "# Title\n\nA **markdown** document."

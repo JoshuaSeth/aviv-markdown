@@ -7,6 +7,7 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     public var onSelectionChange: (() -> Void)?
     public var onViewScaleChange: (() -> Void)?
     public var onImageResolutionChange: (() -> Void)?
+    var onDrawAnnotations: (() -> Void)?
     public var markdownImageBaseURL: URL? {
         didSet {
             imageCache.removeAll()
@@ -26,6 +27,10 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     private var pendingEditedRanges: [NSRange] = []
     private var pendingStyleWorkItem: DispatchWorkItem?
     private var lastStyledSelectionRanges: [NSRange] = []
+    private var documentRenderIndex = MarkdownDocumentRenderIndex(markdown: "")
+    private var documentRenderIndexIsCurrent = true
+    private var editedLineRangesAwaitingRenderIndexRefresh: [NSRange] = []
+    private var renderIndexRevision = 0
     private lazy var sourceEditor: NSTextField = {
         let field = NSTextField(frame: .zero)
         field.isHidden = true
@@ -68,6 +73,11 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         localUndoManager
     }
 
+    public override func draw(_ dirtyRect: NSRect) {
+        super.draw(dirtyRect)
+        onDrawAnnotations?()
+    }
+
     @available(*, unavailable)
     public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
@@ -78,6 +88,7 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         isApplyingMarkdownStyle = true
         textStorage?.setAttributedString(NSAttributedString(string: markdown))
         isApplyingMarkdownStyle = false
+        rebuildDocumentRenderIndex()
         applyMarkdownStyle()
         lastStyledSelectionRanges = selectedRanges.compactMap { $0.rangeValue }
     }
@@ -87,6 +98,7 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         cancelDeferredMarkdownStyle()
         isApplyingMarkdownStyle = true
         textStorage.setAttributedString(styler.attributedString(for: markdown, selectedRanges: []))
+        rebuildDocumentRenderIndex()
         sourceEditor.isHidden = true
         activeEditableSourceRange = nil
         isApplyingMarkdownStyle = false
@@ -99,13 +111,18 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
     private func applyMarkdownStyleImmediately() {
         guard !isApplyingMarkdownStyle, let textStorage else { return }
+        refreshDocumentRenderIndexIfNeeded()
         let ranges = selectedRanges.compactMap { $0.rangeValue }
         isApplyingMarkdownStyle = true
         let undoWasEnabled = undoManager?.isUndoRegistrationEnabled ?? false
         if undoWasEnabled {
             undoManager?.disableUndoRegistration()
         }
-        styler.apply(to: textStorage, selectedRanges: ranges)
+        styler.apply(
+            to: textStorage,
+            selectedRanges: ranges,
+            tableRowsByLocation: documentRenderIndex.tableRowsByLocation
+        )
         super.setSelectedRanges(
             ranges.map { NSValue(range: $0) },
             affinity: .downstream,
@@ -121,6 +138,8 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
     public override func didChangeText() {
         let affectedRanges = consumePendingEditedRanges()
+        documentRenderIndexIsCurrent = false
+        editedLineRangesAwaitingRenderIndexRefresh = editedLineRanges(for: affectedRanges)
         if shouldDeferLiveStyling {
             applyMarkdownStyle(affectedRanges: affectedRanges + lastStyledSelectionRanges)
             scheduleDeferredMarkdownStyle()
@@ -307,7 +326,8 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         styler.apply(
             to: textStorage,
             selectedRanges: ranges,
-            affectedRanges: affectedRanges + ranges
+            affectedRanges: affectedRanges + ranges,
+            tableRowsByLocation: documentRenderIndex.tableRowsByLocation
         )
         if undoWasEnabled {
             undoManager?.enableUndoRegistration()
@@ -319,8 +339,17 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
 
     private func applyMarkdownStyleAfterSelectionChange(previousRanges: [NSRange]) {
         if shouldDeferLiveStyling {
+            let currentRanges = selectedRanges.compactMap { $0.rangeValue }
+            if !documentRenderIndexIsCurrent,
+                !selectionRanges(
+                    currentRanges,
+                    intersect: editedLineRangesAwaitingRenderIndexRefresh
+                )
+            {
+                refreshDocumentRenderIndexIfNeeded()
+            }
             applyMarkdownStyle(
-                affectedRanges: previousRanges + selectedRanges.compactMap { $0.rangeValue }
+                affectedRanges: previousRanges + currentRanges
             )
         } else {
             applyMarkdownStyle()
@@ -339,6 +368,33 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         return pendingEditedRanges
     }
 
+    private func editedLineRanges(for affectedRanges: [NSRange]) -> [NSRange] {
+        let nsString = string as NSString
+        guard nsString.length > 0 else { return [] }
+
+        return affectedRanges.map { affectedRange in
+            let location = min(affectedRange.location, nsString.length - 1)
+            let availableLength = nsString.length - location
+            let length = min(affectedRange.length, availableLength)
+            return nsString.lineRange(for: NSRange(location: location, length: length))
+        }
+    }
+
+    private func selectionRanges(
+        _ selectionRanges: [NSRange],
+        intersect editedLineRanges: [NSRange]
+    ) -> Bool {
+        selectionRanges.contains { selectionRange in
+            editedLineRanges.contains { editedLineRange in
+                if selectionRange.length == 0 {
+                    return selectionRange.location >= editedLineRange.location
+                        && selectionRange.location < NSMaxRange(editedLineRange)
+                }
+                return NSIntersectionRange(selectionRange, editedLineRange).length > 0
+            }
+        }
+    }
+
     private func scheduleDeferredMarkdownStyle() {
         pendingStyleWorkItem?.cancel()
         let workItem = DispatchWorkItem { [weak self] in
@@ -355,6 +411,38 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     private func cancelDeferredMarkdownStyle() {
         pendingStyleWorkItem?.cancel()
         pendingStyleWorkItem = nil
+    }
+
+    var documentRenderRevision: Int {
+        renderIndexRevision
+    }
+
+    var tableBlocksForRendering: [MarkdownTableBlock] {
+        documentRenderIndex.tableBlocks
+    }
+
+    func tableBlocksForRendering(intersecting range: NSRange) -> [MarkdownTableBlock] {
+        documentRenderIndex.tableBlocks(intersecting: range)
+    }
+
+    var minimapLinesForRendering: [MarkdownMinimapLine] {
+        documentRenderIndex.minimapLines
+    }
+
+    var sourceLineRangesForRendering: [NSRange] {
+        documentRenderIndex.sourceLineRanges
+    }
+
+    private func refreshDocumentRenderIndexIfNeeded() {
+        guard !documentRenderIndexIsCurrent else { return }
+        rebuildDocumentRenderIndex()
+    }
+
+    private func rebuildDocumentRenderIndex() {
+        documentRenderIndex = MarkdownDocumentRenderIndex(markdown: string)
+        documentRenderIndexIsCurrent = true
+        editedLineRangesAwaitingRenderIndexRefresh.removeAll(keepingCapacity: true)
+        renderIndexRevision += 1
     }
 
     private func startThumbnailLoad(for url: URL, cacheKey: String, displayName: String) {

@@ -1,8 +1,34 @@
 import AppKit
+import CoreText
 
 public final class MarkdownAnnotationOverlayView: NSView {
     public weak var textView: MarkdownTextView?
     private let fallbackTheme: MarkdownTheme
+    private var tableLayoutRevision = -1
+    private var tableColumnWidths: [TableLayoutKey: [CGFloat]] = [:]
+    private var tableCellLines: [TableCellLineKey: CTLine] = [:]
+    private weak var drawingTargetView: NSView?
+    private static let renderedCellReplacements: [(NSRegularExpression, String)] = [
+        (cellRegex(MarkdownPatterns.image), "$1"),
+        (cellRegex(MarkdownPatterns.link), "$1"),
+        (cellRegex(#"`([^`\n]+)`"#), "$1"),
+        (cellRegex(#"(\*\*|__)(?=\S)(.+?)(?<=\S)\1"#), "$2"),
+        (cellRegex(#"(~~)(?=\S)(.+?)(?<=\S)~~"#), "$2"),
+        (cellRegex(#"(?<!\*)\*(?!\s|\*)([^*\n]+?)(?<!\s)\*(?!\*)"#), "$1"),
+        (cellRegex(#"(?<!\w)_(?!\s|_)([^_\n]+?)(?<!\s)_(?!\w)"#), "$1"),
+    ]
+
+    private struct TableLayoutKey: Hashable {
+        let blockLocation: Int
+        let containerWidth: CGFloat
+        let viewScale: CGFloat
+    }
+
+    private struct TableCellLineKey: Hashable {
+        let layout: TableLayoutKey
+        let cellLocation: Int
+        let isHeader: Bool
+    }
 
     public init(textView: MarkdownTextView, theme: MarkdownTheme = .clean) {
         self.textView = textView
@@ -25,18 +51,32 @@ public final class MarkdownAnnotationOverlayView: NSView {
     }
 
     public override func draw(_ dirtyRect: NSRect) {
+        render(in: self)
+    }
+
+    func renderAnnotations(in textView: MarkdownTextView) {
+        precondition(self.textView === textView, "annotation renderer used with another text view")
+        render(in: textView)
+    }
+
+    private func render(in targetView: NSView) {
         guard
             let textView,
             let layoutManager = textView.layoutManager,
             let textContainer = textView.textContainer
         else { return }
+        precondition(
+            drawingTargetView == nil,
+            "annotation renderer does not support nested drawing"
+        )
+        drawingTargetView = targetView
+        defer { drawingTargetView = nil }
 
         let ranges = textView.selectedRanges.compactMap { $0.rangeValue }
         let visibleRange = visibleCharacterRange(
             in: textView,
             layoutManager: layoutManager,
-            textContainer: textContainer,
-            dirtyRect: dirtyRect
+            textContainer: textContainer
         )
         drawTables(
             in: textView,
@@ -93,8 +133,11 @@ public final class MarkdownAnnotationOverlayView: NSView {
         visibleRange: NSRange
     ) {
         let markdown = textView.string
-        let excludedRanges = imageOverlayExcludedRanges(in: markdown, searchRange: visibleRange)
-        let images = MarkdownImageParser.images(in: markdown, range: visibleRange).filter { image in
+        let visibleImages = MarkdownImageParser.images(in: markdown, range: visibleRange)
+        guard !visibleImages.isEmpty else { return }
+
+        let excludedRanges = imageOverlayExcludedRanges(in: textView, searchRange: visibleRange)
+        let images = visibleImages.filter { image in
             !excludedRanges.contains { NSIntersectionRange($0, image.range).length > 0 }
         }
         guard !images.isEmpty else { return }
@@ -141,7 +184,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
         )
         lineRect.origin.x += textView.textContainerOrigin.x
         lineRect.origin.y += textView.textContainerOrigin.y
-        lineRect = textView.convert(lineRect, to: self)
+        lineRect = textView.convert(lineRect, to: drawingTargetView)
 
         let sourceRect = rect(
             for: image.range,
@@ -232,9 +275,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
         )
     }
 
-    private func imageOverlayExcludedRanges(in markdown: String, searchRange: NSRange) -> [NSRange]
-    {
+    private func imageOverlayExcludedRanges(
+        in textView: MarkdownTextView,
+        searchRange: NSRange
+    ) -> [NSRange] {
         var ranges: [NSRange] = []
+        let markdown = textView.string
         let nsString = markdown as NSString
         guard nsString.length > 0 else { return [] }
 
@@ -278,8 +324,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
             ranges.append(NSRange(location: start, length: nsString.length - start))
         }
 
-        for block in MarkdownTableParser.blocks(in: markdown)
-        where NSIntersectionRange(block.range, boundedSearchRange).length > 0 {
+        for block in textView.tableBlocksForRendering(intersecting: boundedSearchRange) {
             guard let first = block.rows.first?.lineRange,
                 let last = block.rows.last?.lineRange
             else { continue }
@@ -292,16 +337,20 @@ public final class MarkdownAnnotationOverlayView: NSView {
     }
 
     private func drawTables(
-        in textView: NSTextView,
+        in textView: MarkdownTextView,
         layoutManager: NSLayoutManager,
         textContainer: NSTextContainer,
         selectedRanges: [NSRange],
         visibleRange: NSRange
     ) {
-        let blocks = MarkdownTableParser.blocks(in: textView.string).filter {
-            NSIntersectionRange($0.range, visibleRange).length > 0
-        }
+        let blocks = textView.tableBlocksForRendering(intersecting: visibleRange)
         guard !blocks.isEmpty else { return }
+
+        if tableLayoutRevision != textView.documentRenderRevision {
+            tableColumnWidths.removeAll(keepingCapacity: true)
+            tableCellLines.removeAll(keepingCapacity: true)
+            tableLayoutRevision = textView.documentRenderRevision
+        }
 
         layoutManager.ensureLayout(for: textContainer)
 
@@ -311,90 +360,71 @@ public final class MarkdownAnnotationOverlayView: NSView {
                 in: textView,
                 layoutManager: layoutManager,
                 textContainer: textContainer,
-                selectedRanges: selectedRanges
+                selectedRanges: selectedRanges,
+                visibleRange: visibleRange
             )
         }
     }
 
     private func draw(
         block: MarkdownTableBlock,
-        in textView: NSTextView,
+        in textView: MarkdownTextView,
         layoutManager: NSLayoutManager,
         textContainer: NSTextContainer,
-        selectedRanges: [NSRange]
+        selectedRanges: [NSRange],
+        visibleRange: NSRange
     ) {
         let visibleRows = block.rows.filter { !$0.isSeparator }
         guard !visibleRows.isEmpty else { return }
         let theme = currentTheme
-
-        let rowRects = block.rows.map { row -> NSRect in
-            rect(
-                for: row.contentRange,
-                textView: textView,
-                layoutManager: layoutManager,
-                textContainer: textContainer
-            )
-        }
-        guard let firstRect = rowRects.first else { return }
-
-        let columnCount = max(visibleRows.map { $0.cells.count }.max() ?? 0, 1)
         let padding = theme.scaledMetric(14, minimum: 9)
         let font = theme.codeFont
         let headerFont = NSFont.monospacedSystemFont(
             ofSize: theme.scaledMetric(15, minimum: 10),
             weight: .semibold
         )
-        var columnWidths = Array(repeating: theme.scaledMetric(88, minimum: 58), count: columnCount)
-
-        for row in visibleRows {
-            for (index, cell) in row.cells.enumerated() where index < columnWidths.count {
-                let attributes: [NSAttributedString.Key: Any] = [
-                    .font: row.isHeader ? headerFont : font
-                ]
-                let width =
-                    ceil((cell.text as NSString).size(withAttributes: attributes).width) + padding
-                    * 2
-                columnWidths[index] = max(
-                    columnWidths[index],
-                    min(width, theme.scaledMetric(560, minimum: 360))
-                )
-            }
-        }
-
-        let maxWidth = max(
-            theme.scaledMetric(300, minimum: 220),
-            textContainer.containerSize.width - theme.scaledMetric(18, minimum: 12)
+        let layoutKey = TableLayoutKey(
+            blockLocation: block.range.location,
+            containerWidth: textContainer.containerSize.width,
+            viewScale: theme.viewScale
         )
-        let naturalWidth = columnWidths.reduce(0, +)
-        if naturalWidth > maxWidth {
-            let scale = maxWidth / naturalWidth
-            columnWidths = columnWidths.map {
-                max(theme.scaledMetric(72, minimum: 48), floor($0 * scale))
-            }
-        } else if naturalWidth < maxWidth, columnWidths.count > 1 {
-            columnWidths[columnWidths.count - 1] += floor(maxWidth - naturalWidth)
-        }
-
+        let columnWidths = resolvedColumnWidths(
+            for: block,
+            visibleRows: visibleRows,
+            textContainer: textContainer,
+            padding: padding,
+            font: font,
+            headerFont: headerFont
+        )
+        let columnCount = columnWidths.count
         let tableWidth = columnWidths.reduce(0, +)
-        let tableX = firstRect.minX
-        var rowFrames: [Int: NSRect] = [:]
+        let visibleRowIndices = rowIndices(in: block.rows, intersecting: visibleRange)
+        guard let anchorIndex = visibleRowIndices.first else { return }
+        let anchorRect = rect(
+            for: block.rows[anchorIndex].contentRange,
+            textView: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        )
+        let tableX = anchorRect.minX
 
-        for index in block.rows.indices {
-            let rect = rowRects[index]
-            let height = max(
-                theme.scaledMetric(30, minimum: 20),
-                rect.height + theme.scaledMetric(8, minimum: 5)
+        for index in visibleRowIndices {
+            let row = block.rows[index]
+            let sourceRect = rect(
+                for: row.contentRange,
+                textView: textView,
+                layoutManager: layoutManager,
+                textContainer: textContainer
             )
-            rowFrames[index] = NSRect(
+            let frame = NSRect(
                 x: tableX,
-                y: rect.minY - theme.scaledMetric(3, minimum: 2),
+                y: sourceRect.minY - theme.scaledMetric(3, minimum: 2),
                 width: tableWidth,
-                height: height
+                height: max(
+                    theme.scaledMetric(30, minimum: 20),
+                    sourceRect.height + theme.scaledMetric(8, minimum: 5)
+                )
             )
-        }
-
-        for (index, row) in block.rows.enumerated() {
-            guard let frame = rowFrames[index] else { continue }
             let active = selectedRanges.contains { selection in
                 if selection.length == 0 {
                     return NSLocationInRange(selection.location, row.lineRange)
@@ -441,25 +471,155 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
                 if !active, column < row.cells.count {
                     let cell = row.cells[column]
-                    let displayText = renderedCellText(cell.text)
                     let drawRect = NSRect(
                         x: cellX + padding,
                         y: frame.minY + theme.scaledMetric(6, minimum: 4),
                         width: max(8, columnWidths[column] - padding * 2),
                         height: max(10, frame.height - theme.scaledMetric(10, minimum: 7))
                     )
-                    let attributes: [NSAttributedString.Key: Any] = [
-                        .font: row.isHeader ? headerFont : font,
-                        .foregroundColor: row.isHeader
-                            ? theme.textColor : theme.textColor.withAlphaComponent(0.92),
-                        .kern: 0,
-                    ]
-                    (displayText as NSString).draw(in: drawRect, withAttributes: attributes)
+                    let line = cachedCellLine(
+                        for: cell,
+                        isHeader: row.isHeader,
+                        layoutKey: layoutKey,
+                        font: row.isHeader ? headerFont : font,
+                        color: row.isHeader
+                            ? theme.textColor : theme.textColor.withAlphaComponent(0.92)
+                    )
+                    draw(line: line, font: row.isHeader ? headerFont : font, in: drawRect)
                 }
 
                 cellX += columnWidths[column]
             }
         }
+    }
+
+    private func resolvedColumnWidths(
+        for block: MarkdownTableBlock,
+        visibleRows: [MarkdownTableRow],
+        textContainer: NSTextContainer,
+        padding: CGFloat,
+        font: NSFont,
+        headerFont: NSFont
+    ) -> [CGFloat] {
+        let theme = currentTheme
+        let key = TableLayoutKey(
+            blockLocation: block.range.location,
+            containerWidth: textContainer.containerSize.width,
+            viewScale: theme.viewScale
+        )
+        if let cached = tableColumnWidths[key] {
+            return cached
+        }
+
+        let columnCount = max(visibleRows.map { $0.cells.count }.max() ?? 0, 1)
+        var widths = Array(
+            repeating: theme.scaledMetric(88, minimum: 58),
+            count: columnCount
+        )
+        for row in visibleRows {
+            let attributes: [NSAttributedString.Key: Any] = [
+                .font: row.isHeader ? headerFont : font
+            ]
+            for (index, cell) in row.cells.enumerated() where index < widths.count {
+                let width =
+                    ceil(
+                        (cell.text as NSString).size(withAttributes: attributes).width
+                    ) + padding * 2
+                widths[index] = max(
+                    widths[index],
+                    min(width, theme.scaledMetric(560, minimum: 360))
+                )
+            }
+        }
+
+        let maximumWidth = max(
+            theme.scaledMetric(300, minimum: 220),
+            textContainer.containerSize.width - theme.scaledMetric(18, minimum: 12)
+        )
+        let naturalWidth = widths.reduce(0, +)
+        if naturalWidth > maximumWidth {
+            let scale = maximumWidth / naturalWidth
+            widths = widths.map {
+                max(theme.scaledMetric(72, minimum: 48), floor($0 * scale))
+            }
+        } else if naturalWidth < maximumWidth, widths.count > 1 {
+            widths[widths.count - 1] += floor(maximumWidth - naturalWidth)
+        }
+
+        tableColumnWidths[key] = widths
+        return widths
+    }
+
+    private func cachedCellLine(
+        for cell: MarkdownTableCell,
+        isHeader: Bool,
+        layoutKey: TableLayoutKey,
+        font: NSFont,
+        color: NSColor
+    ) -> CTLine {
+        let key = TableCellLineKey(
+            layout: layoutKey,
+            cellLocation: cell.contentRange.location,
+            isHeader: isHeader
+        )
+        if let cached = tableCellLines[key] {
+            return cached
+        }
+
+        let line = CTLineCreateWithAttributedString(
+            NSAttributedString(
+                string: renderedCellText(cell.text),
+                attributes: [
+                    .font: font,
+                    .foregroundColor: color,
+                    .kern: 0,
+                ]
+            )
+        )
+        tableCellLines[key] = line
+        return line
+    }
+
+    private func draw(line: CTLine, font: NSFont, in rect: NSRect) {
+        guard let context = NSGraphicsContext.current?.cgContext,
+            let drawingTargetView
+        else { return }
+
+        context.saveGState()
+        context.clip(to: rect)
+        context.textMatrix = .identity
+        context.translateBy(x: 0, y: drawingTargetView.bounds.height)
+        context.scaleBy(x: 1, y: -1)
+        context.textPosition = CGPoint(
+            x: rect.minX,
+            y: drawingTargetView.bounds.height - rect.minY - font.ascender
+        )
+        CTLineDraw(line, context)
+        context.restoreGState()
+    }
+
+    private func rowIndices(
+        in rows: [MarkdownTableRow],
+        intersecting range: NSRange
+    ) -> Range<Int> {
+        guard !rows.isEmpty, range.location != NSNotFound else { return 0..<0 }
+
+        var lower = 0
+        var upper = rows.count
+        while lower < upper {
+            let middle = lower + (upper - lower) / 2
+            if NSMaxRange(rows[middle].lineRange) <= range.location {
+                lower = middle + 1
+            } else {
+                upper = middle
+            }
+        }
+        let first = lower
+        let rangeEnd = NSMaxRange(range)
+        while lower < rows.count, rows[lower].lineRange.location < rangeEnd {
+            lower += 1
+        }
+        return first..<lower
     }
 
     private func rect(
@@ -491,7 +651,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
         var rect = layoutManager.boundingRect(forGlyphRange: effectiveGlyphRange, in: textContainer)
         rect.origin.x += textView.textContainerOrigin.x
         rect.origin.y += textView.textContainerOrigin.y
-        return textView.convert(rect, to: self)
+        return textView.convert(rect, to: drawingTargetView)
     }
 
     private func annotationRect(
@@ -603,14 +763,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
     private func visibleCharacterRange(
         in textView: NSTextView,
         layoutManager: NSLayoutManager,
-        textContainer: NSTextContainer,
-        dirtyRect: NSRect
+        textContainer: NSTextContainer
     ) -> NSRange {
         let documentLength = (textView.string as NSString).length
         guard documentLength > 0 else { return NSRange(location: 0, length: 0) }
 
-        var queryRect = dirtyRect.insetBy(dx: -80, dy: -600)
-        queryRect = convert(queryRect, to: textView)
+        var queryRect = textView.visibleRect.insetBy(dx: -80, dy: -120)
         queryRect.origin.x -= textView.textContainerOrigin.x
         queryRect.origin.y -= textView.textContainerOrigin.y
 
@@ -661,19 +819,16 @@ public final class MarkdownAnnotationOverlayView: NSView {
     }
 
     private func renderedCellText(_ text: String) -> String {
+        guard
+            text.rangeOfCharacter(
+                from: CharacterSet(charactersIn: "![`*_~\\")
+            ) != nil
+        else {
+            return text
+        }
         var output = text
-        let replacements: [(String, String)] = [
-            (MarkdownPatterns.image, "$1"),
-            (MarkdownPatterns.link, "$1"),
-            (#"`([^`\n]+)`"#, "$1"),
-            (#"(\*\*|__)(?=\S)(.+?)(?<=\S)\1"#, "$2"),
-            (#"(~~)(?=\S)(.+?)(?<=\S)~~"#, "$2"),
-            (#"(?<!\*)\*(?!\s|\*)([^*\n]+?)(?<!\s)\*(?!\*)"#, "$1"),
-            (#"(?<!\w)_(?!\s|_)([^_\n]+?)(?<!\s)_(?!\w)"#, "$1"),
-        ]
 
-        for (pattern, template) in replacements {
-            guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
+        for (regex, template) in Self.renderedCellReplacements {
             let range = NSRange(location: 0, length: (output as NSString).length)
             output = regex.stringByReplacingMatches(
                 in: output,
@@ -683,6 +838,14 @@ public final class MarkdownAnnotationOverlayView: NSView {
         }
 
         return output.replacingOccurrences(of: #"\\|"#, with: "|")
+    }
+
+    private static func cellRegex(_ pattern: String) -> NSRegularExpression {
+        do {
+            return try NSRegularExpression(pattern: pattern)
+        } catch {
+            preconditionFailure("invalid table cell rendering expression: \(error)")
+        }
     }
 
     private func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {

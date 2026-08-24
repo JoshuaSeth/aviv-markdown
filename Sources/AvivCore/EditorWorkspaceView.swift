@@ -83,7 +83,7 @@ public final class EditorWorkspaceView: NSView {
 
     public func setDocumentURL(_ url: URL?) {
         textView.markdownImageBaseURL = url?.deletingLastPathComponent()
-        annotationOverlay.needsDisplay = true
+        textView.needsDisplay = true
     }
 
     public func updateDocumentTitle(url: URL?, isEdited: Bool) {
@@ -155,10 +155,6 @@ public final class EditorWorkspaceView: NSView {
             height: CGFloat.greatestFiniteMagnitude
         )
         textView.autoresizingMask = [.width]
-        annotationOverlay.frame = textView.bounds
-        annotationOverlay.autoresizingMask = [.width, .height]
-        textView.addSubview(annotationOverlay)
-
         titleLabel.translatesAutoresizingMaskIntoConstraints = false
         titleLabel.font = theme.smallFont
         titleLabel.textColor = theme.secondaryTextColor
@@ -314,7 +310,11 @@ public final class EditorWorkspaceView: NSView {
             self.needsDisplay = true
         }
         textView.onImageResolutionChange = { [weak self] in
-            self?.annotationOverlay.needsDisplay = true
+            self?.textView.needsDisplay = true
+        }
+        textView.onDrawAnnotations = { [weak self] in
+            guard let self else { return }
+            self.annotationOverlay.renderAnnotations(in: self.textView)
         }
         updateScaledChrome()
         syncFormatControl()
@@ -322,7 +322,7 @@ public final class EditorWorkspaceView: NSView {
 
     @objc private func boundsDidChange() {
         updateTextInsets(preserveVisibleOrigin: true, refreshDocumentHeight: false)
-        annotationOverlay.needsDisplay = true
+        textView.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
@@ -332,12 +332,12 @@ public final class EditorWorkspaceView: NSView {
         } else {
             updateTextInsets(preserveVisibleOrigin: true)
         }
-        annotationOverlay.needsDisplay = true
+        textView.needsDisplay = true
         scheduleMinimapUpdate()
     }
 
     @objc private func selectionDidChange() {
-        annotationOverlay.needsDisplay = true
+        textView.needsDisplay = true
         scheduleMinimapUpdate()
     }
 
@@ -389,10 +389,7 @@ public final class EditorWorkspaceView: NSView {
         if refreshDocumentHeight || geometryChanged {
             updateDocumentHeight(preserveVisibleOrigin: preserveVisibleOrigin)
         }
-        if annotationOverlay.frame != textView.bounds {
-            annotationOverlay.frame = textView.bounds
-        }
-        annotationOverlay.needsDisplay = true
+        textView.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
