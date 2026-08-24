@@ -40,6 +40,20 @@ MainActor.assumeIsolated {
         )
     }
 
+    if let performanceIndex = arguments.firstIndex(of: "--verify-huge-table-performance") {
+        let evidenceDirectory: URL?
+        if arguments.indices.contains(performanceIndex + 1) {
+            evidenceDirectory = URL(fileURLWithPath: arguments[performanceIndex + 1])
+        } else {
+            evidenceDirectory = nil
+        }
+        exit(
+            MarkdownHugeTablePerformanceVerifier.runCLI(
+                evidenceDirectory: evidenceDirectory
+            )
+        )
+    }
+
     if arguments.contains("--verify-commands") {
         exit(AppCommandVerifier.runCLI())
     }

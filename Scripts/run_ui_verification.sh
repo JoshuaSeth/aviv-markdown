@@ -17,6 +17,7 @@ mkdir -p "$ROOT/dist/snapshots"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-scroll-jitter
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-typing-performance
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-table-restoration "$ROOT/dist/table-restoration"
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-huge-table-performance "$ROOT/dist/huge-table-performance"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/reading.png"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-heading.png" --cursor "Aviv Markdown"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-inline.png" --cursor "bold text"
@@ -48,3 +49,5 @@ echo "$ROOT/dist/snapshots/scroll-stability-after-typing.png"
 echo "$ROOT/dist/table-restoration/table-normal.png"
 echo "$ROOT/dist/table-restoration/table-editing.png"
 echo "$ROOT/dist/table-restoration/table-restored.png"
+echo "$ROOT/dist/huge-table-performance/huge-table-mid-scroll.png"
+echo "$ROOT/dist/huge-table-performance/huge-table-performance-result.json"
