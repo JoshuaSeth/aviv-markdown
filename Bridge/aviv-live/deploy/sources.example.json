@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "sources": {
+    "seth-live-demo.md": {
+      "path": "seth-live-demo.md",
+      "sourceId": "seth-live-demo",
+      "writable": true
+    }
+  }
+}

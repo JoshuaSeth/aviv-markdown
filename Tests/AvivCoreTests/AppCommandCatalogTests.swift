@@ -30,6 +30,14 @@ final class AppCommandCatalogTests: XCTestCase {
             target: .appDelegate
         )
         assertCommand(
+            "openRemote",
+            title: "Open from URL...",
+            action: "openRemoteDocument:",
+            key: "O",
+            modifiers: [.command, .shift],
+            target: .appDelegate
+        )
+        assertCommand(
             "clearRecentDocuments",
             title: "Clear Menu",
             action: "clearRecentDocuments:",

@@ -120,6 +120,11 @@ final class DocumentSessionController {
         }
     }
 
+    func presentOpenURLPanel() {
+        let controller = activeController ?? newWindow(loadStarter: false)
+        controller.openRemoteDocument(nil)
+    }
+
     func remove(_ controller: DocumentWindowController) {
         controllers.removeAll { $0 === controller }
     }
@@ -161,6 +166,9 @@ final class DocumentSessionController {
     }
 
     private func normalized(_ url: URL) -> URL {
-        url.standardizedFileURL.resolvingSymlinksInPath()
+        if url.isFileURL {
+            return url.standardizedFileURL.resolvingSymlinksInPath()
+        }
+        return url.absoluteURL
     }
 }

@@ -17,6 +17,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         documentURL
     }
 
+    var representedRemoteSource: RemoteMarkdownSource? {
+        remoteSource
+    }
+
     var canReuseForOpenedDocument: Bool {
         documentURL == nil && !isEdited
             && (workspace.textView.string.isEmpty
@@ -24,9 +28,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     private let printService: DocumentPrintService
-    private var documentURL: URL?
-    private var savedText = MarkdownSamples.starter
-    private var isEdited = false {
+    let remoteTransport: any RemoteMarkdownTransport
+    let remoteCredentialStore: any RemoteWriteCredentialStoring
+    var documentURL: URL?
+    var savedText = MarkdownSamples.starter
+    var remoteSyncController: RemoteDocumentSyncController?
+    var remoteOpeningController: RemoteDocumentSyncController?
+    var remoteSource: RemoteMarkdownSource?
+    var remoteOpenGeneration: UInt64 = 0
+    var lastExternalUpdateResult: ExternalMarkdownUpdateResult?
+    var hasPendingRemoteConflict = false
+    var isEdited = false {
         didSet {
             window?.isDocumentEdited = isEdited
             workspace.updateDocumentTitle(url: documentURL, isEdited: isEdited)
@@ -34,8 +46,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
     }
 
-    init(printService: DocumentPrintService? = nil) {
+    init(
+        printService: DocumentPrintService? = nil,
+        remoteTransport: any RemoteMarkdownTransport = URLSessionRemoteMarkdownTransport(),
+        remoteCredentialStore: any RemoteWriteCredentialStoring =
+            KeychainRemoteWriteCredentialStore()
+    ) {
         self.printService = printService ?? AppKitDocumentPrintService()
+        self.remoteTransport = remoteTransport
+        self.remoteCredentialStore = remoteCredentialStore
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1080, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -86,6 +105,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     func resetToEmptyDocument() {
         if confirmDiscardIfNeeded() {
+            stopRemoteSync()
             documentURL = nil
             savedText = ""
             workspace.setDocumentURL(nil)
@@ -111,8 +131,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     @discardableResult
     func open(url: URL) -> Bool {
+        if !url.isFileURL {
+            Task { [weak self] in
+                _ = await self?.openRemote(url: url)
+            }
+            return true
+        }
         do {
             let text = try MarkdownDocumentIO.read(from: url)
+            stopRemoteSync()
             documentURL = url
             savedText = text
             workspace.setDocumentURL(url)
@@ -130,6 +157,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     @objc func saveDocument(_ sender: Any?) {
+        if remoteSyncController?.isActive == true {
+            Task { [weak self] in
+                await self?.saveRemoteDocument()
+            }
+            return
+        }
         if let documentURL {
             save(to: documentURL)
         } else {
@@ -151,6 +184,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         do {
             let text = workspace.textView.string
             try MarkdownDocumentIO.write(text, to: url)
+            stopRemoteSync()
             documentURL = url
             savedText = text
             workspace.setDocumentURL(url)
@@ -170,6 +204,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     @objc func revertDocumentToSaved(_ sender: Any?) {
         guard confirmRevertIfNeeded() else { return }
 
+        if remoteSyncController?.isActive == true {
+            Task { [weak self] in
+                await self?.pollRemoteNow()
+            }
+            return
+        }
         if let documentURL {
             open(url: documentURL)
         } else {
@@ -211,10 +251,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func windowWillClose(_ notification: Notification) {
+        stopRemoteSync()
         onWindowWillClose?(self)
     }
 
-    private func confirmDiscardIfNeeded() -> Bool {
+    func confirmDiscardIfNeeded() -> Bool {
         guard isEdited else { return true }
         let alert = NSAlert()
         alert.messageText = "Save changes?"
@@ -240,7 +281,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         return alert.runModal() == .alertFirstButtonReturn
     }
 
-    private func updateWindowTitle() {
+    func updateWindowTitle() {
         window?.title = documentURL?.lastPathComponent ?? "Untitled"
     }
 
