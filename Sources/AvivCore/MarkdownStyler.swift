@@ -23,13 +23,29 @@ public final class MarkdownStyler {
     }
 
     public func apply(to textStorage: NSTextStorage, selectedRanges: [NSRange]) {
+        apply(
+            to: textStorage,
+            selectedRanges: selectedRanges,
+            tableRowsByLocation: MarkdownTableParser.rowMap(in: textStorage.string)
+        )
+    }
+
+    public func apply(
+        to textStorage: NSTextStorage,
+        selectedRanges: [NSRange],
+        tableRowsByLocation tableRows: [Int: MarkdownTableRow]
+    ) {
         let markdown = textStorage.string
         let fullRange = NSRange(location: 0, length: (markdown as NSString).length)
         guard fullRange.length > 0 else { return }
 
         textStorage.beginEditing()
         textStorage.setAttributes(theme.baseAttributes, range: fullRange)
-        applyBlockAndInlineStyles(to: textStorage, selectedRanges: selectedRanges)
+        applyBlockAndInlineStyles(
+            to: textStorage,
+            selectedRanges: selectedRanges,
+            tableRowsByLocation: tableRows
+        )
         textStorage.endEditing()
     }
 
@@ -37,6 +53,20 @@ public final class MarkdownStyler {
         to textStorage: NSTextStorage,
         selectedRanges: [NSRange],
         affectedRanges: [NSRange]
+    ) {
+        apply(
+            to: textStorage,
+            selectedRanges: selectedRanges,
+            affectedRanges: affectedRanges,
+            tableRowsByLocation: MarkdownTableParser.rowMap(in: textStorage.string)
+        )
+    }
+
+    public func apply(
+        to textStorage: NSTextStorage,
+        selectedRanges: [NSRange],
+        affectedRanges: [NSRange],
+        tableRowsByLocation tableRows: [Int: MarkdownTableRow]
     ) {
         let nsString = textStorage.string as NSString
         guard nsString.length > 0,
@@ -53,7 +83,8 @@ public final class MarkdownStyler {
         applyBlockAndInlineStyles(
             to: textStorage,
             selectedRanges: selectedRanges,
-            limitRange: styleRange
+            limitRange: styleRange,
+            tableRowsByLocation: tableRows
         )
         textStorage.endEditing()
     }
@@ -61,10 +92,11 @@ public final class MarkdownStyler {
     private func applyBlockAndInlineStyles(
         to attributed: NSMutableAttributedString,
         selectedRanges: [NSRange],
-        limitRange: NSRange? = nil
+        limitRange: NSRange? = nil,
+        tableRowsByLocation suppliedTableRows: [Int: MarkdownTableRow]? = nil
     ) {
         let nsString = attributed.string as NSString
-        let tableRows = limitRange == nil ? MarkdownTableParser.rowMap(in: attributed.string) : [:]
+        let tableRows = suppliedTableRows ?? MarkdownTableParser.rowMap(in: attributed.string)
         let styleLimit = limitRange.map {
             NSIntersectionRange($0, NSRange(location: 0, length: nsString.length))
         }
