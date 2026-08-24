@@ -80,6 +80,15 @@ public enum AppCommandCatalog {
                 .command(delegateCommand("new", "New", "newDocument:", key: "n")),
                 .command(delegateCommand("newTab", "New Tab", "newTab:", key: "t")),
                 .command(delegateCommand("open", "Open...", "openDocument:", key: "o")),
+                .command(
+                    delegateCommand(
+                        "openRemote",
+                        "Open from URL...",
+                        "openRemoteDocument:",
+                        key: "O",
+                        modifiers: [.command, .shift]
+                    )
+                ),
                 .submenu(
                     title: "Open Recent",
                     entries: [
@@ -106,6 +115,13 @@ public enum AppCommandCatalog {
                     )
                 ),
                 .command(delegateCommand("revert", "Revert to Saved", "revertDocumentToSaved:")),
+                .command(
+                    delegateCommand(
+                        "resolveRemoteChanges",
+                        "Resolve Incoming Changes...",
+                        "resolveRemoteChanges:"
+                    )
+                ),
                 .separator,
                 .command(
                     delegateCommand(

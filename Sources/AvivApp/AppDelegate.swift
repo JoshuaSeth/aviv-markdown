@@ -49,6 +49,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         sender.reply(toOpenOrPrint: .success)
     }
 
+    func application(_ application: NSApplication, open urls: [URL]) {
+        documentSession.open(urls: urls)
+    }
+
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool {
         true
     }
@@ -63,6 +67,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     @objc func openDocument(_ sender: Any?) {
         documentSession.presentOpenPanel()
+    }
+
+    @objc func openRemoteDocument(_ sender: Any?) {
+        documentSession.presentOpenURLPanel()
     }
 
     @objc func openRecentDocument(_ sender: Any?) {
@@ -91,6 +99,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
 
     @objc func revertDocumentToSaved(_ sender: Any?) {
         activeDocumentController()?.revertDocumentToSaved(sender)
+    }
+
+    @objc func resolveRemoteChanges(_ sender: Any?) {
+        activeDocumentController()?.resolveRemoteChanges(sender)
     }
 
     @objc func pageSetup(_ sender: Any?) {
@@ -136,7 +148,12 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     private func launchFileURLs() -> [URL] {
         CommandLine.arguments.dropFirst()
             .filter { !$0.hasPrefix("--") }
-            .map { URL(fileURLWithPath: $0) }
+            .compactMap { argument in
+                if let url = URL(string: argument), RemoteMarkdownSource.isAllowedRemoteURL(url) {
+                    return url
+                }
+                return URL(fileURLWithPath: argument)
+            }
     }
 
     private func activeDocumentController() -> DocumentWindowController? {
@@ -146,6 +163,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     func validateMenuItem(_ menuItem: NSMenuItem) -> Bool {
         if menuItem.action == #selector(revertDocumentToSaved(_:)) {
             return activeDocumentController()?.canRevertToSaved ?? false
+        }
+        if menuItem.action == #selector(resolveRemoteChanges(_:)) {
+            return activeDocumentController()?.hasPendingRemoteConflict ?? false
         }
         if menuItem.action == #selector(openRecentDocument(_:)) {
             return menuItem.representedObject is URL
@@ -210,7 +230,7 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
                 )
                 item.target = self
                 item.representedObject = url
-                item.toolTip = url.path
+                item.toolTip = url.isFileURL ? url.path : url.absoluteString
                 menu.addItem(item)
             }
         }
@@ -229,6 +249,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
     }
 
     private func displayName(for url: URL) -> String {
+        guard url.isFileURL else {
+            return url.lastPathComponent.isEmpty ? url.absoluteString : url.lastPathComponent
+        }
         let displayName = FileManager.default.displayName(atPath: url.path)
         return displayName.isEmpty ? url.lastPathComponent : displayName
     }

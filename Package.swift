@@ -19,7 +19,8 @@ let package = Package(
         .executableTarget(
             name: "Aviv",
             dependencies: ["AvivCore"],
-            path: "Sources/AvivApp"
+            path: "Sources/AvivApp",
+            linkerSettings: [.linkedFramework("Security")]
         ),
         .testTarget(
             name: "AvivCoreTests",

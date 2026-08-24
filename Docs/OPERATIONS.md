@@ -14,7 +14,8 @@ private repository is needed. GitHub is authoritative; the PitchAI development s
 branch, and land it through a pull request.
 
 The project is registered in the PitchAI PM database as `AVIV` (`Aviv Editor`), owned by Seth. Operationalization work
-is recorded in task `AVIV-OPS-20260824`.
+is recorded in task `AVIV-OPS-20260824`; public-URL live sync and authenticated save-back are tracked in
+`AVIV-URL-SYNC-20260824`.
 
 ## Source inventory
 
@@ -64,6 +65,18 @@ Scripts/package_app.sh
 Scripts/package_dmg.sh
 ```
 
+The URL-source verifier needs a public fixture, its write token in a mode-`0600` file, and an external process that
+edits the backing Markdown after each readiness line. It never accepts a token on the command line:
+
+```sh
+dist/Aviv.app/Contents/MacOS/Aviv \
+  --verify-remote-live https://pitchai.net/aviv-live/seth-live-demo.md \
+  --token-file /path/to/write-token \
+  --evidence-dir /path/to/evidence
+```
+
+See [REMOTE_MARKDOWN.md](REMOTE_MARKDOWN.md) for the source headers and exact verification sequence.
+
 ### Windows
 
 The native Windows app requires Windows, .NET 10, PowerShell, and the Windows App SDK described in
@@ -106,6 +119,29 @@ checks. Resolve the legacy findings and install the missing tools in a dedicated
 passing runtime evidence above together with the repository-wide Python gate, and report the native policy-gate debt
 in every release handoff.
 
+## Live Markdown bridge
+
+The production demonstration bridge runs on `pitchai-main` as `aviv-live.service`, bound to
+`127.0.0.1:8793` behind nginx. Its public source is
+`https://pitchai.net/aviv-live/seth-live-demo.md`; authenticated writes use the endpoint advertised in the source
+headers. Runtime files are deliberately outside the Git checkout:
+
+```text
+/opt/aviv-live/server.mjs
+/etc/aviv-live/sources.json
+/etc/aviv-live/write-token
+/var/lib/aviv-live/seth-live-demo.md
+```
+
+The token file is readable only by the service account and must never enter Git, a URL, a command-line argument, or
+release evidence. The source manifest is an allowlist. The bridge rejects traversal, unlisted files, invalid UTF-8,
+oversized documents, missing authentication, source-ID mismatches, and writes without a matching ETag. Writes for one
+source are serialized and committed by atomic rename.
+
+Deploy bridge changes by syntax-checking the candidate, preserving the current installed file, restarting the service,
+then verifying `/healthz`, the public source headers, an authenticated conditional write, and public readback. The
+repository assets are in `Bridge/aviv-live`; its README contains the exact environment and nginx contract.
+
 ## Travel-Mac validation
 
 The SSH alias `travel-macbook` is managed outside this repository. Do not record the underlying address or credentials
@@ -118,6 +154,12 @@ For Apple-platform validation:
 3. Create a temporary directory and clone the GitHub branch into it. Do not reuse the historical checkout.
 4. Run the required Swift build, tests, application, UI verifier, or packaging command in the temporary clone.
 5. Record the commit SHA and command result, then remove the temporary clone.
+
+For Aviv 1.1.0, the coordinated production verification used the public source above and external SSH edits to its
+backing file. A clean edit appeared in 1.246 seconds with `0.000` point viewport movement and `0.000` text-container
+width change. A second edit arriving over a dirty local buffer remained pending without replacing local text.
+`Cmd-S` then changed the ETag and the saved marker was visible through the public URL. The normal performance gate also
+passed on a 4,000-row, 392,480-character table with 0.6 ms scroll-update p95 and 27.0 ms raster p95.
 
 If new local-only work is ever found on the Mac, archive the complete tree first, inspect `git status`, branches,
 remotes, and diffs, and import only reviewed changes on a new server branch. Never reset or clean the Mac to make its

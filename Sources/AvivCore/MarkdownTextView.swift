@@ -476,7 +476,10 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         isAutomaticTextReplacementEnabled = false
         isAutomaticSpellingCorrectionEnabled = true
         isContinuousSpellCheckingEnabled = true
-        usesAdaptiveColorMappingForDarkAppearance = true
+        // Aviv owns a complete, explicit light editor palette. Allowing AppKit to
+        // adapt those foreground colors in Dark Mode turns dark text light while
+        // the editor background remains light, making the document unreadable.
+        usesAdaptiveColorMappingForDarkAppearance = false
         insertionPointColor = styler.theme.accentColor
         selectedTextAttributes = [
             .backgroundColor: styler.theme.selectionColor

@@ -32,6 +32,8 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Smart syntax reveal on the active line.
 - Headings, bold, italic, code, links, local image attachments, blockquotes, rules, tables, task lists, and fenced code.
 - Native open/save panels for `.md` files.
+- On macOS, open a public HTTPS Markdown URL and follow external edits live.
+- Conflict-safe authenticated `Cmd-S` save-back for URL sources that advertise an Aviv write bridge.
 - Native **Open Recent** menu for quickly returning to recent Markdown documents.
 - Multiple windows and native macOS document tabs.
 - `Cmd-T` for a new tab, `Cmd-W` to close the active tab/window.
@@ -44,6 +46,33 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Native print and page setup support.
 - Optional native prompt to make Aviv the default app for opening Markdown files, with a never-show-again choice.
 - Command, tab, layout, and minimap verifiers for regression testing.
+
+## Live URL documents on macOS
+
+Choose **File → Open from URL…** or press `Shift-Cmd-O`, then paste a public HTTPS Markdown URL. Aviv keeps the
+public URL and stable source identity attached to the document and checks for changes with conditional requests at
+least once per second. Clean external edits appear in place. The caret, selection, visible text anchor, scroll
+position, and text-container width are preserved.
+
+If the local buffer is dirty, Aviv does not overwrite it. The source badge changes to **Incoming edit waiting**, the
+changed lines are marked, and **File → Resolve Incoming Changes…** offers three explicit choices: use the incoming
+version, replace the remote version with the local buffer, or keep editing.
+
+`Cmd-S` writes back only when the downloaded source advertises a credential-free HTTPS write endpoint, a stable
+source ID, and an ETag. Aviv sends the write through that authenticated endpoint with `If-Match`, stores the bearer
+token in macOS Keychain, and requires a fresh ETag in the response. An ordinary public download URL remains
+read-only; Aviv never pretends that a local save updated it.
+
+The production demonstration source is
+[https://pitchai.net/aviv-live/seth-live-demo.md](https://pitchai.net/aviv-live/seth-live-demo.md). See
+[Remote Markdown sources](Docs/REMOTE_MARKDOWN.md) for the complete server contract, conflict behavior, and
+verification procedure.
+
+![A clean external Markdown update applied in place](Docs/assets/aviv-remote-clean-update.png)
+
+![A simultaneous external edit held for conflict resolution](Docs/assets/aviv-remote-conflict-preserved.png)
+
+![An authenticated Command-S save completed at the source](Docs/assets/aviv-remote-command-s-saved.png)
 
 ## Screenshots 🖼️
 
@@ -89,6 +118,8 @@ This runs:
 - tab/window verifier
 - layout stability verifier
 - minimap viewport verifier
+- remote-source unit and zero-jump layout tests
+- typing, table-restoration, and 4,000-row huge-table performance verifiers
 - rendered snapshot generation
 
 Core invariants are tested directly: moving the cursor should not shift rendered content, the minimap should track the real scroll viewport, and native tabs/windows should behave like real macOS document tabs.
