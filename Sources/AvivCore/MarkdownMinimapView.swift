@@ -30,7 +30,11 @@ public final class MarkdownMinimapView: NSView {
         let radius = theme.scaledMetric(7, minimum: 5)
         NSBezierPath(roundedRect: bounds, xRadius: radius, yRadius: radius).fill()
         NSColor(calibratedRed: 0.055, green: 0.390, blue: 0.680, alpha: 0.08).setStroke()
-        let border = NSBezierPath(roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5), xRadius: radius, yRadius: radius)
+        let border = NSBezierPath(
+            roundedRect: bounds.insetBy(dx: 0.5, dy: 0.5),
+            xRadius: radius,
+            yRadius: radius
+        )
         border.lineWidth = 1
         border.stroke()
 
@@ -83,7 +87,9 @@ public final class MarkdownMinimapView: NSView {
     }
 
     public func viewportMetrics() -> MarkdownMinimapViewportMetrics? {
-        guard let textView, let clipView = textView.enclosingScrollView?.contentView else { return nil }
+        guard let textView, let clipView = textView.enclosingScrollView?.contentView else {
+            return nil
+        }
         return viewportMetrics(for: textView, clipView: clipView)
     }
 
@@ -135,39 +141,138 @@ public final class MarkdownMinimapView: NSView {
             let height = min(3.2, max(1.6, lineStep * 0.74))
             let widthBoost = CGFloat(max(0, 6 - level)) * theme.scaledMetric(3, minimum: 2)
             drawMarkerBar(
-                rect: NSRect(x: insetX + 1, y: y, width: max(3, 6 - CGFloat(level) * 0.55), height: height),
+                rect: NSRect(
+                    x: insetX + 1,
+                    y: y,
+                    width: max(3, 6 - CGFloat(level) * 0.55),
+                    height: height
+                ),
                 color: theme.accentColor.withAlphaComponent(level == 1 ? 0.78 : 0.62)
             )
             drawMarkerBar(
-                rect: NSRect(x: contentX, y: y, width: min(contentWidth, baseWidth + widthBoost), height: height),
+                rect: NSRect(
+                    x: contentX,
+                    y: y,
+                    width: min(contentWidth, baseWidth + widthBoost),
+                    height: height
+                ),
                 color: theme.accentColor.withAlphaComponent(level == 1 ? 0.66 : 0.52)
             )
         case .unorderedList(let depth):
-            drawListGlyph(checked: nil, ordered: false, depth: depth, y: y, lineStep: lineStep, insetX: insetX)
-            drawContentStroke(x: contentX + CGFloat(depth) * 2.5, y: y, width: baseWidth, lineStep: lineStep, color: theme.secondaryTextColor.withAlphaComponent(0.34))
+            drawListGlyph(
+                checked: nil,
+                ordered: false,
+                depth: depth,
+                y: y,
+                lineStep: lineStep,
+                insetX: insetX
+            )
+            drawContentStroke(
+                x: contentX + CGFloat(depth) * 2.5,
+                y: y,
+                width: baseWidth,
+                lineStep: lineStep,
+                color: theme.secondaryTextColor.withAlphaComponent(0.34)
+            )
         case .orderedList(let depth):
-            drawListGlyph(checked: nil, ordered: true, depth: depth, y: y, lineStep: lineStep, insetX: insetX)
-            drawContentStroke(x: contentX + CGFloat(depth) * 2.5, y: y, width: baseWidth, lineStep: lineStep, color: theme.secondaryTextColor.withAlphaComponent(0.34))
+            drawListGlyph(
+                checked: nil,
+                ordered: true,
+                depth: depth,
+                y: y,
+                lineStep: lineStep,
+                insetX: insetX
+            )
+            drawContentStroke(
+                x: contentX + CGFloat(depth) * 2.5,
+                y: y,
+                width: baseWidth,
+                lineStep: lineStep,
+                color: theme.secondaryTextColor.withAlphaComponent(0.34)
+            )
         case .taskList(let checked, let depth):
-            drawListGlyph(checked: checked, ordered: false, depth: depth, y: y, lineStep: lineStep, insetX: insetX)
-            drawContentStroke(x: contentX + CGFloat(depth) * 2.5, y: y, width: baseWidth, lineStep: lineStep, color: taskColor(checked: checked).withAlphaComponent(0.43))
+            drawListGlyph(
+                checked: checked,
+                ordered: false,
+                depth: depth,
+                y: y,
+                lineStep: lineStep,
+                insetX: insetX
+            )
+            drawContentStroke(
+                x: contentX + CGFloat(depth) * 2.5,
+                y: y,
+                width: baseWidth,
+                lineStep: lineStep,
+                color: taskColor(checked: checked).withAlphaComponent(0.43)
+            )
         case .quote:
-            drawContentStroke(x: contentX, y: y, width: baseWidth, lineStep: lineStep, color: theme.quoteBarColor.withAlphaComponent(0.34))
+            drawContentStroke(
+                x: contentX,
+                y: y,
+                width: baseWidth,
+                lineStep: lineStep,
+                color: theme.quoteBarColor.withAlphaComponent(0.34)
+            )
         case .tableHeader(let columns):
-            drawTableRow(columns: columns, x: contentX - 1, y: y, width: max(baseWidth, contentWidth * 0.72), lineStep: lineStep, alpha: 0.58)
+            drawTableRow(
+                columns: columns,
+                x: contentX - 1,
+                y: y,
+                width: max(baseWidth, contentWidth * 0.72),
+                lineStep: lineStep,
+                alpha: 0.58
+            )
         case .tableSeparator(let columns):
-            drawTableRow(columns: columns, x: contentX - 1, y: y, width: max(baseWidth, contentWidth * 0.72), lineStep: lineStep, alpha: 0.26)
+            drawTableRow(
+                columns: columns,
+                x: contentX - 1,
+                y: y,
+                width: max(baseWidth, contentWidth * 0.72),
+                lineStep: lineStep,
+                alpha: 0.26
+            )
         case .tableRow(let columns):
-            drawTableRow(columns: columns, x: contentX - 1, y: y, width: max(baseWidth, contentWidth * 0.68), lineStep: lineStep, alpha: 0.42)
+            drawTableRow(
+                columns: columns,
+                x: contentX - 1,
+                y: y,
+                width: max(baseWidth, contentWidth * 0.68),
+                lineStep: lineStep,
+                alpha: 0.42
+            )
         case .codeFence:
             drawCodeFence(x: insetX + 2, y: y, lineStep: lineStep)
-            drawContentStroke(x: contentX, y: y, width: min(contentWidth * 0.56, max(baseWidth, 18)), lineStep: lineStep, color: codeColor.withAlphaComponent(0.48))
+            drawContentStroke(
+                x: contentX,
+                y: y,
+                width: min(contentWidth * 0.56, max(baseWidth, 18)),
+                lineStep: lineStep,
+                color: codeColor.withAlphaComponent(0.48)
+            )
         case .code:
-            drawCodeLine(x: contentX, y: y, width: min(contentWidth * 0.82, max(baseWidth, 22)), lineStep: lineStep)
+            drawCodeLine(
+                x: contentX,
+                y: y,
+                width: min(contentWidth * 0.82, max(baseWidth, 22)),
+                lineStep: lineStep
+            )
         case .thematicBreak:
-            drawContentStroke(x: contentX, y: y, width: contentWidth * 0.62, lineStep: lineStep, color: theme.syntaxVisibleColor.withAlphaComponent(0.42))
+            drawContentStroke(
+                x: contentX,
+                y: y,
+                width: contentWidth * 0.62,
+                lineStep: lineStep,
+                color: theme.syntaxVisibleColor.withAlphaComponent(0.42)
+            )
         case .body:
-            drawContentStroke(x: contentX, y: y, width: baseWidth, lineStep: lineStep, color: theme.textColor.withAlphaComponent(0.22))
+            drawContentStroke(
+                x: contentX,
+                y: y,
+                width: baseWidth,
+                lineStep: lineStep,
+                color: theme.textColor.withAlphaComponent(0.22)
+            )
         }
     }
 
@@ -177,7 +282,12 @@ public final class MarkdownMinimapView: NSView {
         for quoteIndex in 0..<min(depth, 3) {
             let x = insetX + CGFloat(quoteIndex) * theme.scaledMetric(3.2, minimum: 2.4)
             drawMarkerBar(
-                rect: NSRect(x: x, y: y - height * 0.15, width: theme.scaledMetric(1.6, minimum: 1.1), height: height),
+                rect: NSRect(
+                    x: x,
+                    y: y - height * 0.15,
+                    width: theme.scaledMetric(1.6, minimum: 1.1),
+                    height: height
+                ),
                 color: theme.quoteBarColor.withAlphaComponent(0.50 - CGFloat(quoteIndex) * 0.08)
             )
         }
@@ -193,7 +303,9 @@ public final class MarkdownMinimapView: NSView {
     ) {
         let theme = currentTheme
         let size = min(5.4, max(3.0, lineStep * 0.56))
-        let x = insetX + theme.scaledMetric(2, minimum: 1.5) + CGFloat(min(depth, 5)) * theme.scaledMetric(2.8, minimum: 2)
+        let x =
+            insetX + theme.scaledMetric(2, minimum: 1.5) + CGFloat(min(depth, 5))
+            * theme.scaledMetric(2.8, minimum: 2)
         let rect = NSRect(x: x, y: y - size * 0.22, width: size, height: size)
 
         if let checked {
@@ -204,21 +316,36 @@ public final class MarkdownMinimapView: NSView {
             box.stroke()
             if checked {
                 color.withAlphaComponent(0.56).setFill()
-                NSBezierPath(roundedRect: rect.insetBy(dx: 1.3, dy: 1.3), xRadius: 0.8, yRadius: 0.8).fill()
+                NSBezierPath(
+                    roundedRect: rect.insetBy(dx: 1.3, dy: 1.3),
+                    xRadius: 0.8,
+                    yRadius: 0.8
+                ).fill()
             }
             return
         }
 
         if ordered {
             theme.secondaryTextColor.withAlphaComponent(0.43).setFill()
-            NSBezierPath(roundedRect: rect.insetBy(dx: size * 0.25, dy: 0), xRadius: size * 0.18, yRadius: size * 0.18).fill()
+            NSBezierPath(
+                roundedRect: rect.insetBy(dx: size * 0.25, dy: 0),
+                xRadius: size * 0.18,
+                yRadius: size * 0.18
+            ).fill()
         } else {
             theme.secondaryTextColor.withAlphaComponent(0.48).setFill()
             NSBezierPath(ovalIn: rect.insetBy(dx: size * 0.14, dy: size * 0.14)).fill()
         }
     }
 
-    private func drawTableRow(columns: Int, x: CGFloat, y: CGFloat, width: CGFloat, lineStep: CGFloat, alpha: CGFloat) {
+    private func drawTableRow(
+        columns: Int,
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        lineStep: CGFloat,
+        alpha: CGFloat
+    ) {
         let height = min(3.0, max(1.35, lineStep * 0.52))
         let columnCount = max(1, min(columns, 5))
         let gap: CGFloat = columnCount > 1 ? 1.3 : 0
@@ -238,7 +365,10 @@ public final class MarkdownMinimapView: NSView {
         let height = min(4.6, max(2.4, lineStep * 0.58))
         let color = codeColor.withAlphaComponent(0.44)
         drawMarkerBar(rect: NSRect(x: x, y: y, width: 4.2, height: 1.2), color: color)
-        drawMarkerBar(rect: NSRect(x: x, y: y + height - 1.2, width: 4.2, height: 1.2), color: color)
+        drawMarkerBar(
+            rect: NSRect(x: x, y: y + height - 1.2, width: 4.2, height: 1.2),
+            color: color
+        )
     }
 
     private func drawCodeLine(x: CGFloat, y: CGFloat, width: CGFloat, lineStep: CGFloat) {
@@ -258,7 +388,13 @@ public final class MarkdownMinimapView: NSView {
         }
     }
 
-    private func drawContentStroke(x: CGFloat, y: CGFloat, width: CGFloat, lineStep: CGFloat, color: NSColor) {
+    private func drawContentStroke(
+        x: CGFloat,
+        y: CGFloat,
+        width: CGFloat,
+        lineStep: CGFloat,
+        color: NSColor
+    ) {
         let height = min(1.8, max(0.9, lineStep * 0.48))
         drawMarkerBar(rect: NSRect(x: x, y: y, width: width, height: height), color: color)
     }
@@ -266,7 +402,12 @@ public final class MarkdownMinimapView: NSView {
     private func drawSelectionMarker(at y: CGFloat, lineStep: CGFloat) {
         let theme = currentTheme
         let size = min(5.5, max(3.4, lineStep * 0.62))
-        let rect = NSRect(x: bounds.maxX - size - theme.scaledMetric(4.5, minimum: 3), y: y - size * 0.20, width: size, height: size)
+        let rect = NSRect(
+            x: bounds.maxX - size - theme.scaledMetric(4.5, minimum: 3),
+            y: y - size * 0.20,
+            width: size,
+            height: size
+        )
         theme.accentColor.withAlphaComponent(0.62).setFill()
         NSBezierPath(ovalIn: rect).fill()
     }
@@ -296,12 +437,23 @@ public final class MarkdownMinimapView: NSView {
         needsDisplay = true
     }
 
-    private func viewportMetrics(for textView: NSTextView, clipView: NSClipView) -> MarkdownMinimapViewportMetrics? {
-        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return nil }
+    private func viewportMetrics(
+        for textView: NSTextView,
+        clipView: NSClipView
+    ) -> MarkdownMinimapViewportMetrics? {
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer
+        else { return nil }
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        let laidOutHeight = ceil(textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height)
-        let documentHeight = max(clipView.bounds.height, textView.bounds.height, textView.frame.height, laidOutHeight)
+        let laidOutHeight = ceil(
+            textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height
+        )
+        let documentHeight = max(
+            clipView.bounds.height,
+            textView.bounds.height,
+            textView.frame.height,
+            laidOutHeight
+        )
         let thumbInset = currentTheme.scaledMetric(3, minimum: 2)
         return MarkdownMinimapViewport.metrics(
             trackBounds: bounds,
@@ -312,7 +464,10 @@ public final class MarkdownMinimapView: NSView {
         )
     }
 
-    private func visualLineFragments(forCharacterRange range: NSRange, in textView: NSTextView) -> [NSRect] {
+    private func visualLineFragments(
+        forCharacterRange range: NSRange,
+        in textView: NSTextView
+    ) -> [NSRect] {
         guard
             range.length > 0,
             let layoutManager = textView.layoutManager,
@@ -320,11 +475,19 @@ public final class MarkdownMinimapView: NSView {
         else { return [] }
 
         layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: range,
+            actualCharacterRange: nil
+        )
         guard glyphRange.length > 0 else { return [] }
 
         var fragments: [NSRect] = []
-        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) { _, usedRect, _, fragmentGlyphRange, _ in
+        layoutManager.enumerateLineFragments(forGlyphRange: glyphRange) {
+            _,
+            usedRect,
+            _,
+            fragmentGlyphRange,
+            _ in
             guard NSIntersectionRange(fragmentGlyphRange, glyphRange).length > 0 else { return }
             var rect = usedRect
             rect.origin.x += textView.textContainerOrigin.x
@@ -338,7 +501,8 @@ public final class MarkdownMinimapView: NSView {
         in textView: NSTextView,
         metrics: MarkdownMinimapViewportMetrics
     ) -> (y: CGFloat, lineStep: CGFloat)? {
-        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return nil }
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer
+        else { return nil }
         let stringLength = (textView.string as NSString).length
         guard stringLength > 0 else { return nil }
 

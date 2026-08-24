@@ -7,7 +7,10 @@ public final class MarkdownStyler {
         self.theme = theme
     }
 
-    public func attributedString(for markdown: String, selectedRanges: [NSRange] = []) -> NSMutableAttributedString {
+    public func attributedString(
+        for markdown: String,
+        selectedRanges: [NSRange] = []
+    ) -> NSMutableAttributedString {
         let attributed = NSMutableAttributedString(string: markdown)
         let fullRange = NSRange(location: 0, length: (markdown as NSString).length)
         guard fullRange.length > 0 else {
@@ -30,17 +33,28 @@ public final class MarkdownStyler {
         textStorage.endEditing()
     }
 
-    public func apply(to textStorage: NSTextStorage, selectedRanges: [NSRange], affectedRanges: [NSRange]) {
+    public func apply(
+        to textStorage: NSTextStorage,
+        selectedRanges: [NSRange],
+        affectedRanges: [NSRange]
+    ) {
         let nsString = textStorage.string as NSString
         guard nsString.length > 0,
-              let styleRange = expandedLineRange(covering: affectedRanges + selectedRanges, in: nsString)
+            let styleRange = expandedLineRange(
+                covering: affectedRanges + selectedRanges,
+                in: nsString
+            )
         else {
             return
         }
 
         textStorage.beginEditing()
         textStorage.setAttributes(theme.baseAttributes, range: styleRange)
-        applyBlockAndInlineStyles(to: textStorage, selectedRanges: selectedRanges, limitRange: styleRange)
+        applyBlockAndInlineStyles(
+            to: textStorage,
+            selectedRanges: selectedRanges,
+            limitRange: styleRange
+        )
         textStorage.endEditing()
     }
 
@@ -51,9 +65,12 @@ public final class MarkdownStyler {
     ) {
         let nsString = attributed.string as NSString
         let tableRows = limitRange == nil ? MarkdownTableParser.rowMap(in: attributed.string) : [:]
-        let styleLimit = limitRange.map { NSIntersectionRange($0, NSRange(location: 0, length: nsString.length)) }
+        let styleLimit = limitRange.map {
+            NSIntersectionRange($0, NSRange(location: 0, length: nsString.length))
+        }
         let upperBound = styleLimit.map { NSMaxRange($0) } ?? nsString.length
-        var index = styleLimit.map { lineRange(containing: $0.location, in: nsString).location } ?? 0
+        var index =
+            styleLimit.map { lineRange(containing: $0.location, in: nsString).location } ?? 0
         var insideFence = styleLimit == nil ? false : isInsideFence(at: index, in: nsString)
 
         while index < nsString.length, index < upperBound {
@@ -61,18 +78,34 @@ public final class MarkdownStyler {
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
             let line = nsString.substring(with: contentRange)
             let trimmed = line.trimmingCharacters(in: .whitespaces)
-            let isActive = isLineActive(lineRange, selectedRanges: selectedRanges, documentLength: nsString.length)
+            let isActive = isLineActive(
+                lineRange,
+                selectedRanges: selectedRanges,
+                documentLength: nsString.length
+            )
 
             if isFence(trimmed) {
-                applyCodeBlockStyle(to: attributed, lineRange: lineRange, contentRange: contentRange)
-                applySyntax(NSRange(location: contentRange.location, length: contentRange.length), active: isActive, to: attributed)
+                applyCodeBlockStyle(
+                    to: attributed,
+                    lineRange: lineRange,
+                    contentRange: contentRange
+                )
+                applySyntax(
+                    NSRange(location: contentRange.location, length: contentRange.length),
+                    active: isActive,
+                    to: attributed
+                )
                 insideFence.toggle()
                 index = NSMaxRange(lineRange)
                 continue
             }
 
             if insideFence {
-                applyCodeBlockStyle(to: attributed, lineRange: lineRange, contentRange: contentRange)
+                applyCodeBlockStyle(
+                    to: attributed,
+                    lineRange: lineRange,
+                    contentRange: contentRange
+                )
                 index = NSMaxRange(lineRange)
                 continue
             }
@@ -90,15 +123,33 @@ public final class MarkdownStyler {
             }
 
             if let heading = parseHeading(line: line, contentRange: contentRange) {
-                applyHeading(level: heading.level, to: attributed, lineRange: lineRange, contentRange: contentRange)
+                applyHeading(
+                    level: heading.level,
+                    to: attributed,
+                    lineRange: lineRange,
+                    contentRange: contentRange
+                )
                 applySyntax(heading.syntaxRange, active: isActive, to: attributed)
-                applyInlineStyles(to: attributed, searchRange: heading.bodyRange, lineActive: isActive)
+                applyInlineStyles(
+                    to: attributed,
+                    searchRange: heading.bodyRange,
+                    lineActive: isActive
+                )
             } else if isHorizontalRule(trimmed) {
-                applyHorizontalRule(to: attributed, lineRange: lineRange, contentRange: contentRange)
+                applyHorizontalRule(
+                    to: attributed,
+                    lineRange: lineRange,
+                    contentRange: contentRange
+                )
             } else if let task = parseTaskList(line: line, contentRange: contentRange) {
                 applyListStyle(to: attributed, lineRange: lineRange, contentRange: contentRange)
                 applySyntax(task.prefixRange, active: isActive, to: attributed)
-                applyTaskMarkerStyle(task.checkboxRange, checked: task.checked, active: isActive, to: attributed)
+                applyTaskMarkerStyle(
+                    task.checkboxRange,
+                    checked: task.checked,
+                    active: isActive,
+                    to: attributed
+                )
                 applyInlineStyles(to: attributed, searchRange: task.bodyRange, lineActive: isActive)
             } else if let list = parseList(line: line, contentRange: contentRange) {
                 applyListStyle(to: attributed, lineRange: lineRange, contentRange: contentRange)
@@ -107,7 +158,11 @@ public final class MarkdownStyler {
             } else if let quote = parseBlockquote(line: line, contentRange: contentRange) {
                 applyQuoteStyle(to: attributed, lineRange: lineRange, contentRange: contentRange)
                 applyVisibleSourceMarker(quote.syntaxRange, to: attributed)
-                applyInlineStyles(to: attributed, searchRange: quote.bodyRange, lineActive: isActive)
+                applyInlineStyles(
+                    to: attributed,
+                    searchRange: quote.bodyRange,
+                    lineActive: isActive
+                )
             } else {
                 applyInlineStyles(to: attributed, searchRange: contentRange, lineActive: isActive)
             }
@@ -116,62 +171,119 @@ public final class MarkdownStyler {
         }
     }
 
-    private func applyHeading(level: Int, to attributed: NSMutableAttributedString, lineRange: NSRange, contentRange: NSRange) {
+    private func applyHeading(
+        level: Int,
+        to attributed: NSMutableAttributedString,
+        lineRange: NSRange,
+        contentRange: NSRange
+    ) {
         let paragraphStyle = theme.paragraphStyle(
             lineSpacing: 4,
             paragraphSpacing: level <= 2 ? 16 : 13,
             paragraphSpacingBefore: level <= 2 ? 15 : 8
         )
-        attributed.addAttributes([
-            .font: theme.headingFont(level: level),
-            .foregroundColor: theme.textColor,
-            .paragraphStyle: paragraphStyle
-        ], range: lineRange)
+        attributed.addAttributes(
+            [
+                .font: theme.headingFont(level: level),
+                .foregroundColor: theme.textColor,
+                .paragraphStyle: paragraphStyle,
+            ],
+            range: lineRange
+        )
         if contentRange.length > 0 {
-            attributed.addAttribute(.font, value: theme.headingFont(level: level), range: contentRange)
+            attributed.addAttribute(
+                .font,
+                value: theme.headingFont(level: level),
+                range: contentRange
+            )
         }
     }
 
-    private func applyListStyle(to attributed: NSMutableAttributedString, lineRange: NSRange, contentRange: NSRange) {
-        attributed.addAttribute(.paragraphStyle, value: theme.paragraphStyle(firstLineHeadIndent: 0, headIndent: 24), range: lineRange)
+    private func applyListStyle(
+        to attributed: NSMutableAttributedString,
+        lineRange: NSRange,
+        contentRange: NSRange
+    ) {
+        attributed.addAttribute(
+            .paragraphStyle,
+            value: theme.paragraphStyle(firstLineHeadIndent: 0, headIndent: 24),
+            range: lineRange
+        )
         if contentRange.length > 0 {
             attributed.addAttribute(.foregroundColor, value: theme.textColor, range: contentRange)
         }
     }
 
-    private func applyQuoteStyle(to attributed: NSMutableAttributedString, lineRange: NSRange, contentRange: NSRange) {
-        attributed.addAttributes([
-            .paragraphStyle: theme.paragraphStyle(lineSpacing: 5, paragraphSpacing: 12, firstLineHeadIndent: 0, headIndent: 18),
-            .foregroundColor: theme.secondaryTextColor
-        ], range: lineRange)
+    private func applyQuoteStyle(
+        to attributed: NSMutableAttributedString,
+        lineRange: NSRange,
+        contentRange: NSRange
+    ) {
+        attributed.addAttributes(
+            [
+                .paragraphStyle: theme.paragraphStyle(
+                    lineSpacing: 5,
+                    paragraphSpacing: 12,
+                    firstLineHeadIndent: 0,
+                    headIndent: 18
+                ),
+                .foregroundColor: theme.secondaryTextColor,
+            ],
+            range: lineRange
+        )
         if contentRange.length > 0 {
             attributed.addAttribute(.obliqueness, value: 0.08, range: contentRange)
         }
     }
 
-    private func applyCodeBlockStyle(to attributed: NSMutableAttributedString, lineRange: NSRange, contentRange: NSRange) {
-        attributed.addAttributes([
-            .font: theme.codeFont,
-            .foregroundColor: theme.textColor,
-            .backgroundColor: theme.codeBackgroundColor,
-            .paragraphStyle: theme.paragraphStyle(lineSpacing: 3, paragraphSpacing: 0)
-        ], range: lineRange)
-        if contentRange.length > 0 {
-            attributed.addAttributes([
+    private func applyCodeBlockStyle(
+        to attributed: NSMutableAttributedString,
+        lineRange: NSRange,
+        contentRange: NSRange
+    ) {
+        attributed.addAttributes(
+            [
                 .font: theme.codeFont,
-                .foregroundColor: theme.textColor
-            ], range: contentRange)
+                .foregroundColor: theme.textColor,
+                .backgroundColor: theme.codeBackgroundColor,
+                .paragraphStyle: theme.paragraphStyle(lineSpacing: 3, paragraphSpacing: 0),
+            ],
+            range: lineRange
+        )
+        if contentRange.length > 0 {
+            attributed.addAttributes(
+                [
+                    .font: theme.codeFont,
+                    .foregroundColor: theme.textColor,
+                ],
+                range: contentRange
+            )
         }
     }
 
-    private func applyHorizontalRule(to attributed: NSMutableAttributedString, lineRange: NSRange, contentRange: NSRange) {
-        attributed.addAttributes([
-            .font: theme.bodyFont,
-            .foregroundColor: theme.syntaxVisibleColor,
-            .paragraphStyle: theme.paragraphStyle(lineSpacing: 2, paragraphSpacing: 18, paragraphSpacingBefore: 10)
-        ], range: lineRange)
+    private func applyHorizontalRule(
+        to attributed: NSMutableAttributedString,
+        lineRange: NSRange,
+        contentRange: NSRange
+    ) {
+        attributed.addAttributes(
+            [
+                .font: theme.bodyFont,
+                .foregroundColor: theme.syntaxVisibleColor,
+                .paragraphStyle: theme.paragraphStyle(
+                    lineSpacing: 2,
+                    paragraphSpacing: 18,
+                    paragraphSpacingBefore: 10
+                ),
+            ],
+            range: lineRange
+        )
         if contentRange.length > 0 {
-            attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: contentRange)
+            attributed.addAttribute(
+                .strikethroughStyle,
+                value: NSUnderlineStyle.single.rawValue,
+                range: contentRange
+            )
         }
     }
 
@@ -182,11 +294,14 @@ public final class MarkdownStyler {
         row: MarkdownTableRow,
         lineActive: Bool
     ) {
-        attributed.addAttributes([
-            .font: theme.codeFont,
-            .paragraphStyle: theme.paragraphStyle(lineSpacing: 3, paragraphSpacing: 4),
-            .foregroundColor: theme.textColor
-        ], range: lineRange)
+        attributed.addAttributes(
+            [
+                .font: theme.codeFont,
+                .paragraphStyle: theme.paragraphStyle(lineSpacing: 3, paragraphSpacing: 4),
+                .foregroundColor: theme.textColor,
+            ],
+            range: lineRange
+        )
 
         if !lineActive {
             if row.isSeparator {
@@ -195,14 +310,20 @@ public final class MarkdownStyler {
                 paragraph.maximumLineHeight = 1
                 paragraph.lineSpacing = 0
                 paragraph.paragraphSpacing = 0
-                attributed.addAttributes([
-                    .font: NSFont.systemFont(ofSize: 0.01),
-                    .paragraphStyle: paragraph.copy() as! NSParagraphStyle
-                ], range: lineRange)
+                attributed.addAttributes(
+                    [
+                        .font: NSFont.systemFont(ofSize: 0.01),
+                        .paragraphStyle: paragraph.copy() as! NSParagraphStyle,
+                    ],
+                    range: lineRange
+                )
             }
-            attributed.addAttributes([
-                .foregroundColor: theme.syntaxHiddenColor
-            ], range: contentRange)
+            attributed.addAttributes(
+                [
+                    .foregroundColor: theme.syntaxHiddenColor
+                ],
+                range: contentRange
+            )
             return
         }
 
@@ -211,22 +332,45 @@ public final class MarkdownStyler {
             let location = contentRange.location + offset
             let character = nsString.substring(with: NSRange(location: location, length: 1))
             if character == "|" {
-                attributed.addAttribute(.foregroundColor, value: theme.syntaxVisibleColor, range: NSRange(location: location, length: 1))
+                attributed.addAttribute(
+                    .foregroundColor,
+                    value: theme.syntaxVisibleColor,
+                    range: NSRange(location: location, length: 1)
+                )
             } else if character == "-" || character == ":" {
-                attributed.addAttribute(.foregroundColor, value: theme.secondaryTextColor, range: NSRange(location: location, length: 1))
+                attributed.addAttribute(
+                    .foregroundColor,
+                    value: theme.secondaryTextColor,
+                    range: NSRange(location: location, length: 1)
+                )
             }
         }
         if !row.isSeparator {
-            applyInlineStyles(to: attributed, searchRange: contentRange, lineActive: lineActive, renderImages: false)
+            applyInlineStyles(
+                to: attributed,
+                searchRange: contentRange,
+                lineActive: lineActive,
+                renderImages: false
+            )
         }
     }
 
-    private func applyTaskMarkerStyle(_ range: NSRange, checked: Bool, active: Bool, to attributed: NSMutableAttributedString) {
+    private func applyTaskMarkerStyle(
+        _ range: NSRange,
+        checked: Bool,
+        active: Bool,
+        to attributed: NSMutableAttributedString
+    ) {
         guard range.length > 0 else { return }
-        attributed.addAttributes([
-            .font: theme.codeFont,
-            .foregroundColor: active ? theme.syntaxVisibleColor : (checked ? theme.accentColor : theme.secondaryTextColor)
-        ], range: range)
+        attributed.addAttributes(
+            [
+                .font: theme.codeFont,
+                .foregroundColor: active
+                    ? theme.syntaxVisibleColor
+                    : (checked ? theme.accentColor : theme.secondaryTextColor),
+            ],
+            range: range
+        )
     }
 
     private func applyInlineStyles(
@@ -240,72 +384,164 @@ public final class MarkdownStyler {
         var protectedRanges: [NSRange] = []
 
         if renderImages {
-            applyMatches(pattern: MarkdownPatterns.image, to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+            applyMatches(
+                pattern: MarkdownPatterns.image,
+                to: attributed,
+                in: searchRange,
+                protectedRanges: &protectedRanges
+            ) { match in
                 self.applyImageSourceStyle(match.range, to: attributed)
                 return [match.range]
             }
         }
 
-        applyMatches(pattern: "`([^`\\n]+)`", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: "`([^`\\n]+)`",
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let content = match.range(at: 1)
-            self.applySyntax(NSRange(location: match.range.location, length: 1), active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(match.range) - 1, length: 1), active: lineActive, to: attributed)
-            attributed.addAttributes([
-                .font: self.theme.codeFont,
-                .foregroundColor: self.theme.textColor,
-                .backgroundColor: self.theme.codeBackgroundColor
-            ], range: content)
+            self.applySyntax(
+                NSRange(location: match.range.location, length: 1),
+                active: lineActive,
+                to: attributed
+            )
+            self.applySyntax(
+                NSRange(location: NSMaxRange(match.range) - 1, length: 1),
+                active: lineActive,
+                to: attributed
+            )
+            attributed.addAttributes(
+                [
+                    .font: self.theme.codeFont,
+                    .foregroundColor: self.theme.textColor,
+                    .backgroundColor: self.theme.codeBackgroundColor,
+                ],
+                range: content
+            )
             return [match.range]
         }
 
-        applyMatches(pattern: MarkdownPatterns.link, to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: MarkdownPatterns.link,
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let textRange = match.range(at: 1)
             let targetRange = match.range(at: 2)
-            attributed.addAttributes([
-                .foregroundColor: self.theme.accentColor,
-                .underlineStyle: NSUnderlineStyle.single.rawValue
-            ], range: textRange)
+            attributed.addAttributes(
+                [
+                    .foregroundColor: self.theme.accentColor,
+                    .underlineStyle: NSUnderlineStyle.single.rawValue,
+                ],
+                range: textRange
+            )
 
             let prefixLength = textRange.location - match.range.location
-            self.applySyntax(NSRange(location: match.range.location, length: prefixLength), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: match.range.location, length: prefixLength),
+                active: lineActive,
+                to: attributed
+            )
             let middleStart = NSMaxRange(textRange)
-            self.applySyntax(NSRange(location: middleStart, length: targetRange.location - middleStart), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: middleStart, length: targetRange.location - middleStart),
+                active: lineActive,
+                to: attributed
+            )
             self.applySyntax(targetRange, active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(targetRange), length: NSMaxRange(match.range) - NSMaxRange(targetRange)), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(
+                    location: NSMaxRange(targetRange),
+                    length: NSMaxRange(match.range) - NSMaxRange(targetRange)
+                ),
+                active: lineActive,
+                to: attributed
+            )
             return [match.range]
         }
 
-        applyMatches(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1",
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let delimiter = match.range(at: 1)
             let content = match.range(at: 2)
             self.applyFontTrait(.boldFontMask, to: attributed, range: content)
             self.applySyntax(delimiter, active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(content), length: delimiter.length), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: NSMaxRange(content), length: delimiter.length),
+                active: lineActive,
+                to: attributed
+            )
             return [match.range]
         }
 
-        applyMatches(pattern: "(~~)(?=\\S)(.+?)(?<=\\S)~~", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: "(~~)(?=\\S)(.+?)(?<=\\S)~~",
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let delimiter = match.range(at: 1)
             let content = match.range(at: 2)
-            attributed.addAttribute(.strikethroughStyle, value: NSUnderlineStyle.single.rawValue, range: content)
+            attributed.addAttribute(
+                .strikethroughStyle,
+                value: NSUnderlineStyle.single.rawValue,
+                range: content
+            )
             self.applySyntax(delimiter, active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(content), length: delimiter.length), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: NSMaxRange(content), length: delimiter.length),
+                active: lineActive,
+                to: attributed
+            )
             return [match.range]
         }
 
-        applyMatches(pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)",
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let content = match.range(at: 1)
             self.applyFontTrait(.italicFontMask, to: attributed, range: content)
-            self.applySyntax(NSRange(location: match.range.location, length: 1), active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(match.range) - 1, length: 1), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: match.range.location, length: 1),
+                active: lineActive,
+                to: attributed
+            )
+            self.applySyntax(
+                NSRange(location: NSMaxRange(match.range) - 1, length: 1),
+                active: lineActive,
+                to: attributed
+            )
             return [match.range]
         }
 
-        applyMatches(pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)", to: attributed, in: searchRange, protectedRanges: &protectedRanges) { match in
+        applyMatches(
+            pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)",
+            to: attributed,
+            in: searchRange,
+            protectedRanges: &protectedRanges
+        ) { match in
             let content = match.range(at: 1)
             self.applyFontTrait(.italicFontMask, to: attributed, range: content)
-            self.applySyntax(NSRange(location: match.range.location, length: 1), active: lineActive, to: attributed)
-            self.applySyntax(NSRange(location: NSMaxRange(match.range) - 1, length: 1), active: lineActive, to: attributed)
+            self.applySyntax(
+                NSRange(location: match.range.location, length: 1),
+                active: lineActive,
+                to: attributed
+            )
+            self.applySyntax(
+                NSRange(location: NSMaxRange(match.range) - 1, length: 1),
+                active: lineActive,
+                to: attributed
+            )
             return [match.range]
         }
     }
@@ -321,12 +557,19 @@ public final class MarkdownStyler {
         paragraph.paragraphSpacing = theme.scaledMetric(14, minimum: 9)
         paragraph.paragraphSpacingBefore = theme.scaledMetric(4, minimum: 2)
 
-        attributed.addAttribute(.paragraphStyle, value: paragraph.copy() as! NSParagraphStyle, range: lineRange)
-        attributed.addAttributes([
-            .foregroundColor: theme.syntaxHiddenColor,
-            .font: NSFont.systemFont(ofSize: 0.01),
-            .kern: 0
-        ], range: range)
+        attributed.addAttribute(
+            .paragraphStyle,
+            value: paragraph.copy() as! NSParagraphStyle,
+            range: lineRange
+        )
+        attributed.addAttributes(
+            [
+                .foregroundColor: theme.syntaxHiddenColor,
+                .font: NSFont.systemFont(ofSize: 0.01),
+                .kern: 0,
+            ],
+            range: range
+        )
     }
 
     private func applyMatches(
@@ -364,24 +607,43 @@ public final class MarkdownStyler {
         }
     }
 
-    private func applySyntax(_ range: NSRange, active: Bool, to attributed: NSMutableAttributedString) {
-        guard range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= attributed.length else { return }
-        attributed.addAttributes([
-            .foregroundColor: theme.syntaxHiddenColor,
-            .font: NSFont.systemFont(ofSize: 0.01),
-            .kern: 0
-        ], range: range)
+    private func applySyntax(
+        _ range: NSRange,
+        active: Bool,
+        to attributed: NSMutableAttributedString
+    ) {
+        guard range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= attributed.length
+        else { return }
+        attributed.addAttributes(
+            [
+                .foregroundColor: theme.syntaxHiddenColor,
+                .font: NSFont.systemFont(ofSize: 0.01),
+                .kern: 0,
+            ],
+            range: range
+        )
     }
 
-    private func applyVisibleSourceMarker(_ range: NSRange, to attributed: NSMutableAttributedString) {
-        guard range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= attributed.length else { return }
-        attributed.addAttributes([
-            .foregroundColor: theme.syntaxVisibleColor,
-            .font: theme.bodyFont
-        ], range: range)
+    private func applyVisibleSourceMarker(
+        _ range: NSRange,
+        to attributed: NSMutableAttributedString
+    ) {
+        guard range.location != NSNotFound, range.length > 0, NSMaxRange(range) <= attributed.length
+        else { return }
+        attributed.addAttributes(
+            [
+                .foregroundColor: theme.syntaxVisibleColor,
+                .font: theme.bodyFont,
+            ],
+            range: range
+        )
     }
 
-    private func applyFontTrait(_ trait: NSFontTraitMask, to attributed: NSMutableAttributedString, range: NSRange) {
+    private func applyFontTrait(
+        _ trait: NSFontTraitMask,
+        to attributed: NSMutableAttributedString,
+        range: NSRange
+    ) {
         guard range.location != NSNotFound, range.length > 0 else { return }
         attributed.enumerateAttribute(.font, in: range) { value, subrange, _ in
             let font = (value as? NSFont) ?? theme.bodyFont
@@ -390,14 +652,16 @@ public final class MarkdownStyler {
         }
     }
 
-    private func parseHeading(line: String, contentRange: NSRange) -> (level: Int, syntaxRange: NSRange, bodyRange: NSRange)? {
+    private func parseHeading(
+        line: String,
+        contentRange: NSRange
+    ) -> (level: Int, syntaxRange: NSRange, bodyRange: NSRange)? {
         var level = 0
         for scalar in line.unicodeScalars {
-            if scalar == "#" {
-                level += 1
-            } else {
+            guard scalar == "#" else {
                 break
             }
+            level += 1
         }
         guard (1...6).contains(level), line.count > level else { return nil }
         let index = line.index(line.startIndex, offsetBy: level)
@@ -411,8 +675,13 @@ public final class MarkdownStyler {
         )
     }
 
-    private func parseTaskList(line: String, contentRange: NSRange) -> (prefixRange: NSRange, checkboxRange: NSRange, bodyRange: NSRange, checked: Bool)? {
-        guard let match = firstMatch(regex: MarkdownStylerRegex.taskList, in: line) else { return nil }
+    private func parseTaskList(
+        line: String,
+        contentRange: NSRange
+    ) -> (prefixRange: NSRange, checkboxRange: NSRange, bodyRange: NSRange, checked: Bool)? {
+        guard let match = firstMatch(regex: MarkdownStylerRegex.taskList, in: line) else {
+            return nil
+        }
         let prefix = match.range(at: 1)
         let checkbox = match.range(at: 2)
         let full = match.range(at: 0)
@@ -427,7 +696,10 @@ public final class MarkdownStyler {
         )
     }
 
-    private func parseList(line: String, contentRange: NSRange) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
+    private func parseList(
+        line: String,
+        contentRange: NSRange
+    ) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
         guard let match = firstMatch(regex: MarkdownStylerRegex.list, in: line) else { return nil }
         let full = match.range(at: 0)
         let bodyStart = contentRange.location + full.length
@@ -437,8 +709,13 @@ public final class MarkdownStyler {
         )
     }
 
-    private func parseBlockquote(line: String, contentRange: NSRange) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
-        guard let match = firstMatch(regex: MarkdownStylerRegex.blockquote, in: line) else { return nil }
+    private func parseBlockquote(
+        line: String,
+        contentRange: NSRange
+    ) -> (syntaxRange: NSRange, bodyRange: NSRange)? {
+        guard let match = firstMatch(regex: MarkdownStylerRegex.blockquote, in: line) else {
+            return nil
+        }
         let full = match.range(at: 0)
         let bodyStart = contentRange.location + full.length
         return (
@@ -462,11 +739,18 @@ public final class MarkdownStyler {
         return characters == ["-"] || characters == ["*"] || characters == ["_"]
     }
 
-    private func isLineActive(_ lineRange: NSRange, selectedRanges: [NSRange], documentLength: Int) -> Bool {
+    private func isLineActive(
+        _ lineRange: NSRange,
+        selectedRanges: [NSRange],
+        documentLength: Int
+    ) -> Bool {
         guard !selectedRanges.isEmpty else { return false }
         for selection in selectedRanges {
             if selection.length == 0 {
-                if NSLocationInRange(selection.location, lineRange) || (selection.location == documentLength && NSMaxRange(lineRange) == documentLength) {
+                if NSLocationInRange(selection.location, lineRange)
+                    || (selection.location == documentLength
+                        && NSMaxRange(lineRange) == documentLength)
+                {
                     return true
                 }
             } else if rangesIntersect(lineRange, selection) {
@@ -482,7 +766,9 @@ public final class MarkdownStyler {
         while index < min(location, nsString.length) {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
-            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(
+                in: .whitespaces
+            )
             if isFence(trimmed) {
                 insideFence.toggle()
             }
@@ -493,15 +779,22 @@ public final class MarkdownStyler {
 
     private func expandedLineRange(covering ranges: [NSRange], in nsString: NSString) -> NSRange? {
         var result: NSRange?
-        for range in ranges {
-            guard range.location != NSNotFound else { continue }
-            let lineRange = lineRange(containing: range.location, length: range.length, in: nsString)
+        for range in ranges where range.location != NSNotFound {
+            let lineRange = lineRange(
+                containing: range.location,
+                length: range.length,
+                in: nsString
+            )
             result = result.map { NSUnionRange($0, lineRange) } ?? lineRange
         }
         return result
     }
 
-    private func lineRange(containing location: Int, length: Int = 0, in nsString: NSString) -> NSRange {
+    private func lineRange(
+        containing location: Int,
+        length: Int = 0,
+        in nsString: NSString
+    ) -> NSRange {
         guard nsString.length > 0 else { return NSRange(location: 0, length: 0) }
         let boundedLocation = min(max(0, location), max(0, nsString.length - 1))
         let boundedLength = min(max(0, length), nsString.length - boundedLocation)
@@ -513,11 +806,10 @@ public final class MarkdownStyler {
         var length = lineRange.length
         while length > 0 {
             let character = nsString.character(at: lineRange.location + length - 1)
-            if character == 10 || character == 13 {
-                length -= 1
-            } else {
+            guard character == 10 || character == 13 else {
                 break
             }
+            length -= 1
         }
         return NSRange(location: lineRange.location, length: length)
     }
@@ -533,9 +825,15 @@ private enum MarkdownStylerRegex {
     static let link = try! NSRegularExpression(pattern: MarkdownPatterns.link)
     static let bold = try! NSRegularExpression(pattern: "(\\*\\*|__)(?=\\S)(.+?)(?<=\\S)\\1")
     static let strike = try! NSRegularExpression(pattern: "(~~)(?=\\S)(.+?)(?<=\\S)~~")
-    static let italicAsterisk = try! NSRegularExpression(pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)")
-    static let italicUnderscore = try! NSRegularExpression(pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)")
-    static let taskList = try! NSRegularExpression(pattern: #"^(\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])\s+"#)
+    static let italicAsterisk = try! NSRegularExpression(
+        pattern: "(?<!\\*)\\*(?!\\s|\\*)([^*\\n]+?)(?<!\\s)\\*(?!\\*)"
+    )
+    static let italicUnderscore = try! NSRegularExpression(
+        pattern: "(?<!\\w)_(?!\\s|_)([^_\\n]+?)(?<!\\s)_(?!\\w)"
+    )
+    static let taskList = try! NSRegularExpression(
+        pattern: #"^(\s*(?:[-+*]|\d+[.)])\s+)(\[[ xX]\])\s+"#
+    )
     static let list = try! NSRegularExpression(pattern: #"^\s*(?:[-+*]|\d+[.)])\s+"#)
     static let blockquote = try! NSRegularExpression(pattern: #"^\s*>\s?"#)
 

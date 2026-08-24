@@ -44,47 +44,91 @@ public enum MarkdownMinimapStructure {
             let textLength = trimmed.count
 
             if isFence(trimmed) {
-                result.append(MarkdownMinimapLine(kind: .codeFence, quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: .codeFence,
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: textLength
+                    )
+                )
                 insideFence.toggle()
                 continue
             }
 
             if insideFence {
-                result.append(MarkdownMinimapLine(kind: .code, quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: .code,
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: textLength
+                    )
+                )
                 continue
             }
 
             if trimmed.isEmpty {
-                result.append(MarkdownMinimapLine(kind: .blank, quoteDepth: quoteStripped.quoteDepth, textLength: 0))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: .blank,
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: 0
+                    )
+                )
                 continue
             }
 
             if quoteStripped.quoteDepth == 0, let tableRow = tableRows[line.contentRange.location] {
-                result.append(MarkdownMinimapLine(
-                    kind: tableKind(for: tableRow),
-                    quoteDepth: 0,
-                    textLength: textLength
-                ))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: tableKind(for: tableRow),
+                        quoteDepth: 0,
+                        textLength: textLength
+                    )
+                )
                 continue
             }
 
             if let level = headingLevel(in: trimmed) {
-                result.append(MarkdownMinimapLine(kind: .heading(level: level), quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: .heading(level: level),
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: textLength
+                    )
+                )
                 continue
             }
 
             if let list = listKind(in: content) {
-                result.append(MarkdownMinimapLine(kind: list, quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: list,
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: textLength
+                    )
+                )
                 continue
             }
 
             if isThematicBreak(trimmed) {
-                result.append(MarkdownMinimapLine(kind: .thematicBreak, quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+                result.append(
+                    MarkdownMinimapLine(
+                        kind: .thematicBreak,
+                        quoteDepth: quoteStripped.quoteDepth,
+                        textLength: textLength
+                    )
+                )
                 continue
             }
 
             let kind: MarkdownMinimapLine.Kind = quoteStripped.quoteDepth > 0 ? .quote : .body
-            result.append(MarkdownMinimapLine(kind: kind, quoteDepth: quoteStripped.quoteDepth, textLength: textLength))
+            result.append(
+                MarkdownMinimapLine(
+                    kind: kind,
+                    quoteDepth: quoteStripped.quoteDepth,
+                    textLength: textLength
+                )
+            )
         }
 
         return result
@@ -103,22 +147,26 @@ public enum MarkdownMinimapStructure {
 
             while index < nsString.length {
                 let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
-                lines.append(DocumentLine(contentRange: rangeWithoutLineEnding(lineRange, in: nsString)))
+                lines.append(
+                    DocumentLine(contentRange: rangeWithoutLineEnding(lineRange, in: nsString))
+                )
                 index = NSMaxRange(lineRange)
             }
 
             return lines
         }
 
-        private static func rangeWithoutLineEnding(_ lineRange: NSRange, in nsString: NSString) -> NSRange {
+        private static func rangeWithoutLineEnding(
+            _ lineRange: NSRange,
+            in nsString: NSString
+        ) -> NSRange {
             var length = lineRange.length
             while length > 0 {
                 let character = nsString.character(at: lineRange.location + length - 1)
-                if character == 10 || character == 13 {
-                    length -= 1
-                } else {
+                guard character == 10 || character == 13 else {
                     break
                 }
+                length -= 1
             }
             return NSRange(location: lineRange.location, length: length)
         }
@@ -166,11 +214,10 @@ public enum MarkdownMinimapStructure {
     private static func headingLevel(in trimmed: String) -> Int? {
         var level = 0
         for character in trimmed {
-            if character == "#" {
-                level += 1
-            } else {
+            guard character == "#" else {
                 break
             }
+            level += 1
         }
 
         guard (1...6).contains(level) else { return nil }
@@ -183,9 +230,12 @@ public enum MarkdownMinimapStructure {
 
     private static func listKind(in content: String) -> MarkdownMinimapLine.Kind? {
         let leadingWhitespace = content.prefix { $0 == " " || $0 == "\t" }
-        let depth = min(5, leadingWhitespace.reduce(0) { partial, character in
-            partial + (character == "\t" ? 2 : 1)
-        } / 2)
+        let depth = min(
+            5,
+            leadingWhitespace.reduce(0) { partial, character in
+                partial + (character == "\t" ? 2 : 1)
+            } / 2
+        )
         let trimmed = content.trimmingCharacters(in: .whitespaces)
 
         if let body = unorderedListBody(in: trimmed) {
@@ -206,7 +256,9 @@ public enum MarkdownMinimapStructure {
     }
 
     private static func unorderedListBody(in trimmed: String) -> Substring? {
-        guard let first = trimmed.first, first == "-" || first == "*" || first == "+" else { return nil }
+        guard let first = trimmed.first, first == "-" || first == "*" || first == "+" else {
+            return nil
+        }
         let afterMarker = trimmed.dropFirst()
         guard afterMarker.first == " " || afterMarker.first == "\t" else { return nil }
         return afterMarker.dropFirst()
@@ -221,12 +273,15 @@ public enum MarkdownMinimapStructure {
             index = trimmed.index(after: index)
         }
 
-        guard digitCount > 0, index < trimmed.endIndex, trimmed[index] == "." || trimmed[index] == ")" else {
+        guard digitCount > 0, index < trimmed.endIndex,
+            trimmed[index] == "." || trimmed[index] == ")"
+        else {
             return nil
         }
 
         let markerEnd = trimmed.index(after: index)
-        guard markerEnd < trimmed.endIndex, trimmed[markerEnd] == " " || trimmed[markerEnd] == "\t" else {
+        guard markerEnd < trimmed.endIndex, trimmed[markerEnd] == " " || trimmed[markerEnd] == "\t"
+        else {
             return nil
         }
 
@@ -236,8 +291,9 @@ public enum MarkdownMinimapStructure {
     private static func taskState(in body: Substring) -> Bool? {
         let trimmedBody = body.trimmingCharacters(in: .whitespaces)
         guard trimmedBody.count >= 3,
-              trimmedBody.first == "[",
-              trimmedBody[trimmedBody.index(trimmedBody.startIndex, offsetBy: 2)] == "]" else {
+            trimmedBody.first == "[",
+            trimmedBody[trimmedBody.index(trimmedBody.startIndex, offsetBy: 2)] == "]"
+        else {
             return nil
         }
 
@@ -253,7 +309,9 @@ public enum MarkdownMinimapStructure {
 
     private static func isThematicBreak(_ trimmed: String) -> Bool {
         let compact = trimmed.filter { $0 != " " && $0 != "\t" }
-        guard compact.count >= 3, let first = compact.first, first == "-" || first == "_" || first == "*" else {
+        guard compact.count >= 3, let first = compact.first,
+            first == "-" || first == "_" || first == "*"
+        else {
             return false
         }
         return compact.allSatisfy { $0 == first }

@@ -150,7 +150,10 @@ public final class EditorWorkspaceView: NSView {
 
         textView.frame = NSRect(x: 0, y: 0, width: 900, height: 1400)
         textView.minSize = NSSize(width: 0, height: 0)
-        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.maxSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
         textView.autoresizingMask = [.width]
         annotationOverlay.frame = textView.bounds
         annotationOverlay.autoresizingMask = [.width, .height]
@@ -224,16 +227,31 @@ public final class EditorWorkspaceView: NSView {
         scrollView.contentView.postsBoundsChangedNotifications = true
 
         topBarHeightConstraint = topBarBackdropView.heightAnchor.constraint(equalToConstant: 54)
-        minimapTrailingConstraint = minimapView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -12)
+        minimapTrailingConstraint = minimapView.trailingAnchor.constraint(
+            equalTo: trailingAnchor,
+            constant: -12
+        )
         minimapTopConstraint = minimapView.topAnchor.constraint(equalTo: topAnchor, constant: 58)
-        minimapBottomConstraint = minimapView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -40)
+        minimapBottomConstraint = minimapView.bottomAnchor.constraint(
+            equalTo: bottomAnchor,
+            constant: -40
+        )
         minimapWidthConstraint = minimapView.widthAnchor.constraint(equalToConstant: 86)
         titleTopConstraint = titleLabel.topAnchor.constraint(equalTo: topAnchor, constant: 13)
-        statusTrailingConstraint = statusLabel.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -18)
-        statusBottomConstraint = statusLabel.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+        statusTrailingConstraint = statusLabel.trailingAnchor.constraint(
+            equalTo: trailingAnchor,
+            constant: -18
+        )
+        statusBottomConstraint = statusLabel.bottomAnchor.constraint(
+            equalTo: bottomAnchor,
+            constant: -12
+        )
         statusWidthConstraint = statusLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 220)
         ruleTopConstraint = rule.topAnchor.constraint(equalTo: topAnchor, constant: 44)
-        formatBottomConstraint = formatBackdropView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -12)
+        formatBottomConstraint = formatBackdropView.bottomAnchor.constraint(
+            equalTo: bottomAnchor,
+            constant: -12
+        )
 
         NSLayoutConstraint.activate([
             scrollView.leadingAnchor.constraint(equalTo: leadingAnchor),
@@ -268,18 +286,24 @@ public final class EditorWorkspaceView: NSView {
             formatBottomConstraint!,
             formatBackdropView.heightAnchor.constraint(equalToConstant: 32),
 
-            formatLabel.leadingAnchor.constraint(equalTo: formatBackdropView.leadingAnchor, constant: 11),
+            formatLabel.leadingAnchor.constraint(
+                equalTo: formatBackdropView.leadingAnchor,
+                constant: 11
+            ),
             formatLabel.centerYAnchor.constraint(equalTo: formatBackdropView.centerYAnchor),
 
             formatButton.leadingAnchor.constraint(equalTo: formatLabel.trailingAnchor, constant: 7),
-            formatButton.trailingAnchor.constraint(equalTo: formatBackdropView.trailingAnchor, constant: -4),
+            formatButton.trailingAnchor.constraint(
+                equalTo: formatBackdropView.trailingAnchor,
+                constant: -4
+            ),
             formatButton.centerYAnchor.constraint(equalTo: formatBackdropView.centerYAnchor),
             formatButton.widthAnchor.constraint(equalToConstant: 118),
 
             rule.leadingAnchor.constraint(equalTo: leadingAnchor),
             rule.trailingAnchor.constraint(equalTo: trailingAnchor),
             ruleTopConstraint!,
-            rule.heightAnchor.constraint(equalToConstant: 1)
+            rule.heightAnchor.constraint(equalToConstant: 1),
         ])
 
         textView.onViewScaleChange = { [weak self] in
@@ -317,7 +341,10 @@ public final class EditorWorkspaceView: NSView {
         scheduleMinimapUpdate()
     }
 
-    private func updateTextInsets(preserveVisibleOrigin: Bool = false, refreshDocumentHeight: Bool = true) {
+    private func updateTextInsets(
+        preserveVisibleOrigin: Bool = false,
+        refreshDocumentHeight: Bool = true
+    ) {
         let visibleWidth = max(320, scrollView.contentSize.width)
         let scale = currentTheme.viewScale
         let horizontalPadding = documentFormat.editorHorizontalPadding(scale: scale)
@@ -340,7 +367,10 @@ public final class EditorWorkspaceView: NSView {
             }
 
             if let textContainer = textView.textContainer {
-                let newContainerSize = NSSize(width: containerWidth, height: CGFloat.greatestFiniteMagnitude)
+                let newContainerSize = NSSize(
+                    width: containerWidth,
+                    height: CGFloat.greatestFiniteMagnitude
+                )
                 if !sizesMatch(textContainer.containerSize, newContainerSize) {
                     textContainer.containerSize = newContainerSize
                 }
@@ -407,13 +437,16 @@ public final class EditorWorkspaceView: NSView {
     }
 
     private func updateDocumentHeight(preserveVisibleOrigin: Bool) {
-        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer else { return }
+        guard let layoutManager = textView.layoutManager, let textContainer = textView.textContainer
+        else { return }
         let clipView = scrollView.contentView
         let originalOrigin = clipView.bounds.origin
 
         layoutManager.ensureLayout(for: textContainer)
         let usedRect = layoutManager.usedRect(for: textContainer)
-        let laidOutHeight = roundedUpToDevicePixel(textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height)
+        let laidOutHeight = roundedUpToDevicePixel(
+            textView.textContainerOrigin.y + usedRect.maxY + textView.textContainerInset.height
+        )
         let documentHeight = max(scrollView.contentSize.height, laidOutHeight)
         if abs(textView.frame.size.height - documentHeight) > geometryEpsilon {
             textView.frame.size.height = documentHeight
@@ -423,8 +456,9 @@ public final class EditorWorkspaceView: NSView {
         let maxY = max(0, textView.frame.height - clipView.bounds.height)
         let targetY = min(max(0, originalOrigin.y), maxY)
         let target = NSPoint(x: originalOrigin.x, y: targetY)
-        if abs(clipView.bounds.origin.y - target.y) > geometryEpsilon ||
-            abs(clipView.bounds.origin.x - target.x) > geometryEpsilon {
+        if abs(clipView.bounds.origin.y - target.y) > geometryEpsilon
+            || abs(clipView.bounds.origin.x - target.x) > geometryEpsilon
+        {
             clipView.scroll(to: target)
             scrollView.reflectScrolledClipView(clipView)
         }
@@ -487,7 +521,8 @@ public final class EditorWorkspaceView: NSView {
     }
 
     private func sizesMatch(_ lhs: NSSize, _ rhs: NSSize) -> Bool {
-        abs(lhs.width - rhs.width) <= geometryEpsilon && abs(lhs.height - rhs.height) <= geometryEpsilon
+        abs(lhs.width - rhs.width) <= geometryEpsilon
+            && abs(lhs.height - rhs.height) <= geometryEpsilon
     }
 
     private struct TextGeometry {
@@ -497,10 +532,10 @@ public final class EditorWorkspaceView: NSView {
         let containerWidth: CGFloat
 
         func matches(_ other: TextGeometry, epsilon: CGFloat) -> Bool {
-            abs(visibleWidth - other.visibleWidth) <= epsilon &&
-                abs(sideInset - other.sideInset) <= epsilon &&
-                abs(verticalInset - other.verticalInset) <= epsilon &&
-                abs(containerWidth - other.containerWidth) <= epsilon
+            abs(visibleWidth - other.visibleWidth) <= epsilon
+                && abs(sideInset - other.sideInset) <= epsilon
+                && abs(verticalInset - other.verticalInset) <= epsilon
+                && abs(containerWidth - other.containerWidth) <= epsilon
         }
     }
 }
@@ -521,7 +556,11 @@ private final class ChromeBackdropView: NSView {
         strokeColor: NSColor,
         cornerRadius: CGFloat = 0
     ) {
-        self.tintView = BackdropTintView(fillColor: tintColor, strokeColor: strokeColor, cornerRadius: cornerRadius)
+        self.tintView = BackdropTintView(
+            fillColor: tintColor,
+            strokeColor: strokeColor,
+            cornerRadius: cornerRadius
+        )
         self.cornerRadius = cornerRadius
         super.init(frame: .zero)
 
@@ -546,7 +585,7 @@ private final class ChromeBackdropView: NSView {
             tintView.leadingAnchor.constraint(equalTo: leadingAnchor),
             tintView.trailingAnchor.constraint(equalTo: trailingAnchor),
             tintView.topAnchor.constraint(equalTo: topAnchor),
-            tintView.bottomAnchor.constraint(equalTo: bottomAnchor)
+            tintView.bottomAnchor.constraint(equalTo: bottomAnchor),
         ])
         applyCornerRadius()
     }

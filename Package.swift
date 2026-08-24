@@ -9,7 +9,7 @@ let package = Package(
     ],
     products: [
         .executable(name: "Aviv", targets: ["Aviv"]),
-        .library(name: "AvivCore", targets: ["AvivCore"])
+        .library(name: "AvivCore", targets: ["AvivCore"]),
     ],
     targets: [
         .target(
@@ -25,6 +25,6 @@ let package = Package(
             name: "AvivCoreTests",
             dependencies: ["AvivCore"],
             path: "Tests/AvivCoreTests"
-        )
+        ),
     ]
 )

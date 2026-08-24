@@ -10,6 +10,7 @@ public struct MarkdownTypingPerformanceResult {
     public let maxEditLatency: TimeInterval
 }
 
+@MainActor
 public enum MarkdownTypingPerformanceVerifier {
     public static func verify(editCount: Int = 72) -> MarkdownTypingPerformanceResult {
         let workspace = EditorWorkspaceView(frame: NSRect(x: 0, y: 0, width: 1040, height: 740))
@@ -24,7 +25,11 @@ public enum MarkdownTypingPerformanceVerifier {
 
         var insertionLocation = targetRange.location + targetRange.length
         workspace.textView.setSelectedRange(NSRange(location: insertionLocation, length: 0))
-        center(workspace, around: NSRange(location: insertionLocation, length: 1), visibleFraction: 0.55)
+        center(
+            workspace,
+            around: NSRange(location: insertionLocation, length: 1),
+            visibleFraction: 0.55
+        )
         settle(workspace)
 
         var measurements: [TimeInterval] = []
@@ -51,10 +56,14 @@ public enum MarkdownTypingPerformanceVerifier {
         var failures: [String] = []
 
         if average > 0.035 {
-            failures.append(String(format: "average edit latency %.3f ms exceeded 35 ms", average * 1000))
+            failures.append(
+                String(format: "average edit latency %.3f ms exceeded 35 ms", average * 1000)
+            )
         }
         if maximum > 0.150 {
-            failures.append(String(format: "max edit latency %.3f ms exceeded 150 ms", maximum * 1000))
+            failures.append(
+                String(format: "max edit latency %.3f ms exceeded 150 ms", maximum * 1000)
+            )
         }
 
         return MarkdownTypingPerformanceResult(
@@ -89,7 +98,11 @@ public enum MarkdownTypingPerformanceVerifier {
         return 1
     }
 
-    private static func center(_ workspace: EditorWorkspaceView, around range: NSRange, visibleFraction: CGFloat) {
+    private static func center(
+        _ workspace: EditorWorkspaceView,
+        around range: NSRange,
+        visibleFraction: CGFloat
+    ) {
         guard
             let layoutManager = workspace.textView.layoutManager,
             let textContainer = workspace.textView.textContainer
@@ -98,7 +111,10 @@ public enum MarkdownTypingPerformanceVerifier {
         }
 
         layoutManager.ensureLayout(for: textContainer)
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: range, actualCharacterRange: nil)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: range,
+            actualCharacterRange: nil
+        )
         var rect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
         rect.origin.x += workspace.textView.textContainerOrigin.x
         rect.origin.y += workspace.textView.textContainerOrigin.y

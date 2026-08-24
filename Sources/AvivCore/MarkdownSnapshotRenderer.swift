@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 
+@MainActor
 public enum MarkdownSnapshotRenderer {
     public static func renderSample(
         to url: URL,
@@ -20,7 +21,10 @@ public enum MarkdownSnapshotRenderer {
             workspace.textView.setViewScale(viewScale)
         }
         workspace.loadMarkdown(markdown)
-        workspace.updateDocumentTitle(url: URL(fileURLWithPath: "Aviv Markdown.md"), isEdited: false)
+        workspace.updateDocumentTitle(
+            url: URL(fileURLWithPath: "Aviv Markdown.md"),
+            isEdited: false
+        )
         workspace.layoutSubtreeIfNeeded()
 
         if let cursorNeedle {
@@ -30,7 +34,9 @@ public enum MarkdownSnapshotRenderer {
                 workspace.textView.setSelectedRange(NSRange(location: range.location, length: 0))
             }
         } else {
-            workspace.textView.setSelectedRange(NSRange(location: (workspace.textView.string as NSString).length, length: 0))
+            workspace.textView.setSelectedRange(
+                NSRange(location: (workspace.textView.string as NSString).length, length: 0)
+            )
         }
 
         if let scrollRatio {
@@ -39,8 +45,13 @@ public enum MarkdownSnapshotRenderer {
 
         if ProcessInfo.processInfo.environment["AVIV_DEBUG_SNAPSHOT"] == "1" {
             let ranges = workspace.textView.selectedRanges.compactMap { $0.rangeValue }
-            let tokens = MarkdownAnnotationParser.tokens(in: workspace.textView.string, selectedRanges: ranges)
-            print("snapshot debug: cursor=\(cursorNeedle ?? "nil") contains=\(workspace.textView.string.contains(cursorNeedle ?? "")) ranges=\(ranges) tokens=\(tokens.map { $0.label })")
+            let tokens = MarkdownAnnotationParser.tokens(
+                in: workspace.textView.string,
+                selectedRanges: ranges
+            )
+            print(
+                "snapshot debug: cursor=\(cursorNeedle ?? "nil") contains=\(workspace.textView.string.contains(cursorNeedle ?? "")) ranges=\(ranges) tokens=\(tokens.map { $0.label })"
+            )
         }
 
         workspace.layoutSubtreeIfNeeded()
@@ -135,9 +146,12 @@ private final class PrintPreviewCanvas: NSView {
         self.printView = printView
         self.paperRect = NSRect(x: 28, y: 28, width: paperSize.width, height: paperSize.height)
         self.margins = margins
-        super.init(frame: NSRect(x: 0, y: 0, width: paperSize.width + 56, height: paperSize.height + 56))
+        super.init(
+            frame: NSRect(x: 0, y: 0, width: paperSize.width + 56, height: paperSize.height + 56)
+        )
         wantsLayer = true
-        layer?.backgroundColor = NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1).cgColor
+        layer?.backgroundColor =
+            NSColor(calibratedRed: 0.93, green: 0.95, blue: 0.96, alpha: 1).cgColor
         addSubview(printView)
         positionPrintView()
     }

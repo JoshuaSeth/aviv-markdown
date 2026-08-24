@@ -2,6 +2,7 @@ import AppKit
 import AvivCore
 import Foundation
 
+@MainActor
 enum AppCommandVerifier {
     static func runCLI() -> Int32 {
         _ = NSApplication.shared
@@ -15,13 +16,17 @@ enum AppCommandVerifier {
 
         var failures: [String] = []
         failures.append(contentsOf: verifyMenuStructure())
-        failures.append(contentsOf: verifyCommandTargets(delegate: delegate, controller: controller))
-        failures.append(contentsOf: verifyBehavior(
-            delegate: delegate,
-            controller: controller,
-            printService: printService,
-            recentDocuments: recentDocuments
-        ))
+        failures.append(
+            contentsOf: verifyCommandTargets(delegate: delegate, controller: controller)
+        )
+        failures.append(
+            contentsOf: verifyBehavior(
+                delegate: delegate,
+                controller: controller,
+                printService: printService,
+                recentDocuments: recentDocuments
+            )
+        )
 
         controller.close()
 
@@ -52,21 +57,32 @@ enum AppCommandVerifier {
         }
 
         for command in AppCommandCatalog.commands {
-            guard let item = builtItems.first(where: { $0.identifier?.rawValue == command.identifier }) else {
+            guard
+                let item = builtItems.first(where: { $0.identifier?.rawValue == command.identifier }
+                )
+            else {
                 failures.append("missing menu item for \(command.identifier)")
                 continue
             }
             if item.title != command.title {
-                failures.append("\(command.identifier) title is \(item.title), expected \(command.title)")
+                failures.append(
+                    "\(command.identifier) title is \(item.title), expected \(command.title)"
+                )
             }
             if item.action != Selector(command.actionName) {
-                failures.append("\(command.identifier) action is \(String(describing: item.action)), expected \(command.actionName)")
+                failures.append(
+                    "\(command.identifier) action is \(String(describing: item.action)), expected \(command.actionName)"
+                )
             }
             if item.keyEquivalent != command.keyEquivalent {
-                failures.append("\(command.identifier) key is \(item.keyEquivalent), expected \(command.keyEquivalent)")
+                failures.append(
+                    "\(command.identifier) key is \(item.keyEquivalent), expected \(command.keyEquivalent)"
+                )
             }
             if normalized(item.keyEquivalentModifierMask) != normalized(command.modifierMask) {
-                failures.append("\(command.identifier) modifiers are \(item.keyEquivalentModifierMask), expected \(command.modifierMask)")
+                failures.append(
+                    "\(command.identifier) modifiers are \(item.keyEquivalentModifierMask), expected \(command.modifierMask)"
+                )
             }
             if item.tag != command.tag {
                 failures.append("\(command.identifier) tag is \(item.tag), expected \(command.tag)")
@@ -76,7 +92,10 @@ enum AppCommandVerifier {
         return failures
     }
 
-    private static func verifyCommandTargets(delegate: AppDelegate, controller: DocumentWindowController) -> [String] {
+    private static func verifyCommandTargets(
+        delegate: AppDelegate,
+        controller: DocumentWindowController
+    ) -> [String] {
         var failures: [String] = []
 
         for command in AppCommandCatalog.commands {
@@ -84,15 +103,21 @@ enum AppCommandVerifier {
             switch command.targetRoute {
             case .application:
                 if !NSApp.responds(to: selector) {
-                    failures.append("NSApplication does not respond to \(command.actionName) for \(command.identifier)")
+                    failures.append(
+                        "NSApplication does not respond to \(command.actionName) for \(command.identifier)"
+                    )
                 }
             case .appDelegate:
                 if !delegate.responds(to: selector) {
-                    failures.append("AppDelegate does not respond to \(command.actionName) for \(command.identifier)")
+                    failures.append(
+                        "AppDelegate does not respond to \(command.actionName) for \(command.identifier)"
+                    )
                 }
             case .firstResponder:
                 if !responderChainCanHandle(selector, controller: controller) {
-                    failures.append("document responder chain does not handle \(command.actionName) for \(command.identifier)")
+                    failures.append(
+                        "document responder chain does not handle \(command.actionName) for \(command.identifier)"
+                    )
                 }
             }
         }
@@ -148,7 +173,9 @@ enum AppCommandVerifier {
         }
         delegate.decreaseTextSize(nil)
         delegate.resetTextSize(nil)
-        if abs(controller.workspace.textView.styler.theme.viewScale - MarkdownTheme.defaultViewScale) > 0.001 {
+        if abs(
+            controller.workspace.textView.styler.theme.viewScale - MarkdownTheme.defaultViewScale
+        ) > 0.001 {
             failures.append("Actual Size command did not reset view scale")
         }
         if controller.workspace.textView.string != zoomSource {
@@ -162,7 +189,9 @@ enum AppCommandVerifier {
             failures.append("Bold command did not wrap selected text")
         }
 
-        failures.append(contentsOf: verifyOpenRecentMenu(delegate: delegate, recentDocuments: recentDocuments))
+        failures.append(
+            contentsOf: verifyOpenRecentMenu(delegate: delegate, recentDocuments: recentDocuments)
+        )
 
         return failures
     }
@@ -184,11 +213,19 @@ enum AppCommandVerifier {
             .appendingPathExtension("md")
 
         do {
-            try "# Recent\n\nOpened from native menu.".write(to: recentURL, atomically: true, encoding: .utf8)
+            try "# Recent\n\nOpened from native menu.".write(
+                to: recentURL,
+                atomically: true,
+                encoding: .utf8
+            )
             recentDocuments.noteNewRecentDocumentURL(recentURL)
             openRecentMenu.delegate?.menuNeedsUpdate?(openRecentMenu)
 
-            guard let recentItem = openRecentMenu.items.first(where: { ($0.representedObject as? URL) == recentURL }) else {
+            guard
+                let recentItem = openRecentMenu.items.first(where: {
+                    ($0.representedObject as? URL) == recentURL
+                })
+            else {
                 try? FileManager.default.removeItem(at: recentURL)
                 return ["Open Recent submenu did not render the recorded recent file"]
             }
@@ -197,11 +234,15 @@ enum AppCommandVerifier {
                 failures.append("Open Recent file item does not target openRecentDocument:")
             }
             if recentItem.title != recentURL.lastPathComponent {
-                failures.append("Open Recent file item title is \(recentItem.title), expected \(recentURL.lastPathComponent)")
+                failures.append(
+                    "Open Recent file item title is \(recentItem.title), expected \(recentURL.lastPathComponent)"
+                )
             }
 
             delegate.openRecentDocument(recentItem)
-            if !delegate.documentSession.controllers.contains(where: { $0.representedDocumentURL == recentURL }) {
+            if !delegate.documentSession.controllers.contains(where: {
+                $0.representedDocumentURL == recentURL
+            }) {
                 failures.append("Open Recent item did not open the represented document")
             }
 
@@ -224,7 +265,10 @@ enum AppCommandVerifier {
         return failures
     }
 
-    private static func responderChainCanHandle(_ selector: Selector, controller: DocumentWindowController) -> Bool {
+    private static func responderChainCanHandle(
+        _ selector: Selector,
+        controller: DocumentWindowController
+    ) -> Bool {
         let textView = controller.workspace.textView
         if textView.responds(to: selector) {
             return true
@@ -256,6 +300,7 @@ enum AppCommandVerifier {
     }
 }
 
+@MainActor
 private final class RecordingPrintService: DocumentPrintService {
     var pageSetupCount = 0
     var printCount = 0
@@ -264,11 +309,18 @@ private final class RecordingPrintService: DocumentPrintService {
         pageSetupCount += 1
     }
 
-    func print(markdown: String, title: String, format: MarkdownDocumentFormat, baseURL: URL?, window: NSWindow?) {
+    func print(
+        markdown: String,
+        title: String,
+        format: MarkdownDocumentFormat,
+        baseURL: URL?,
+        window: NSWindow?
+    ) {
         printCount += 1
     }
 }
 
+@MainActor
 private final class RecordingRecentDocumentManager: RecentDocumentManaging {
     private(set) var recentDocumentURLs: [URL] = []
 

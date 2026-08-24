@@ -12,15 +12,30 @@ public struct MarkdownEditableSourceSpan: Equatable {
 }
 
 public enum MarkdownSourceSpanParser {
-    public static func editableSpan(containing location: Int, in markdown: String) -> MarkdownEditableSourceSpan? {
-        imageSpan(containing: location, in: markdown) ?? linkSpan(containing: location, in: markdown)
+    public static func editableSpan(
+        containing location: Int,
+        in markdown: String
+    ) -> MarkdownEditableSourceSpan? {
+        imageSpan(containing: location, in: markdown)
+            ?? linkSpan(containing: location, in: markdown)
     }
 
-    public static func imageSpan(containing location: Int, in markdown: String) -> MarkdownEditableSourceSpan? {
-        sourceSpan(containing: location, in: markdown, pattern: MarkdownPatterns.image, kind: .image)
+    public static func imageSpan(
+        containing location: Int,
+        in markdown: String
+    ) -> MarkdownEditableSourceSpan? {
+        sourceSpan(
+            containing: location,
+            in: markdown,
+            pattern: MarkdownPatterns.image,
+            kind: .image
+        )
     }
 
-    public static func linkSpan(containing location: Int, in markdown: String) -> MarkdownEditableSourceSpan? {
+    public static func linkSpan(
+        containing location: Int,
+        in markdown: String
+    ) -> MarkdownEditableSourceSpan? {
         sourceSpan(containing: location, in: markdown, pattern: MarkdownPatterns.link, kind: .link)
     }
 
@@ -40,9 +55,15 @@ public enum MarkdownSourceSpanParser {
             return nil
         }
 
-        let matches = regex.matches(in: line, range: NSRange(location: 0, length: (line as NSString).length))
+        let matches = regex.matches(
+            in: line,
+            range: NSRange(location: 0, length: (line as NSString).length)
+        )
         for match in matches {
-            let globalRange = NSRange(location: lineRange.location + match.range.location, length: match.range.length)
+            let globalRange = NSRange(
+                location: lineRange.location + match.range.location,
+                length: match.range.length
+            )
             if NSLocationInRange(location, globalRange) || location == NSMaxRange(globalRange) {
                 return MarkdownEditableSourceSpan(
                     range: globalRange,

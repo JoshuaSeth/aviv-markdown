@@ -1,23 +1,24 @@
 import XCTest
+
 @testable import AvivCore
 
 final class MarkdownMinimapStructureTests: XCTestCase {
     func testClassifiesDocumentStructureForMinimap() {
         let markdown = """
-        # Heading
-        Body text
-        - Bullet
-          1. Ordered
-        - [x] Done
-        > - [ ] Quoted task
-        | A | B |
-        | --- | --- |
-        | 1 | 2 |
-        ---
-        ```swift
-        let value = 1
-        ```
-        """
+            # Heading
+            Body text
+            - Bullet
+              1. Ordered
+            - [x] Done
+            > - [ ] Quoted task
+            | A | B |
+            | --- | --- |
+            | 1 | 2 |
+            ---
+            ```swift
+            let value = 1
+            ```
+            """
 
         let lines = MarkdownMinimapStructure.lines(in: markdown)
 
@@ -39,11 +40,11 @@ final class MarkdownMinimapStructureTests: XCTestCase {
 
     func testPipesInsideCodeFenceDoNotBecomeTables() {
         let markdown = """
-        ```text
-        | Not | Table |
-        | --- | ----- |
-        ```
-        """
+            ```text
+            | Not | Table |
+            | --- | ----- |
+            ```
+            """
 
         let lines = MarkdownMinimapStructure.lines(in: markdown)
 

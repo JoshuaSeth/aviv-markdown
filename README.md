@@ -105,6 +105,17 @@ Docs                 design notes and regression checklists
 Samples              sample Markdown fixtures
 ```
 
+## Development Operations
+
+The GitHub repository is the source of truth. PitchAI's canonical development-server checkout is
+`/code/aviv-markdown`; `main` is the default branch and `staging` is the integration branch. Create a work branch from
+`staging`, validate it, and merge it through a pull request.
+
+Run the native gate with `make check` and the repository-wide Python gate with
+`uv run --project quality --python 3.12 --frozen check`. macOS runtime and packaging work must also be verified on a
+Mac. See [Docs/OPERATIONS.md](Docs/OPERATIONS.md) for the full environment, travel-Mac safeguards, source inventory,
+and agent workflow.
+
 ## Philosophy 🧘
 
 Aviv is intentionally quiet. Markdown remains editable source, but the visual surface is designed for reading and writing rather than inspecting syntax all day.

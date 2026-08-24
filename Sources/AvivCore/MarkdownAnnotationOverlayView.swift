@@ -45,7 +45,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
             selectedRanges: ranges,
             visibleRange: visibleRange
         )
-        drawImages(in: textView, layoutManager: layoutManager, textContainer: textContainer, visibleRange: visibleRange)
+        drawImages(
+            in: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer,
+            visibleRange: visibleRange
+        )
 
         let tokens = MarkdownAnnotationParser.tokens(in: textView.string, selectedRanges: ranges)
         guard !tokens.isEmpty else { return }
@@ -54,10 +59,24 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
         var occupiedRects: [NSRect] = []
         for token in tokens.sorted(by: { $0.range.location < $1.range.location }) {
-            guard token.range.location != NSNotFound, token.range.location < textView.string.utf16.count else { continue }
-            let glyphRange = layoutManager.glyphRange(forCharacterRange: token.range, actualCharacterRange: nil)
-            let effectiveGlyphRange = glyphRange.length > 0 ? glyphRange : NSRange(location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)), length: 1)
-            var rect = layoutManager.boundingRect(forGlyphRange: effectiveGlyphRange, in: textContainer)
+            guard token.range.location != NSNotFound,
+                token.range.location < textView.string.utf16.count
+            else { continue }
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: token.range,
+                actualCharacterRange: nil
+            )
+            let effectiveGlyphRange =
+                glyphRange.length > 0
+                ? glyphRange
+                : NSRange(
+                    location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)),
+                    length: 1
+                )
+            var rect = layoutManager.boundingRect(
+                forGlyphRange: effectiveGlyphRange,
+                in: textContainer
+            )
             rect.origin.x += textView.textContainerOrigin.x
             rect.origin.y += textView.textContainerOrigin.y
             rect = textView.convert(rect, to: self)
@@ -103,17 +122,37 @@ public final class MarkdownAnnotationOverlayView: NSView {
         textContainer: NSTextContainer
     ) -> NSRect {
         let theme = currentTheme
-        let safeRange = NSRange(location: lineRange.location, length: max(1, min(lineRange.length, max(1, textView.string.utf16.count - lineRange.location))))
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: safeRange, actualCharacterRange: nil)
+        let safeRange = NSRange(
+            location: lineRange.location,
+            length: max(
+                1,
+                min(lineRange.length, max(1, textView.string.utf16.count - lineRange.location))
+            )
+        )
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: safeRange,
+            actualCharacterRange: nil
+        )
         let glyphIndex = min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1))
         var effectiveRange = NSRange(location: 0, length: 0)
-        var lineRect = layoutManager.lineFragmentRect(forGlyphAt: glyphIndex, effectiveRange: &effectiveRange)
+        var lineRect = layoutManager.lineFragmentRect(
+            forGlyphAt: glyphIndex,
+            effectiveRange: &effectiveRange
+        )
         lineRect.origin.x += textView.textContainerOrigin.x
         lineRect.origin.y += textView.textContainerOrigin.y
         lineRect = textView.convert(lineRect, to: self)
 
-        let sourceRect = rect(for: image.range, textView: textView, layoutManager: layoutManager, textContainer: textContainer)
-        let maxWidth = min(theme.scaledMetric(540, minimum: 360), max(120, textContainer.containerSize.width))
+        let sourceRect = rect(
+            for: image.range,
+            textView: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        )
+        let maxWidth = min(
+            theme.scaledMetric(540, minimum: 360),
+            max(120, textContainer.containerSize.width)
+        )
         let maxHeight = theme.scaledMetric(300, minimum: 192)
         let resolved = textView.resolvedMarkdownImage(for: image)
         let imageSize = resolved.image?.size ?? NSSize(width: maxWidth, height: maxHeight * 0.62)
@@ -154,9 +193,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
             let attributes: [NSAttributedString.Key: Any] = [
                 .font: theme.smallFont,
                 .foregroundColor: theme.secondaryTextColor,
-                .kern: 0
+                .kern: 0,
             ]
-            let textRect = frame.insetBy(dx: theme.scaledMetric(13, minimum: 9), dy: theme.scaledMetric(11, minimum: 8))
+            let textRect = frame.insetBy(
+                dx: theme.scaledMetric(13, minimum: 9),
+                dy: theme.scaledMetric(11, minimum: 8)
+            )
             (label as NSString).draw(in: textRect, withAttributes: attributes)
         }
 
@@ -166,9 +208,13 @@ public final class MarkdownAnnotationOverlayView: NSView {
         path.stroke()
     }
 
-    private func placeholderLabel(for reference: MarkdownImageReference, resolved: MarkdownResolvedImage) -> String {
+    private func placeholderLabel(
+        for reference: MarkdownImageReference,
+        resolved: MarkdownResolvedImage
+    ) -> String {
         if let sourceURL = resolved.sourceURL,
-           !FileManager.default.fileExists(atPath: sourceURL.path) {
+            !FileManager.default.fileExists(atPath: sourceURL.path)
+        {
             return "Missing image: \(resolved.displayName)"
         }
 
@@ -180,25 +226,43 @@ public final class MarkdownAnnotationOverlayView: NSView {
             return maximum
         }
         let scale = min(maximum.width / source.width, maximum.height / source.height, 1)
-        return NSSize(width: max(24, floor(source.width * scale)), height: max(24, floor(source.height * scale)))
+        return NSSize(
+            width: max(24, floor(source.width * scale)),
+            height: max(24, floor(source.height * scale))
+        )
     }
 
-    private func imageOverlayExcludedRanges(in markdown: String, searchRange: NSRange) -> [NSRange] {
+    private func imageOverlayExcludedRanges(in markdown: String, searchRange: NSRange) -> [NSRange]
+    {
         var ranges: [NSRange] = []
         let nsString = markdown as NSString
         guard nsString.length > 0 else { return [] }
 
-        let boundedSearchRange = NSIntersectionRange(searchRange, NSRange(location: 0, length: nsString.length))
+        let boundedSearchRange = NSIntersectionRange(
+            searchRange,
+            NSRange(location: 0, length: nsString.length)
+        )
         guard boundedSearchRange.location != NSNotFound else { return [] }
 
-        var index = nsString.lineRange(for: NSRange(location: boundedSearchRange.location, length: 0)).location
-        let searchEnd = NSMaxRange(nsString.lineRange(for: NSRange(location: min(NSMaxRange(boundedSearchRange), max(0, nsString.length - 1)), length: 0)))
+        var index = nsString.lineRange(
+            for: NSRange(location: boundedSearchRange.location, length: 0)
+        ).location
+        let searchEnd = NSMaxRange(
+            nsString.lineRange(
+                for: NSRange(
+                    location: min(NSMaxRange(boundedSearchRange), max(0, nsString.length - 1)),
+                    length: 0
+                )
+            )
+        )
         var fenceStart: Int? = isInsideFence(at: index, in: nsString) ? index : nil
 
         while index < nsString.length, index < searchEnd {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
-            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(
+                in: .whitespaces
+            )
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
                 if let start = fenceStart {
                     ranges.append(NSRange(location: start, length: NSMaxRange(lineRange) - start))
@@ -214,12 +278,14 @@ public final class MarkdownAnnotationOverlayView: NSView {
             ranges.append(NSRange(location: start, length: nsString.length - start))
         }
 
-        for block in MarkdownTableParser.blocks(in: markdown) {
-            guard NSIntersectionRange(block.range, boundedSearchRange).length > 0 else { continue }
+        for block in MarkdownTableParser.blocks(in: markdown)
+        where NSIntersectionRange(block.range, boundedSearchRange).length > 0 {
             guard let first = block.rows.first?.lineRange,
-                  let last = block.rows.last?.lineRange
+                let last = block.rows.last?.lineRange
             else { continue }
-            ranges.append(NSRange(location: first.location, length: NSMaxRange(last) - first.location))
+            ranges.append(
+                NSRange(location: first.location, length: NSMaxRange(last) - first.location)
+            )
         }
 
         return ranges
@@ -240,7 +306,13 @@ public final class MarkdownAnnotationOverlayView: NSView {
         layoutManager.ensureLayout(for: textContainer)
 
         for block in blocks {
-            draw(block: block, in: textView, layoutManager: layoutManager, textContainer: textContainer, selectedRanges: selectedRanges)
+            draw(
+                block: block,
+                in: textView,
+                layoutManager: layoutManager,
+                textContainer: textContainer,
+                selectedRanges: selectedRanges
+            )
         }
     }
 
@@ -256,14 +328,22 @@ public final class MarkdownAnnotationOverlayView: NSView {
         let theme = currentTheme
 
         let rowRects = block.rows.map { row -> NSRect in
-            rect(for: row.contentRange, textView: textView, layoutManager: layoutManager, textContainer: textContainer)
+            rect(
+                for: row.contentRange,
+                textView: textView,
+                layoutManager: layoutManager,
+                textContainer: textContainer
+            )
         }
         guard let firstRect = rowRects.first else { return }
 
         let columnCount = max(visibleRows.map { $0.cells.count }.max() ?? 0, 1)
         let padding = theme.scaledMetric(14, minimum: 9)
         let font = theme.codeFont
-        let headerFont = NSFont.monospacedSystemFont(ofSize: theme.scaledMetric(15, minimum: 10), weight: .semibold)
+        let headerFont = NSFont.monospacedSystemFont(
+            ofSize: theme.scaledMetric(15, minimum: 10),
+            weight: .semibold
+        )
         var columnWidths = Array(repeating: theme.scaledMetric(88, minimum: 58), count: columnCount)
 
         for row in visibleRows {
@@ -271,16 +351,26 @@ public final class MarkdownAnnotationOverlayView: NSView {
                 let attributes: [NSAttributedString.Key: Any] = [
                     .font: row.isHeader ? headerFont : font
                 ]
-                let width = ceil((cell.text as NSString).size(withAttributes: attributes).width) + padding * 2
-                columnWidths[index] = max(columnWidths[index], min(width, theme.scaledMetric(560, minimum: 360)))
+                let width =
+                    ceil((cell.text as NSString).size(withAttributes: attributes).width) + padding
+                    * 2
+                columnWidths[index] = max(
+                    columnWidths[index],
+                    min(width, theme.scaledMetric(560, minimum: 360))
+                )
             }
         }
 
-        let maxWidth = max(theme.scaledMetric(300, minimum: 220), textContainer.containerSize.width - theme.scaledMetric(18, minimum: 12))
+        let maxWidth = max(
+            theme.scaledMetric(300, minimum: 220),
+            textContainer.containerSize.width - theme.scaledMetric(18, minimum: 12)
+        )
         let naturalWidth = columnWidths.reduce(0, +)
         if naturalWidth > maxWidth {
             let scale = maxWidth / naturalWidth
-            columnWidths = columnWidths.map { max(theme.scaledMetric(72, minimum: 48), floor($0 * scale)) }
+            columnWidths = columnWidths.map {
+                max(theme.scaledMetric(72, minimum: 48), floor($0 * scale))
+            }
         } else if naturalWidth < maxWidth, columnWidths.count > 1 {
             columnWidths[columnWidths.count - 1] += floor(maxWidth - naturalWidth)
         }
@@ -291,8 +381,16 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
         for index in block.rows.indices {
             let rect = rowRects[index]
-            let height = max(theme.scaledMetric(30, minimum: 20), rect.height + theme.scaledMetric(8, minimum: 5))
-            rowFrames[index] = NSRect(x: tableX, y: rect.minY - theme.scaledMetric(3, minimum: 2), width: tableWidth, height: height)
+            let height = max(
+                theme.scaledMetric(30, minimum: 20),
+                rect.height + theme.scaledMetric(8, minimum: 5)
+            )
+            rowFrames[index] = NSRect(
+                x: tableX,
+                y: rect.minY - theme.scaledMetric(3, minimum: 2),
+                width: tableWidth,
+                height: height
+            )
         }
 
         for (index, row) in block.rows.enumerated() {
@@ -320,7 +418,8 @@ public final class MarkdownAnnotationOverlayView: NSView {
             } else if active {
                 fillColor = NSColor(calibratedRed: 0.970, green: 0.978, blue: 0.982, alpha: 0.14)
             } else {
-                fillColor = index.isMultiple(of: 2)
+                fillColor =
+                    index.isMultiple(of: 2)
                     ? NSColor(calibratedWhite: 1.0, alpha: 0.72)
                     : NSColor(calibratedRed: 0.980, green: 0.982, blue: 0.978, alpha: 0.70)
             }
@@ -351,8 +450,9 @@ public final class MarkdownAnnotationOverlayView: NSView {
                     )
                     let attributes: [NSAttributedString.Key: Any] = [
                         .font: row.isHeader ? headerFont : font,
-                        .foregroundColor: row.isHeader ? theme.textColor : theme.textColor.withAlphaComponent(0.92),
-                        .kern: 0
+                        .foregroundColor: row.isHeader
+                            ? theme.textColor : theme.textColor.withAlphaComponent(0.92),
+                        .kern: 0,
                     ]
                     (displayText as NSString).draw(in: drawRect, withAttributes: attributes)
                 }
@@ -372,28 +472,53 @@ public final class MarkdownAnnotationOverlayView: NSView {
         if range.length > 0 {
             safeRange = range
         } else {
-            safeRange = NSRange(location: min(range.location, max(0, layoutManager.numberOfGlyphs - 1)), length: 1)
+            safeRange = NSRange(
+                location: min(range.location, max(0, layoutManager.numberOfGlyphs - 1)),
+                length: 1
+            )
         }
-        let glyphRange = layoutManager.glyphRange(forCharacterRange: safeRange, actualCharacterRange: nil)
-        let effectiveGlyphRange = glyphRange.length > 0 ? glyphRange : NSRange(location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)), length: 1)
+        let glyphRange = layoutManager.glyphRange(
+            forCharacterRange: safeRange,
+            actualCharacterRange: nil
+        )
+        let effectiveGlyphRange =
+            glyphRange.length > 0
+            ? glyphRange
+            : NSRange(
+                location: min(glyphRange.location, max(0, layoutManager.numberOfGlyphs - 1)),
+                length: 1
+            )
         var rect = layoutManager.boundingRect(forGlyphRange: effectiveGlyphRange, in: textContainer)
         rect.origin.x += textView.textContainerOrigin.x
         rect.origin.y += textView.textContainerOrigin.y
         return textView.convert(rect, to: self)
     }
 
-    private func annotationRect(for token: MarkdownAnnotationToken, near rect: NSRect, occupiedRects: [NSRect]) -> NSRect {
+    private func annotationRect(
+        for token: MarkdownAnnotationToken,
+        near rect: NSRect,
+        occupiedRects: [NSRect]
+    ) -> NSRect {
         let size = annotationSize(for: token)
         var origin: NSPoint
         let theme = currentTheme
 
         switch token.role {
         case .heading:
-            origin = NSPoint(x: max(8, rect.minX - size.width - theme.scaledMetric(9, minimum: 6)), y: rect.minY + theme.scaledMetric(8, minimum: 5))
+            origin = NSPoint(
+                x: max(8, rect.minX - size.width - theme.scaledMetric(9, minimum: 6)),
+                y: rect.minY + theme.scaledMetric(8, minimum: 5)
+            )
         case .linkSource:
-            origin = NSPoint(x: max(8, rect.minX), y: max(0, rect.minY - size.height - theme.scaledMetric(7, minimum: 5)))
+            origin = NSPoint(
+                x: max(8, rect.minX),
+                y: max(0, rect.minY - size.height - theme.scaledMetric(7, minimum: 5))
+            )
         case .linkTarget:
-            origin = NSPoint(x: rect.minX + theme.scaledMetric(2, minimum: 1), y: max(0, rect.minY - size.height - theme.scaledMetric(1, minimum: 1)))
+            origin = NSPoint(
+                x: rect.minX + theme.scaledMetric(2, minimum: 1),
+                y: max(0, rect.minY - size.height - theme.scaledMetric(1, minimum: 1))
+            )
         case .codeFence:
             origin = NSPoint(x: rect.minX, y: rect.minY)
         case .inlineDelimiter:
@@ -402,7 +527,10 @@ public final class MarkdownAnnotationOverlayView: NSView {
 
         var proposed = NSRect(origin: origin, size: size)
         while occupiedRects.contains(where: { $0.intersects(proposed) }) {
-            proposed.origin.y = max(0, proposed.origin.y - proposed.height - theme.scaledMetric(3, minimum: 2))
+            proposed.origin.y = max(
+                0,
+                proposed.origin.y - proposed.height - theme.scaledMetric(3, minimum: 2)
+            )
         }
         return proposed
     }
@@ -412,12 +540,15 @@ public final class MarkdownAnnotationOverlayView: NSView {
         let font = annotationFont(for: token)
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
-            .kern: 0
+            .kern: 0,
         ]
         let size = (token.label as NSString).size(withAttributes: attributes)
         if token.role == .linkSource {
             return NSSize(
-                width: min(theme.scaledMetric(460, minimum: 300), ceil(size.width) + theme.scaledMetric(12, minimum: 8)),
+                width: min(
+                    theme.scaledMetric(460, minimum: 300),
+                    ceil(size.width) + theme.scaledMetric(12, minimum: 8)
+                ),
                 height: ceil(size.height) + theme.scaledMetric(5, minimum: 3)
             )
         }
@@ -430,7 +561,7 @@ public final class MarkdownAnnotationOverlayView: NSView {
         let attributes: [NSAttributedString.Key: Any] = [
             .font: font,
             .foregroundColor: theme.syntaxVisibleColor,
-            .kern: 0
+            .kern: 0,
         ]
 
         if token.role == .linkSource || token.role == .linkTarget {
@@ -439,8 +570,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
             NSBezierPath(roundedRect: rect, xRadius: radius, yRadius: radius).fill()
         }
 
-        let drawRect = token.role == .linkSource
-            ? rect.insetBy(dx: theme.scaledMetric(6, minimum: 4), dy: theme.scaledMetric(2, minimum: 1.5))
+        let drawRect =
+            token.role == .linkSource
+            ? rect.insetBy(
+                dx: theme.scaledMetric(6, minimum: 4),
+                dy: theme.scaledMetric(2, minimum: 1.5)
+            )
             : rect
         (token.label as NSString).draw(in: drawRect, withAttributes: attributes)
     }
@@ -449,9 +584,15 @@ public final class MarkdownAnnotationOverlayView: NSView {
         let theme = currentTheme
         switch token.role {
         case .linkSource, .linkTarget:
-            return NSFont.monospacedSystemFont(ofSize: theme.scaledMetric(10.5, minimum: 8), weight: .medium)
+            return NSFont.monospacedSystemFont(
+                ofSize: theme.scaledMetric(10.5, minimum: 8),
+                weight: .medium
+            )
         default:
-            return NSFont.monospacedSystemFont(ofSize: theme.scaledMetric(11.5, minimum: 8.5), weight: .medium)
+            return NSFont.monospacedSystemFont(
+                ofSize: theme.scaledMetric(11.5, minimum: 8.5),
+                weight: .medium
+            )
         }
     }
 
@@ -478,17 +619,28 @@ public final class MarkdownAnnotationOverlayView: NSView {
             return NSRange(location: 0, length: documentLength)
         }
 
-        var characterRange = layoutManager.characterRange(forGlyphRange: glyphRange, actualGlyphRange: nil)
-        characterRange = NSIntersectionRange(characterRange, NSRange(location: 0, length: documentLength))
+        var characterRange = layoutManager.characterRange(
+            forGlyphRange: glyphRange,
+            actualGlyphRange: nil
+        )
+        characterRange = NSIntersectionRange(
+            characterRange,
+            NSRange(location: 0, length: documentLength)
+        )
         guard characterRange.location != NSNotFound else {
             return NSRange(location: 0, length: documentLength)
         }
 
         let nsString = textView.string as NSString
-        let startLine = nsString.lineRange(for: NSRange(location: characterRange.location, length: 0))
+        let startLine = nsString.lineRange(
+            for: NSRange(location: characterRange.location, length: 0)
+        )
         let endLocation = min(NSMaxRange(characterRange), max(0, documentLength - 1))
         let endLine = nsString.lineRange(for: NSRange(location: endLocation, length: 0))
-        return NSRange(location: startLine.location, length: NSMaxRange(endLine) - startLine.location)
+        return NSRange(
+            location: startLine.location,
+            length: NSMaxRange(endLine) - startLine.location
+        )
     }
 
     private func isInsideFence(at location: Int, in nsString: NSString) -> Bool {
@@ -497,7 +649,9 @@ public final class MarkdownAnnotationOverlayView: NSView {
         while index < min(location, nsString.length) {
             let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
             let contentRange = rangeWithoutLineEnding(lineRange, in: nsString)
-            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(in: .whitespaces)
+            let trimmed = nsString.substring(with: contentRange).trimmingCharacters(
+                in: .whitespaces
+            )
             if trimmed.hasPrefix("```") || trimmed.hasPrefix("~~~") {
                 insideFence.toggle()
             }
@@ -515,13 +669,17 @@ public final class MarkdownAnnotationOverlayView: NSView {
             (#"(\*\*|__)(?=\S)(.+?)(?<=\S)\1"#, "$2"),
             (#"(~~)(?=\S)(.+?)(?<=\S)~~"#, "$2"),
             (#"(?<!\*)\*(?!\s|\*)([^*\n]+?)(?<!\s)\*(?!\*)"#, "$1"),
-            (#"(?<!\w)_(?!\s|_)([^_\n]+?)(?<!\s)_(?!\w)"#, "$1")
+            (#"(?<!\w)_(?!\s|_)([^_\n]+?)(?<!\s)_(?!\w)"#, "$1"),
         ]
 
         for (pattern, template) in replacements {
             guard let regex = try? NSRegularExpression(pattern: pattern) else { continue }
             let range = NSRange(location: 0, length: (output as NSString).length)
-            output = regex.stringByReplacingMatches(in: output, range: range, withTemplate: template)
+            output = regex.stringByReplacingMatches(
+                in: output,
+                range: range,
+                withTemplate: template
+            )
         }
 
         return output.replacingOccurrences(of: #"\\|"#, with: "|")
@@ -531,11 +689,10 @@ public final class MarkdownAnnotationOverlayView: NSView {
         var length = lineRange.length
         while length > 0 {
             let character = nsString.character(at: lineRange.location + length - 1)
-            if character == 10 || character == 13 {
-                length -= 1
-            } else {
+            guard character == 10 || character == 13 else {
                 break
             }
+            length -= 1
         }
         return NSRange(location: lineRange.location, length: length)
     }

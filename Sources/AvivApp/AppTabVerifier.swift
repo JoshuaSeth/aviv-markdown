@@ -2,6 +2,7 @@ import AppKit
 import AvivCore
 import Foundation
 
+@MainActor
 enum AppTabVerifier {
     static func runCLI() -> Int32 {
         _ = NSApplication.shared
@@ -32,7 +33,9 @@ enum AppTabVerifier {
             failures.append("New Tab did not create a second document controller")
         }
         if firstTabCount != 2 {
-            failures.append("New Tab did not join the active native tab group; count=\(firstTabCount)")
+            failures.append(
+                "New Tab did not join the active native tab group; count=\(firstTabCount)"
+            )
         }
 
         let urls = makeFixtureFiles()
@@ -77,11 +80,13 @@ enum AppTabVerifier {
             "selectPreviousTab:",
             "selectNextTab:",
             "moveTabToNewWindow:",
-            "mergeAllWindows:"
+            "mergeAllWindows:",
         ]
         for selectorName in tabSelectors {
             let selector = Selector(selectorName)
-            if windowB.window?.responds(to: selector) != true && NSApp.target(forAction: selector, to: nil, from: nil) == nil {
+            if windowB.window?.responds(to: selector) != true
+                && NSApp.target(forAction: selector, to: nil, from: nil) == nil
+            {
                 failures.append("native tab action is not available: \(selectorName)")
             }
         }
@@ -109,12 +114,18 @@ enum AppTabVerifier {
     private static func makeFixtureFiles() -> [URL] {
         let directory = FileManager.default.temporaryDirectory
         let files = [
-            directory.appendingPathComponent("aviv-tab-alpha-\(UUID().uuidString)").appendingPathExtension("md"),
-            directory.appendingPathComponent("aviv-tab-beta-\(UUID().uuidString)").appendingPathExtension("md")
+            directory.appendingPathComponent("aviv-tab-alpha-\(UUID().uuidString)")
+                .appendingPathExtension("md"),
+            directory.appendingPathComponent("aviv-tab-beta-\(UUID().uuidString)")
+                .appendingPathExtension("md"),
         ]
 
         for (index, url) in files.enumerated() {
-            try? "# Tab \(index + 1)\n\nFixture document.".write(to: url, atomically: true, encoding: .utf8)
+            try? "# Tab \(index + 1)\n\nFixture document.".write(
+                to: url,
+                atomically: true,
+                encoding: .utf8
+            )
         }
 
         return files

@@ -18,19 +18,36 @@ public struct MarkdownTheme {
     public static let maximumViewScale: CGFloat = 1.60
     public static let zoomStep: CGFloat = 1.10
 
-    public static let clean = MarkdownTheme(
-        backgroundColor: NSColor(calibratedRed: 0.985, green: 0.986, blue: 0.982, alpha: 1.0),
-        editorBackgroundColor: NSColor(calibratedRed: 1.0, green: 1.0, blue: 0.995, alpha: 1.0),
-        textColor: NSColor(calibratedRed: 0.105, green: 0.111, blue: 0.125, alpha: 1.0),
-        secondaryTextColor: NSColor(calibratedRed: 0.420, green: 0.444, blue: 0.488, alpha: 1.0),
-        syntaxVisibleColor: NSColor(calibratedRed: 0.540, green: 0.565, blue: 0.615, alpha: 1.0),
-        syntaxHiddenColor: NSColor(calibratedWhite: 0.0, alpha: 0.0),
-        accentColor: NSColor(calibratedRed: 0.055, green: 0.390, blue: 0.680, alpha: 1.0),
-        codeBackgroundColor: NSColor(calibratedRed: 0.940, green: 0.946, blue: 0.952, alpha: 1.0),
-        quoteBarColor: NSColor(calibratedRed: 0.125, green: 0.510, blue: 0.455, alpha: 1.0),
-        selectionColor: NSColor(calibratedRed: 0.735, green: 0.855, blue: 0.965, alpha: 0.55),
-        viewScale: defaultViewScale
-    )
+    public static var clean: MarkdownTheme {
+        MarkdownTheme(
+            backgroundColor: NSColor(calibratedRed: 0.985, green: 0.986, blue: 0.982, alpha: 1.0),
+            editorBackgroundColor: NSColor(calibratedRed: 1.0, green: 1.0, blue: 0.995, alpha: 1.0),
+            textColor: NSColor(calibratedRed: 0.105, green: 0.111, blue: 0.125, alpha: 1.0),
+            secondaryTextColor: NSColor(
+                calibratedRed: 0.420,
+                green: 0.444,
+                blue: 0.488,
+                alpha: 1.0
+            ),
+            syntaxVisibleColor: NSColor(
+                calibratedRed: 0.540,
+                green: 0.565,
+                blue: 0.615,
+                alpha: 1.0
+            ),
+            syntaxHiddenColor: NSColor(calibratedWhite: 0.0, alpha: 0.0),
+            accentColor: NSColor(calibratedRed: 0.055, green: 0.390, blue: 0.680, alpha: 1.0),
+            codeBackgroundColor: NSColor(
+                calibratedRed: 0.940,
+                green: 0.946,
+                blue: 0.952,
+                alpha: 1.0
+            ),
+            quoteBarColor: NSColor(calibratedRed: 0.125, green: 0.510, blue: 0.455, alpha: 1.0),
+            selectionColor: NSColor(calibratedRed: 0.735, green: 0.855, blue: 0.965, alpha: 0.55),
+            viewScale: defaultViewScale
+        )
+    }
 
     public init(
         backgroundColor: NSColor,
@@ -146,7 +163,7 @@ public struct MarkdownTheme {
             .foregroundColor: textColor,
             .paragraphStyle: paragraphStyle(),
             .kern: 0,
-            .ligature: 1
+            .ligature: 1,
         ]
     }
 

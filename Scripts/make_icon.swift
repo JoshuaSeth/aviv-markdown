@@ -32,7 +32,7 @@ let variants = [
     IconVariant(points: 256, scale: 1),
     IconVariant(points: 256, scale: 2),
     IconVariant(points: 512, scale: 1),
-    IconVariant(points: 512, scale: 2)
+    IconVariant(points: 512, scale: 2),
 ]
 
 for variant in variants {
@@ -41,7 +41,14 @@ for variant in variants {
 
     let bounds = NSRect(x: 0, y: 0, width: variant.pixels, height: variant.pixels)
     let radius = CGFloat(variant.pixels) * 0.205
-    let background = NSBezierPath(roundedRect: bounds.insetBy(dx: CGFloat(variant.pixels) * 0.055, dy: CGFloat(variant.pixels) * 0.055), xRadius: radius, yRadius: radius)
+    let background = NSBezierPath(
+        roundedRect: bounds.insetBy(
+            dx: CGFloat(variant.pixels) * 0.055,
+            dy: CGFloat(variant.pixels) * 0.055
+        ),
+        xRadius: radius,
+        yRadius: radius
+    )
 
     NSColor(calibratedRed: 0.985, green: 0.986, blue: 0.982, alpha: 1).setFill()
     bounds.fill()
@@ -65,7 +72,7 @@ for variant in variants {
         .font: font,
         .foregroundColor: NSColor(calibratedRed: 0.105, green: 0.111, blue: 0.125, alpha: 1),
         .paragraphStyle: paragraph,
-        .kern: 0
+        .kern: 0,
     ]
     let string = NSString(string: "A")
     let textRect = NSRect(
@@ -77,9 +84,12 @@ for variant in variants {
     string.draw(in: textRect, withAttributes: attributes)
 
     let markAttributes: [NSAttributedString.Key: Any] = [
-        .font: NSFont.monospacedSystemFont(ofSize: CGFloat(variant.pixels) * 0.16, weight: .semibold),
+        .font: NSFont.monospacedSystemFont(
+            ofSize: CGFloat(variant.pixels) * 0.16,
+            weight: .semibold
+        ),
         .foregroundColor: NSColor(calibratedRed: 0.540, green: 0.565, blue: 0.615, alpha: 1),
-        .kern: 0
+        .kern: 0,
     ]
     NSString(string: "#").draw(
         at: NSPoint(x: CGFloat(variant.pixels) * 0.245, y: CGFloat(variant.pixels) * 0.62),

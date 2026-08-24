@@ -3,13 +3,14 @@ import CoreServices
 import Foundation
 import UniformTypeIdentifiers
 
+@MainActor
 enum MarkdownDefaultAppService {
     private static let neverAskKey = "Aviv.NeverAskDefaultMarkdownApp"
     private static let fallbackBundleID = "local.aviv.markdown"
     private static let roles: [LSRolesMask] = [.all, .editor, .viewer]
     private static let markdownContentTypes = [
         "net.daringfireball.markdown",
-        "io.typora.markdown"
+        "io.typora.markdown",
     ]
     private static let markdownExtensions = [
         "md",
@@ -23,14 +24,14 @@ enum MarkdownDefaultAppService {
         "mmd",
         "rmd",
         "rmarkdown",
-        "qmd"
+        "qmd",
     ]
     private static let genericTextContentTypes = Set([
         "public.plain-text",
         "public.text",
         "public.data",
         "public.item",
-        "public.content"
+        "public.content",
     ])
 
     static func presentPromptIfNeeded(window: NSWindow?, defaults: UserDefaults = .standard) {
@@ -41,7 +42,8 @@ enum MarkdownDefaultAppService {
         let alert = NSAlert()
         alert.alertStyle = .informational
         alert.messageText = "Open Markdown files with Aviv?"
-        alert.informativeText = "Aviv can become the default app for .md, .markdown, and related Markdown files so double-clicking a document opens this clean editor."
+        alert.informativeText =
+            "Aviv can become the default app for .md, .markdown, and related Markdown files so double-clicking a document opens this clean editor."
         alert.addButton(withTitle: "Use Aviv")
         alert.addButton(withTitle: "Not Now")
         alert.addButton(withTitle: "Never Show Again")
@@ -68,28 +70,34 @@ enum MarkdownDefaultAppService {
         }
     }
 
-    static func isCurrentAppDefaultForMarkdown(bundleID: String = currentBundleID) -> Bool {
-        defaultableContentTypes().allSatisfy { contentType in
+    static func isCurrentAppDefaultForMarkdown(bundleID: String? = nil) -> Bool {
+        let resolvedBundleID = bundleID ?? currentBundleID
+        return defaultableContentTypes().allSatisfy { contentType in
             roles.allSatisfy { role in
-                defaultHandler(for: contentType, role: role) == bundleID
+                defaultHandler(for: contentType, role: role) == resolvedBundleID
             }
         }
     }
 
     @discardableResult
-    static func setCurrentAppAsDefaultForMarkdown(bundleID: String = currentBundleID) -> Bool {
+    static func setCurrentAppAsDefaultForMarkdown(bundleID: String? = nil) -> Bool {
+        let resolvedBundleID = bundleID ?? currentBundleID
         registerCurrentBundleIfPossible()
 
         var succeeded = true
         for contentType in defaultableContentTypes() {
             for role in roles {
-                let status = LSSetDefaultRoleHandlerForContentType(contentType as CFString, role, bundleID as CFString)
+                let status = LSSetDefaultRoleHandlerForContentType(
+                    contentType as CFString,
+                    role,
+                    resolvedBundleID as CFString
+                )
                 if status != noErr {
                     succeeded = false
                 }
             }
         }
-        return succeeded && isCurrentAppDefaultForMarkdown(bundleID: bundleID)
+        return succeeded && isCurrentAppDefaultForMarkdown(bundleID: resolvedBundleID)
     }
 
     static func verifyPromptLogicForCLI() -> Int32 {
@@ -104,7 +112,9 @@ enum MarkdownDefaultAppService {
             return 1
         }
 
-        print("default-app-verifier: PASS bundle=\(bundleID) types=\(defaultableContentTypes().count)")
+        print(
+            "default-app-verifier: PASS bundle=\(bundleID) types=\(defaultableContentTypes().count)"
+        )
         return 0
     }
 
@@ -113,15 +123,16 @@ enum MarkdownDefaultAppService {
     }
 
     private static var shouldSkipDefaultAppPrompt: Bool {
-        ProcessInfo.processInfo.environment["AVIV_SKIP_DEFAULT_APP_PROMPT"] == "1" ||
-            ProcessInfo.processInfo.environment["AVIV_UI_VERIFY"] == "1"
+        ProcessInfo.processInfo.environment["AVIV_SKIP_DEFAULT_APP_PROMPT"] == "1"
+            || ProcessInfo.processInfo.environment["AVIV_UI_VERIFY"] == "1"
     }
 
     private static func presentFailure(window: NSWindow?) {
         let alert = NSAlert()
         alert.alertStyle = .warning
         alert.messageText = "Aviv could not update the default app."
-        alert.informativeText = "You can still set Aviv from Finder: choose a Markdown file, open Get Info, choose Aviv under Open With, then select Change All."
+        alert.informativeText =
+            "You can still set Aviv from Finder: choose a Markdown file, open Get Info, choose Aviv under Open With, then select Change All."
         alert.addButton(withTitle: "OK")
 
         if let window {
@@ -132,7 +143,8 @@ enum MarkdownDefaultAppService {
     }
 
     private static func defaultHandler(for contentType: String, role: LSRolesMask) -> String? {
-        guard let unmanaged = LSCopyDefaultRoleHandlerForContentType(contentType as CFString, role) else {
+        guard let unmanaged = LSCopyDefaultRoleHandlerForContentType(contentType as CFString, role)
+        else {
             return nil
         }
         return unmanaged.takeRetainedValue() as String
@@ -140,8 +152,11 @@ enum MarkdownDefaultAppService {
 
     private static func defaultableContentTypes() -> [String] {
         var result: [String] = []
-        for contentType in markdownContentTypes + markdownExtensions.compactMap({ UTType(filenameExtension: $0)?.identifier }) {
-            guard !genericTextContentTypes.contains(contentType), !result.contains(contentType) else {
+        for contentType in markdownContentTypes
+            + markdownExtensions.compactMap({ UTType(filenameExtension: $0)?.identifier })
+        {
+            guard !genericTextContentTypes.contains(contentType), !result.contains(contentType)
+            else {
                 continue
             }
             result.append(contentType)

@@ -26,22 +26,25 @@ public struct MarkdownImageReference: Equatable {
 }
 
 public enum MarkdownImageParser {
-    public static func images(in markdown: String, range searchRange: NSRange? = nil) -> [MarkdownImageReference] {
+    public static func images(
+        in markdown: String,
+        range searchRange: NSRange? = nil
+    ) -> [MarkdownImageReference] {
         let nsString = markdown as NSString
         guard nsString.length > 0,
-              let regex = try? NSRegularExpression(pattern: MarkdownPatterns.image)
+            let regex = try? NSRegularExpression(pattern: MarkdownPatterns.image)
         else { return [] }
 
         let range = searchRange ?? NSRange(location: 0, length: nsString.length)
         return regex.matches(in: markdown, range: range).compactMap { match in
             guard match.range.location != NSNotFound,
-                  match.numberOfRanges >= 3
+                match.numberOfRanges >= 3
             else { return nil }
 
             let altRange = match.range(at: 1)
             let targetRange = match.range(at: 2)
             guard altRange.location != NSNotFound,
-                  targetRange.location != NSNotFound
+                targetRange.location != NSNotFound
             else { return nil }
 
             return MarkdownImageReference(
@@ -66,7 +69,8 @@ public enum MarkdownImageResolver {
         }
 
         if target.hasPrefix("file://"),
-           let url = URL(string: target) {
+            let url = URL(string: target)
+        {
             return url
         }
 
@@ -79,8 +83,11 @@ public enum MarkdownImageResolver {
             return baseURL.appendingPathComponent(expanded).standardizedFileURL
         }
 
-        return URL(fileURLWithPath: expanded, relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath))
-            .standardizedFileURL
+        return URL(
+            fileURLWithPath: expanded,
+            relativeTo: URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+        )
+        .standardizedFileURL
     }
 
     private static func cleanedTarget(_ rawTarget: String) -> String {

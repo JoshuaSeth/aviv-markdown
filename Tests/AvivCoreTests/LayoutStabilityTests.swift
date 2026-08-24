@@ -1,7 +1,9 @@
 import XCTest
+
 @testable import AvivCore
 
 final class LayoutStabilityTests: XCTestCase {
+    @MainActor
     func testCursorMovementDoesNotMoveRenderedContentOrChangeContentStyle() {
         let result = MarkdownLayoutVerifier.verify()
         XCTAssertTrue(result.passed, result.failures.joined(separator: "\n"))
