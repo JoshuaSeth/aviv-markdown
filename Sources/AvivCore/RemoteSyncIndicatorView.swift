@@ -1,7 +1,7 @@
 import AppKit
 
-final class RemoteSyncIndicatorView: NSView {
-    static let indicatorIdentifiers = [
+public final class RemoteSyncIndicatorView: NSView {
+    public static let indicatorIdentifiers = [
         "remote-source-badge",
         "remote-source-heartbeat",
         "remote-status-shimmer",
@@ -11,38 +11,42 @@ final class RemoteSyncIndicatorView: NSView {
     private let heartbeatView = NSView()
     private let shimmerLayer = CAGradientLayer()
     private var currentPresentation: RemoteSyncPresentation?
-    private(set) var accessibilitySummaryForTesting = ""
+    public private(set) var accessibilitySummaryForTesting = ""
 
-    var visibleTextForTesting: String {
+    public var visibleTextForTesting: String {
         ""
     }
 
-    override init(frame frameRect: NSRect) {
+    public override var intrinsicContentSize: NSSize {
+        NSSize(width: 28, height: 28)
+    }
+
+    public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layout() {
+    public override func layout() {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
         shimmerLayer.frame = bounds
         heartbeatView.layer?.cornerRadius = heartbeatView.bounds.height / 2
     }
 
-    func update(_ presentation: RemoteSyncPresentation, theme: MarkdownTheme) {
+    public func update(_ presentation: RemoteSyncPresentation, theme: MarkdownTheme) {
         currentPresentation = presentation
         isHidden = false
         let stateColor = phaseColor(presentation.phase, theme: theme)
-        iconView.contentTintColor = theme.accentColor.withAlphaComponent(0.72)
+        iconView.contentTintColor = theme.secondaryTextColor.withAlphaComponent(0.72)
         heartbeatView.layer?.backgroundColor =
             stateColor.cgColor
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.56).cgColor
-        layer?.borderColor = stateColor.withAlphaComponent(0.18).cgColor
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.borderColor = NSColor.clear.cgColor
         accessibilitySummaryForTesting =
             "Live document from \(presentation.sourceHost), \(presentation.detail)"
         setAccessibilityLabel(accessibilitySummaryForTesting)
@@ -56,9 +60,9 @@ final class RemoteSyncIndicatorView: NSView {
     private func setup() {
         wantsLayer = true
         layer?.masksToBounds = true
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.56).cgColor
-        layer?.borderColor = NSColor(calibratedWhite: 0.45, alpha: 0.12).cgColor
-        layer?.borderWidth = 1
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.borderColor = NSColor.clear.cgColor
+        layer?.borderWidth = 0
         setAccessibilityElement(true)
         setAccessibilityIdentifier("remote-source-badge")
 

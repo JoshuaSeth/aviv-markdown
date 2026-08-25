@@ -58,7 +58,10 @@ final class RemoteExternalUpdateLayoutTests: XCTestCase {
         workspace.layoutSubtreeIfNeeded()
 
         let identifiers = workspace.remoteIndicatorIdentifiersForTesting
-        XCTAssertGreaterThanOrEqual(Set(identifiers).count, 5)
+        XCTAssertEqual(
+            Set(RemoteSyncIndicatorView.indicatorIdentifiers + identifiers).count,
+            6
+        )
         XCTAssertEqual(workspace.resolvedTextContainerWidthForTesting, widthBefore, accuracy: 0.01)
         XCTAssertEqual(
             workspace.scrollView.contentView.bounds.origin.x,
@@ -73,43 +76,40 @@ final class RemoteExternalUpdateLayoutTests: XCTestCase {
     }
 
     @MainActor
-    func testLiveDocumentHeaderKeepsOneCenteredTitleAndTrailingStatusAtEveryWidth() {
+    func testLiveDocumentHeaderKeepsOneCenteredTitleAtEveryWidth() {
         for width in [CGFloat(720), 840, 1080, 1440] {
             let workspace = EditorWorkspaceView(
                 frame: NSRect(x: 0, y: 0, width: width, height: 740)
             )
             let remoteURL = URL(string: "https://pitchai.net/aviv-live/seth-live-demo.md")!
             workspace.updateDocumentTitle(url: remoteURL, isEdited: false)
-            workspace.updateRemoteSyncPresentation(
-                RemoteSyncPresentation(
-                    phase: .watching,
-                    sourceHost: "pitchai.net",
-                    isWritable: true,
-                    detail: "Live • Save enabled"
-                )
-            )
             workspace.layoutSubtreeIfNeeded()
 
             let titleFrame = workspace.documentTitleFrameForTesting
-            let indicatorFrame = workspace.remoteIndicatorFrameForTesting
             XCTAssertEqual(workspace.documentTitleTextForTesting, "seth-live-demo.md")
             XCTAssertEqual(titleFrame.midX, width / 2, accuracy: 0.5)
-            XCTAssertFalse(workspace.remoteIndicatorIsHiddenForTesting)
-            XCTAssertEqual(indicatorFrame.width, 28, accuracy: 0.01)
-            XCTAssertEqual(indicatorFrame.maxX, width - 14, accuracy: 0.5)
-            XCTAssertGreaterThan(indicatorFrame.minX, width / 2)
-            XCTAssertFalse(indicatorFrame.intersects(titleFrame))
-            XCTAssertFalse(
-                indicatorFrame.intersects(
-                    NSRect(x: 0, y: 0, width: 100, height: workspace.bounds.height)
-                )
-            )
-            XCTAssertEqual(workspace.remoteIndicatorVisibleTextForTesting, "")
-            XCTAssertEqual(
-                workspace.remoteIndicatorAccessibilitySummaryForTesting,
-                "Live document from pitchai.net, Live • Save enabled"
-            )
         }
+    }
+
+    @MainActor
+    func testCompactLiveDocumentStatusHasNoVisibleSourceOrDetailText() {
+        let indicator = RemoteSyncIndicatorView(frame: .zero)
+        indicator.update(
+            RemoteSyncPresentation(
+                phase: .watching,
+                sourceHost: "pitchai.net",
+                isWritable: true,
+                detail: "Live • Save enabled"
+            ),
+            theme: .clean
+        )
+
+        XCTAssertEqual(indicator.intrinsicContentSize, NSSize(width: 28, height: 28))
+        XCTAssertEqual(indicator.visibleTextForTesting, "")
+        XCTAssertEqual(
+            indicator.accessibilitySummaryForTesting,
+            "Live document from pitchai.net, Live • Save enabled"
+        )
     }
 
     @MainActor
@@ -124,7 +124,7 @@ final class RemoteExternalUpdateLayoutTests: XCTestCase {
 
         XCTAssertEqual(workspace.documentTitleTextForTesting, "normal-local-document.md")
         XCTAssertEqual(workspace.documentTitleFrameForTesting.midX, 360, accuracy: 0.5)
-        XCTAssertTrue(workspace.remoteIndicatorIsHiddenForTesting)
+        XCTAssertEqual(workspace.remoteIndicatorIdentifiersForTesting.count, 3)
     }
 
     private func fixture(prefix: String) -> String {

@@ -25,7 +25,17 @@ enum HeaderUIVerifier {
             try resizeAndRender(
                 controller,
                 width: 1080,
-                to: options.evidenceDirectory.appendingPathComponent("local-header-1080.png")
+                to: options.evidenceDirectory.appendingPathComponent(
+                    "local-native-window-1080.png"
+                )
+            )
+            try renderWorkspaceEvidence(
+                controller,
+                documentURL: options.localFile,
+                width: 1080,
+                to: options.evidenceDirectory.appendingPathComponent(
+                    "local-workspace-header-1080.png"
+                )
             )
             emit("AVIV_HEADER_LOCAL title=\(options.localFile.lastPathComponent) live_status=hidden")
 
@@ -48,7 +58,15 @@ enum HeaderUIVerifier {
                     controller,
                     width: width,
                     to: options.evidenceDirectory.appendingPathComponent(
-                        "remote-header-\(Int(width)).png"
+                        "remote-native-window-\(Int(width)).png"
+                    )
+                )
+                try renderWorkspaceEvidence(
+                    controller,
+                    documentURL: options.remoteURL,
+                    width: width,
+                    to: options.evidenceDirectory.appendingPathComponent(
+                        "remote-workspace-header-\(Int(width)).png"
                     )
                 )
             }
@@ -77,7 +95,7 @@ enum HeaderUIVerifier {
         guard window.titleVisibility == .hidden else {
             throw HeaderUIVerificationError("AppKit is still painting a duplicate window title.")
         }
-        guard controller.workspace.remoteIndicatorIsHiddenForTesting else {
+        guard controller.liveDocumentIndicatorFrameForTesting == nil else {
             throw HeaderUIVerificationError("The local document incorrectly shows a live status.")
         }
     }
@@ -100,28 +118,24 @@ enum HeaderUIVerifier {
         guard window.titleVisibility == .hidden else {
             throw HeaderUIVerificationError("AppKit is still painting a duplicate live title.")
         }
-        guard !controller.workspace.remoteIndicatorIsHiddenForTesting else {
+        guard let indicatorFrame = controller.liveDocumentIndicatorFrameForTesting else {
             throw HeaderUIVerificationError("The live document status is hidden.")
         }
-        guard controller.workspace.remoteIndicatorVisibleTextForTesting.isEmpty else {
+        guard controller.liveDocumentIndicatorVisibleTextForTesting.isEmpty else {
             throw HeaderUIVerificationError("The live status still paints duplicate side text.")
         }
         guard
-            controller.workspace.remoteIndicatorAccessibilitySummaryForTesting.contains(
+            controller.liveDocumentIndicatorAccessibilitySummaryForTesting.contains(
                 expectedURL.host ?? ""
             )
         else {
             throw HeaderUIVerificationError("The compact live status lost its source description.")
         }
 
-        let indicatorFrame = controller.workspace.remoteIndicatorFrameForTesting
         let titleFrame = controller.workspace.documentTitleFrameForTesting
         let trafficLightFrame = try trafficLightFrame(in: controller.workspace, window: window)
         guard abs(titleFrame.midX - controller.workspace.bounds.midX) <= 0.5 else {
             throw HeaderUIVerificationError("The document title is not centered at width \(Int(width)).")
-        }
-        guard abs(indicatorFrame.maxX - (controller.workspace.bounds.maxX - 14)) <= 0.5 else {
-            throw HeaderUIVerificationError("The live status is not trailing at width \(Int(width)).")
         }
         guard !indicatorFrame.intersects(titleFrame) else {
             throw HeaderUIVerificationError("The live status overlaps the title at width \(Int(width)).")
@@ -195,6 +209,31 @@ enum HeaderUIVerifier {
         frameView.cacheDisplay(in: frameView.bounds, to: bitmap)
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw HeaderUIVerificationError("Could not encode the native-window evidence PNG.")
+        }
+        try png.write(to: url, options: .atomic)
+    }
+
+    private static func renderWorkspaceEvidence(
+        _ controller: DocumentWindowController,
+        documentURL: URL,
+        width: CGFloat,
+        to url: URL
+    ) throws {
+        let snapshot = EditorWorkspaceView(
+            frame: NSRect(x: 0, y: 0, width: width, height: 720)
+        )
+        snapshot.documentFormat = controller.workspace.documentFormat
+        snapshot.loadMarkdown(controller.workspace.textView.string)
+        snapshot.updateDocumentTitle(url: documentURL, isEdited: false)
+        snapshot.layoutSubtreeIfNeeded()
+        snapshot.displayIfNeeded()
+        guard let bitmap = snapshot.bitmapImageRepForCachingDisplay(in: snapshot.bounds) else {
+            throw HeaderUIVerificationError("Could not allocate a workspace evidence bitmap.")
+        }
+        bitmap.size = snapshot.bounds.size
+        snapshot.cacheDisplay(in: snapshot.bounds, to: bitmap)
+        guard let png = bitmap.representation(using: .png, properties: [:]) else {
+            throw HeaderUIVerificationError("Could not encode the workspace evidence PNG.")
         }
         try png.write(to: url, options: .atomic)
     }
