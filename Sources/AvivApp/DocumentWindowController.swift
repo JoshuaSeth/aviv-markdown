@@ -120,6 +120,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         workspace.loadMarkdown(MarkdownSamples.starter)
         workspace.updateDocumentTitle(url: nil, isEdited: false)
         updateWindowTitle()
+        DispatchQueue.main.async { [weak self] in
+            self?.alignDocumentTitleForCurrentLayout()
+        }
         workspace.textView.onContentChange = { [weak self] text in
             guard let self else { return }
             self.isEdited = text != self.savedText
@@ -296,6 +299,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         onWindowWillClose?(self)
     }
 
+    func windowDidResize(_ notification: Notification) {
+        alignDocumentTitleForCurrentLayout()
+    }
+
     func confirmDiscardIfNeeded() -> Bool {
         guard isEdited else { return true }
         let alert = NSAlert()
@@ -328,6 +335,18 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         documentTitleToolbarView.update(title: isEdited ? "\(base) *" : base)
     }
 
+    func alignDocumentTitleForCurrentLayout() {
+        guard documentTitleToolbarView.window != nil else { return }
+        let itemFrame = workspace.convert(
+            documentTitleToolbarView.bounds,
+            from: documentTitleToolbarView
+        )
+        documentTitleToolbarView.setHorizontalOffset(
+            workspace.bounds.midX - itemFrame.midX
+        )
+        documentTitleToolbarView.layoutSubtreeIfNeeded()
+    }
+
     private func configureToolbar() {
         let toolbar = NSToolbar(identifier: "Aviv.Toolbar")
         toolbar.delegate = self
@@ -358,6 +377,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
         toolbar.items.first(where: { $0.itemIdentifier == .liveDocument })?.toolTip =
             remoteSyncToolbarView.accessibilitySummaryForTesting
+        window?.contentView?.superview?.layoutSubtreeIfNeeded()
+        alignDocumentTitleForCurrentLayout()
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
@@ -500,6 +521,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
 private final class DocumentTitleToolbarView: NSView {
     private let label = NSTextField(labelWithString: "Untitled")
+    private var titleCenterConstraint: NSLayoutConstraint?
 
     var visibleTitleView: NSView {
         label
@@ -522,8 +544,9 @@ private final class DocumentTitleToolbarView: NSView {
         label.lineBreakMode = .byTruncatingMiddle
         label.setAccessibilityElement(false)
         addSubview(label)
+        titleCenterConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
         NSLayoutConstraint.activate([
-            label.centerXAnchor.constraint(equalTo: centerXAnchor, constant: 8),
+            titleCenterConstraint!,
             label.widthAnchor.constraint(equalToConstant: 184),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
@@ -540,6 +563,10 @@ private final class DocumentTitleToolbarView: NSView {
     func update(title: String) {
         label.stringValue = title
         setAccessibilityLabel("Document title, \(title)")
+    }
+
+    func setHorizontalOffset(_ offset: CGFloat) {
+        titleCenterConstraint?.constant = min(8, max(-8, offset))
     }
 }
 

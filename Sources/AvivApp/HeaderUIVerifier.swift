@@ -110,6 +110,8 @@ enum HeaderUIVerifier {
         }
         window.setContentSize(NSSize(width: width, height: 720))
         layoutWindow(window)
+        controller.alignDocumentTitleForCurrentLayout()
+        layoutWindow(window)
 
         try verifySingleCenteredTitle(
             controller,
@@ -178,6 +180,8 @@ enum HeaderUIVerifier {
         guard let window = controller.window else {
             throw HeaderUIVerificationError("The document has no window.")
         }
+        layoutWindow(window)
+        controller.alignDocumentTitleForCurrentLayout()
         layoutWindow(window)
         guard window.title == expectedTitle else {
             throw HeaderUIVerificationError("AppKit document metadata has the wrong title.")
@@ -261,6 +265,8 @@ enum HeaderUIVerifier {
             throw HeaderUIVerificationError("The native window frame is unavailable for capture.")
         }
         window.setContentSize(NSSize(width: width, height: 720))
+        layoutWindow(window)
+        controller.alignDocumentTitleForCurrentLayout()
         layoutWindow(window)
         frameView.displayIfNeeded()
         let captureBounds = NSRect(
