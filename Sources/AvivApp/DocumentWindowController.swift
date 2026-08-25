@@ -9,6 +9,34 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     var onWindowWillClose: ((DocumentWindowController) -> Void)?
     var onDocumentURLAccessed: ((URL) -> Void)?
 
+    var remoteIndicatorIdentifiersForTesting: [String] {
+        RemoteSyncIndicatorView.indicatorIdentifiers
+            + workspace.remoteIndicatorIdentifiersForTesting
+    }
+
+    var liveDocumentIndicatorFrameForTesting: NSRect? {
+        guard window?.toolbar?.items.contains(where: { $0.itemIdentifier == .liveDocument }) == true
+        else { return nil }
+        return workspace.convert(remoteSyncToolbarView.bounds, from: remoteSyncToolbarView)
+    }
+
+    var liveDocumentIndicatorVisibleTextForTesting: String {
+        remoteSyncToolbarView.visibleTextForTesting
+    }
+
+    var liveDocumentIndicatorAccessibilitySummaryForTesting: String {
+        remoteSyncToolbarView.accessibilitySummaryForTesting
+    }
+
+    var documentTitleFrameForTesting: NSRect {
+        let visibleTitleView = documentTitleToolbarView.visibleTitleView
+        return workspace.convert(visibleTitleView.bounds, from: visibleTitleView)
+    }
+
+    var documentTitleTextForTesting: String {
+        documentTitleToolbarView.stringValue
+    }
+
     var canRevertToSaved: Bool {
         isEdited || documentURL != nil
     }
@@ -28,6 +56,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     private let printService: DocumentPrintService
+    private let remoteSyncToolbarView = RemoteSyncIndicatorView(
+        frame: NSRect(x: 0, y: 0, width: 28, height: 28)
+    )
+    private let documentTitleToolbarView = DocumentTitleToolbarView()
     let remoteTransport: any RemoteMarkdownTransport
     let remoteCredentialStore: any RemoteWriteCredentialStoring
     var documentURL: URL?
@@ -62,6 +94,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             defer: false
         )
         window.title = "Aviv"
+        // Keep the document title available to AppKit for tabs, Window menu entries,
+        // accessibility, and represented-document behavior. Aviv presents one subtle
+        // title through AppKit's centered toolbar slot, so the native title must not be
+        // painted a second time on top of it.
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unifiedCompact
         window.isReleasedWhenClosed = false
@@ -73,12 +110,19 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         super.init(window: window)
 
         window.delegate = self
+        workspace.showsDocumentTitle = false
         window.contentView = workspace
         configureToolbar()
+        workspace.onRemoteSyncPresentationChange = { [weak self] presentation in
+            self?.updateLiveDocumentToolbar(presentation)
+        }
         workspace.setDocumentURL(nil)
         workspace.loadMarkdown(MarkdownSamples.starter)
         workspace.updateDocumentTitle(url: nil, isEdited: false)
         updateWindowTitle()
+        DispatchQueue.main.async { [weak self] in
+            self?.alignDocumentTitleForCurrentLayout()
+        }
         workspace.textView.onContentChange = { [weak self] text in
             guard let self else { return }
             self.isEdited = text != self.savedText
@@ -255,6 +299,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         onWindowWillClose?(self)
     }
 
+    func windowDidResize(_ notification: Notification) {
+        alignDocumentTitleForCurrentLayout()
+    }
+
     func confirmDiscardIfNeeded() -> Bool {
         guard isEdited else { return true }
         let alert = NSAlert()
@@ -282,7 +330,21 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func updateWindowTitle() {
-        window?.title = documentURL?.lastPathComponent ?? "Untitled"
+        let base = documentURL?.lastPathComponent ?? "Untitled"
+        window?.title = base
+        documentTitleToolbarView.update(title: isEdited ? "\(base) *" : base)
+    }
+
+    func alignDocumentTitleForCurrentLayout() {
+        guard documentTitleToolbarView.window != nil else { return }
+        let itemFrame = workspace.convert(
+            documentTitleToolbarView.bounds,
+            from: documentTitleToolbarView
+        )
+        documentTitleToolbarView.setHorizontalOffset(
+            workspace.bounds.midX - itemFrame.midX
+        )
+        documentTitleToolbarView.layoutSubtreeIfNeeded()
     }
 
     private func configureToolbar() {
@@ -291,20 +353,47 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         toolbar.displayMode = .iconOnly
         toolbar.sizeMode = .small
         toolbar.allowsUserCustomization = false
+        toolbar.centeredItemIdentifier = .documentTitle
         window?.toolbar = toolbar
+    }
+
+    private func updateLiveDocumentToolbar(_ presentation: RemoteSyncPresentation?) {
+        guard let toolbar = window?.toolbar else { return }
+        guard let presentation else {
+            if let index = toolbar.items.firstIndex(where: {
+                $0.itemIdentifier == .liveDocument
+            }) {
+                toolbar.removeItem(at: index)
+            }
+            return
+        }
+
+        remoteSyncToolbarView.update(presentation, theme: .clean)
+        if !toolbar.items.contains(where: { $0.itemIdentifier == .liveDocument }) {
+            toolbar.insertItem(
+                withItemIdentifier: .liveDocument,
+                at: min(3, toolbar.items.count)
+            )
+        }
+        toolbar.items.first(where: { $0.itemIdentifier == .liveDocument })?.toolTip =
+            remoteSyncToolbarView.accessibilitySummaryForTesting
+        window?.contentView?.superview?.layoutSubtreeIfNeeded()
+        alignDocumentTitleForCurrentLayout()
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
-            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
-            .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+            .newDocument, .openDocument, .saveDocument, .liveDocument, .flexibleSpace,
+            .documentTitle, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold, .italic, .code,
+            .heading1, .heading2,
         ]
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
-            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
-            .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .documentTitle,
+            .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold, .italic, .code, .heading1,
+            .heading2,
         ]
     }
 
@@ -332,6 +421,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             )
             item.label = "Save"
             item.action = #selector(saveDocument(_:))
+        case .liveDocument:
+            item.view = remoteSyncToolbarView
+            item.label = "Live Document"
+            item.paletteLabel = "Live Document"
+            item.toolTip = remoteSyncToolbarView.accessibilitySummaryForTesting
+        case .documentTitle:
+            item.view = documentTitleToolbarView
+            item.label = "Document Title"
+            item.paletteLabel = "Document Title"
+            item.visibilityPriority = .high
         case .zoomOut:
             item.image = toolbarImage(
                 named: "minus.magnifyingglass",
@@ -420,10 +519,64 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 }
 
+private final class DocumentTitleToolbarView: NSView {
+    private let label = NSTextField(labelWithString: "Untitled")
+    private var titleCenterConstraint: NSLayoutConstraint?
+
+    var visibleTitleView: NSView {
+        label
+    }
+
+    var stringValue: String {
+        label.stringValue
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 200, height: 24)
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = MarkdownTheme.clean.smallFont
+        label.textColor = MarkdownTheme.clean.secondaryTextColor
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingMiddle
+        label.setAccessibilityElement(false)
+        addSubview(label)
+        let centerConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
+        titleCenterConstraint = centerConstraint
+        NSLayoutConstraint.activate([
+            centerConstraint,
+            label.widthAnchor.constraint(equalToConstant: 184),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("document-title")
+        update(title: "Untitled")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(title: String) {
+        label.stringValue = title
+        setAccessibilityLabel("Document title, \(title)")
+    }
+
+    func setHorizontalOffset(_ offset: CGFloat) {
+        titleCenterConstraint?.constant = offset
+    }
+}
+
 extension NSToolbarItem.Identifier {
     fileprivate static let newDocument = NSToolbarItem.Identifier("Aviv.Toolbar.New")
     fileprivate static let openDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Open")
     fileprivate static let saveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Save")
+    fileprivate static let liveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.LiveDocument")
+    fileprivate static let documentTitle = NSToolbarItem.Identifier("Aviv.Toolbar.DocumentTitle")
     fileprivate static let zoomOut = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomOut")
     fileprivate static let actualSize = NSToolbarItem.Identifier("Aviv.Toolbar.ActualSize")
     fileprivate static let zoomIn = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomIn")

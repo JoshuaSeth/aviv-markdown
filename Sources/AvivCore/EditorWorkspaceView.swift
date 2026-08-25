@@ -15,6 +15,12 @@ public final class EditorWorkspaceView: NSView {
         }
     }
     public var onDocumentFormatChange: ((MarkdownDocumentFormat) -> Void)?
+    public var onRemoteSyncPresentationChange: ((RemoteSyncPresentation?) -> Void)?
+    public var showsDocumentTitle = true {
+        didSet {
+            titleLabel.isHidden = !showsDocumentTitle
+        }
+    }
 
     private let theme: MarkdownTheme
     private let annotationOverlay: MarkdownAnnotationOverlayView
@@ -32,7 +38,6 @@ public final class EditorWorkspaceView: NSView {
     )
     private let titleLabel = NSTextField(labelWithString: "Untitled")
     private let statusLabel = NSTextField(labelWithString: "")
-    private let remoteSyncIndicatorView = RemoteSyncIndicatorView()
     private let remoteEdgePulseView = RemoteEdgePulseView()
     private let remoteChangedLineMarkerView: RemoteChangedLineMarkerView
     private let remoteSyncToastView = RemoteSyncToastView()
@@ -100,12 +105,12 @@ public final class EditorWorkspaceView: NSView {
 
     public func updateRemoteSyncPresentation(_ presentation: RemoteSyncPresentation?) {
         guard let presentation else {
-            remoteSyncIndicatorView.isHidden = true
             remoteChangedLineMarkerView.lineRanges = []
             remoteSyncToastView.alphaValue = 0
+            onRemoteSyncPresentationChange?(nil)
             return
         }
-        remoteSyncIndicatorView.update(presentation, theme: currentTheme)
+        onRemoteSyncPresentationChange?(presentation)
     }
 
     public func announceRemoteChange(
@@ -153,7 +158,7 @@ public final class EditorWorkspaceView: NSView {
     }
 
     public var remoteIndicatorIdentifiersForTesting: [String] {
-        RemoteSyncIndicatorView.indicatorIdentifiers + [
+        [
             "remote-edge-pulse",
             "remote-changed-lines",
             "remote-sync-toast",
@@ -162,6 +167,14 @@ public final class EditorWorkspaceView: NSView {
 
     public var remoteChangedLineCountForTesting: Int {
         remoteChangedLineMarkerView.lineRanges.count
+    }
+
+    public var documentTitleFrameForTesting: NSRect {
+        titleLabel.frame
+    }
+
+    public var documentTitleTextForTesting: String {
+        titleLabel.stringValue
     }
 
     public func updateMetrics() {
@@ -244,7 +257,6 @@ public final class EditorWorkspaceView: NSView {
         statusLabel.alignment = .right
         statusLabel.lineBreakMode = .byTruncatingTail
 
-        remoteSyncIndicatorView.translatesAutoresizingMaskIntoConstraints = false
         remoteEdgePulseView.translatesAutoresizingMaskIntoConstraints = false
         remoteChangedLineMarkerView.translatesAutoresizingMaskIntoConstraints = false
         remoteSyncToastView.translatesAutoresizingMaskIntoConstraints = false
@@ -285,7 +297,6 @@ public final class EditorWorkspaceView: NSView {
         addSubview(rule)
         addSubview(remoteChangedLineMarkerView)
         addSubview(remoteEdgePulseView)
-        addSubview(remoteSyncIndicatorView)
         addSubview(remoteSyncToastView)
 
         NotificationCenter.default.addObserver(
@@ -396,11 +407,6 @@ public final class EditorWorkspaceView: NSView {
             remoteEdgePulseView.trailingAnchor.constraint(equalTo: trailingAnchor),
             remoteEdgePulseView.topAnchor.constraint(equalTo: topAnchor),
             remoteEdgePulseView.heightAnchor.constraint(equalToConstant: 2),
-
-            remoteSyncIndicatorView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
-            remoteSyncIndicatorView.topAnchor.constraint(equalTo: topAnchor, constant: 9),
-            remoteSyncIndicatorView.heightAnchor.constraint(equalToConstant: 28),
-            remoteSyncIndicatorView.widthAnchor.constraint(equalToConstant: 270),
 
             remoteSyncToastView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22),
             remoteSyncToastView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -46),

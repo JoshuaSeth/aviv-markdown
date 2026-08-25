@@ -1,60 +1,56 @@
 import AppKit
 
-final class RemoteSyncIndicatorView: NSView {
-    static let indicatorIdentifiers = [
+public final class RemoteSyncIndicatorView: NSView {
+    public static let indicatorIdentifiers = [
         "remote-source-badge",
         "remote-source-heartbeat",
         "remote-status-shimmer",
     ]
 
     private let iconView = NSImageView()
-    private let sourceLabel = NSTextField(labelWithString: "")
-    private let detailLabel = NSTextField(labelWithString: "")
     private let heartbeatView = NSView()
     private let shimmerLayer = CAGradientLayer()
     private var currentPresentation: RemoteSyncPresentation?
+    public private(set) var accessibilitySummaryForTesting = ""
 
-    override init(frame frameRect: NSRect) {
+    public var visibleTextForTesting: String {
+        ""
+    }
+
+    public override var intrinsicContentSize: NSSize {
+        NSSize(width: 28, height: 28)
+    }
+
+    public override init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
     }
 
     @available(*, unavailable)
-    required init?(coder: NSCoder) {
+    public required init?(coder: NSCoder) {
         fatalError("init(coder:) has not been implemented")
     }
 
-    override func layout() {
+    public override func layout() {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
         shimmerLayer.frame = bounds
         heartbeatView.layer?.cornerRadius = heartbeatView.bounds.height / 2
     }
 
-    func update(_ presentation: RemoteSyncPresentation, theme: MarkdownTheme) {
+    public func update(_ presentation: RemoteSyncPresentation, theme: MarkdownTheme) {
         currentPresentation = presentation
         isHidden = false
-        sourceLabel.stringValue = presentation.sourceHost
-        detailLabel.stringValue = presentation.detail
-        sourceLabel.font = NSFont.systemFont(
-            ofSize: theme.scaledMetric(11.5, minimum: 10),
-            weight: .semibold
-        )
-        detailLabel.font = NSFont.systemFont(
-            ofSize: theme.scaledMetric(10.5, minimum: 9),
-            weight: .medium
-        )
-        sourceLabel.textColor = theme.textColor.withAlphaComponent(0.82)
-        detailLabel.textColor = phaseColor(presentation.phase, theme: theme)
-        iconView.contentTintColor = theme.accentColor.withAlphaComponent(0.82)
+        let stateColor = phaseColor(presentation.phase, theme: theme)
+        iconView.contentTintColor = theme.secondaryTextColor.withAlphaComponent(0.72)
         heartbeatView.layer?.backgroundColor =
-            phaseColor(
-                presentation.phase,
-                theme: theme
-            ).cgColor
-        setAccessibilityLabel(
-            "Remote Markdown source \(presentation.sourceHost), \(presentation.detail)"
-        )
+            stateColor.cgColor
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.borderColor = NSColor.clear.cgColor
+        accessibilitySummaryForTesting =
+            "Live document from \(presentation.sourceHost), \(presentation.detail)"
+        setAccessibilityLabel(accessibilitySummaryForTesting)
+        toolTip = accessibilitySummaryForTesting
         animateHeartbeat()
         if [.incomingApplied, .saved, .conflict].contains(presentation.phase) {
             animateShimmer(theme: theme)
@@ -63,21 +59,22 @@ final class RemoteSyncIndicatorView: NSView {
 
     private func setup() {
         wantsLayer = true
-        layer?.backgroundColor = NSColor.white.withAlphaComponent(0.72).cgColor
-        layer?.borderColor = NSColor(calibratedWhite: 0.45, alpha: 0.14).cgColor
-        layer?.borderWidth = 1
+        layer?.masksToBounds = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        layer?.borderColor = NSColor.clear.cgColor
+        layer?.borderWidth = 0
         setAccessibilityElement(true)
         setAccessibilityIdentifier("remote-source-badge")
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.image = NSImage(
             systemSymbolName: "network",
-            accessibilityDescription: "Remote source"
+            accessibilityDescription: nil
         )
-        sourceLabel.translatesAutoresizingMaskIntoConstraints = false
-        sourceLabel.lineBreakMode = .byTruncatingMiddle
-        detailLabel.translatesAutoresizingMaskIntoConstraints = false
-        detailLabel.lineBreakMode = .byTruncatingTail
+        iconView.symbolConfiguration = NSImage.SymbolConfiguration(
+            pointSize: 12.5,
+            weight: .medium
+        )
         heartbeatView.translatesAutoresizingMaskIntoConstraints = false
         heartbeatView.wantsLayer = true
         heartbeatView.setAccessibilityElement(true)
@@ -95,27 +92,16 @@ final class RemoteSyncIndicatorView: NSView {
         shimmerLayer.endPoint = CGPoint(x: 1, y: 0.5)
 
         addSubview(iconView)
-        addSubview(sourceLabel)
-        addSubview(detailLabel)
         addSubview(heartbeatView)
         NSLayoutConstraint.activate([
-            iconView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 9),
+            iconView.centerXAnchor.constraint(equalTo: centerXAnchor, constant: -1),
             iconView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            iconView.widthAnchor.constraint(equalToConstant: 15),
-            iconView.heightAnchor.constraint(equalToConstant: 15),
-            sourceLabel.leadingAnchor.constraint(equalTo: iconView.trailingAnchor, constant: 6),
-            sourceLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            sourceLabel.widthAnchor.constraint(lessThanOrEqualToConstant: 118),
-            detailLabel.leadingAnchor.constraint(equalTo: sourceLabel.trailingAnchor, constant: 7),
-            detailLabel.centerYAnchor.constraint(equalTo: centerYAnchor),
-            heartbeatView.leadingAnchor.constraint(
-                equalTo: detailLabel.trailingAnchor,
-                constant: 7
-            ),
-            heartbeatView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -9),
-            heartbeatView.centerYAnchor.constraint(equalTo: centerYAnchor),
-            heartbeatView.widthAnchor.constraint(equalToConstant: 7),
-            heartbeatView.heightAnchor.constraint(equalToConstant: 7),
+            iconView.widthAnchor.constraint(equalToConstant: 14),
+            iconView.heightAnchor.constraint(equalToConstant: 14),
+            heartbeatView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -4),
+            heartbeatView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -4),
+            heartbeatView.widthAnchor.constraint(equalToConstant: 6),
+            heartbeatView.heightAnchor.constraint(equalToConstant: 6),
         ])
         isHidden = true
     }
