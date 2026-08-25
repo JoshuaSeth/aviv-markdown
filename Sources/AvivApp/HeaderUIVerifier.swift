@@ -187,7 +187,9 @@ enum HeaderUIVerifier {
         }
         let frame = controller.documentTitleFrameForTesting
         guard abs(frame.midX - controller.workspace.bounds.midX) <= 0.5 else {
-            throw HeaderUIVerificationError("The visible document title is not centered.")
+            throw HeaderUIVerificationError(
+                "The visible document title is not centered: title=\(format(frame)) workspace_mid=\(Int(controller.workspace.bounds.midX))."
+            )
         }
         let toolbarFrames = try toolbarButtonFrames(
             in: controller.workspace,

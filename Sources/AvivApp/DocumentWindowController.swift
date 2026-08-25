@@ -329,12 +329,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         documentTitleToolbarLabel.setAccessibilityLabel(
             "Document title, \(documentTitleToolbarLabel.stringValue)"
         )
-        let fittingSize = documentTitleToolbarLabel.fittingSize
-        documentTitleToolbarLabel.frame.size = NSSize(
-            width: min(280, max(80, fittingSize.width)),
-            height: max(18, fittingSize.height)
-        )
-        window?.contentView?.superview?.needsLayout = true
     }
 
     private func configureDocumentTitleToolbarLabel() {
@@ -342,6 +336,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         documentTitleToolbarLabel.textColor = MarkdownTheme.clean.secondaryTextColor
         documentTitleToolbarLabel.alignment = .center
         documentTitleToolbarLabel.lineBreakMode = .byTruncatingMiddle
+        documentTitleToolbarLabel.frame = NSRect(x: 0, y: 0, width: 200, height: 18)
         documentTitleToolbarLabel.setAccessibilityIdentifier("document-title")
     }
 
@@ -426,6 +421,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.view = documentTitleToolbarLabel
             item.label = "Document Title"
             item.paletteLabel = "Document Title"
+            item.visibilityPriority = .high
         case .zoomOut:
             item.image = toolbarImage(
                 named: "minus.magnifyingglass",
