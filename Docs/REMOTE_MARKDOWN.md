@@ -5,9 +5,11 @@ authenticated bridge when the source explicitly advertises one. The Windows app 
 
 ## Open and follow a URL
 
-Use **File → Open from URL…** (`Shift-Cmd-O`) and enter a credential-free HTTPS URL. Aviv downloads no more than 16 MiB
-and accepts valid UTF-8 or UTF-16 Markdown. Embedded URL credentials, insecure HTTP URLs, unsafe write URLs, invalid
-text, and malformed responses fail visibly.
+Use **File → Open from URL…** (`Shift-Cmd-O`) and enter an HTTPS URL. Generic sources should be credential-free. A
+provider may instead define a constrained read-only query token, as PitchAI Live Documents does; in that case the
+entire URL is sensitive and must not be shared. Aviv downloads no more than 16 MiB and accepts valid UTF-8 or UTF-16
+Markdown. URL user-info credentials, insecure HTTP URLs, unsafe write URLs, invalid text, and malformed responses fail
+visibly.
 
 The open document retains two URL identities:
 
@@ -35,17 +37,23 @@ response headers:
 | `X-Aviv-Source-ID` | bridge identity | Stable identity that must not change while the document is open |
 | `X-Aviv-Poll-Interval` | optional | Requested polling interval in seconds, clamped to 1–60 |
 | `X-Aviv-Source-URL` | bridge diagnostics | Canonical public download URL |
-| `X-Aviv-Write-URL` | authenticated save | Credential-free HTTPS endpoint that accepts conditional `PUT` |
+| `X-Aviv-Write-URL` | authenticated save | HTTPS endpoint that accepts conditional `PUT`; any provider-defined read token must remain unchanged |
 
 The production example is
 [https://pitchai.net/aviv-live/seth-live-demo.md](https://pitchai.net/aviv-live/seth-live-demo.md).
 
+PitchAI's authenticated general-purpose source is Live Documents at `https://livedocuments.pitchai.net`. It uses a
+separate read-only `access_token` query value for Aviv's initial `GET` and a bearer token for `PUT`; the same complete
+URL is advertised for reads and writes. See [PitchAI Live Documents in Aviv](LIVE_DOCUMENTS.md) for the exact safe
+folder, credential handling, open/save workflow, error map, deployment path, and operator checks.
+
 ## Authenticated Command-S
 
-Aviv never sends `PUT` to an arbitrary public download URL. `Cmd-S` is enabled for a URL source only when
+Aviv never sends `PUT` to an arbitrary download URL. `Cmd-S` is enabled for a URL source only when
 `X-Aviv-Write-URL` is present and the current source has an ETag. On the first save, Aviv names the write host and asks
-for its bearer token. The token is stored in macOS Keychain under service `net.pitchai.aviv.remote-write`; it is not
-placed in the public URL, recent documents, logs, or Markdown metadata.
+for its bearer token. The token is stored in macOS Keychain under service `net.pitchai.aviv.remote-write`; Aviv does
+not place that write token in the opened URL, recent documents, logs, or Markdown metadata. Provider-defined read-only
+query tokens are part of the opened URL and must be handled as sensitive URLs.
 
 The write request contains:
 

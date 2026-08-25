@@ -4,50 +4,10 @@ import XCTest
 @testable import AvivCore
 
 final class RemoteMarkdownTransportTests: XCTestCase {
-    override func tearDown() {
-        StubURLProtocol.handler = nil
-        super.tearDown()
-    }
-
     func testFetchReadsSourceContractAndSendsConditionalValidator() async throws {
-        let openedURL = try XCTUnwrap(URL(string: "https://public.example/live.md"))
-        let resolvedURL = try XCTUnwrap(URL(string: "https://cdn.example/live.md"))
-        let writeURL = try XCTUnwrap(URL(string: "https://bridge.example/api/live.md"))
-        var requestCount = 0
-        StubURLProtocol.handler = { request in
-            requestCount += 1
-            if requestCount == 2 {
-                XCTAssertEqual(request.value(forHTTPHeaderField: "If-None-Match"), "\"v1\"")
-                return (
-                    try XCTUnwrap(
-                        HTTPURLResponse(
-                            url: resolvedURL,
-                            statusCode: 304,
-                            httpVersion: "HTTP/1.1",
-                            headerFields: nil
-                        )
-                    ),
-                    Data()
-                )
-            }
-            return (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: resolvedURL,
-                        statusCode: 200,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: [
-                            "Content-Type": "text/markdown; charset=utf-8",
-                            "ETag": "\"v1\"",
-                            "X-Aviv-Source-ID": "seth-live-demo",
-                            "X-Aviv-Write-URL": writeURL.absoluteString,
-                            "X-Aviv-Poll-Interval": "0.2",
-                        ]
-                    )
-                ),
-                Data("# Remote\n".utf8)
-            )
-        }
+        let openedURL = try XCTUnwrap(URL(string: "https://public.example/fetch.md"))
+        let resolvedURL = try XCTUnwrap(URL(string: "https://cdn.example/fetch.md"))
+        let writeURL = try XCTUnwrap(URL(string: "https://bridge.example/api/fetch.md"))
         let transport = makeTransport()
 
         let first = try await transport.fetch(from: openedURL, openedURL: openedURL, validator: nil)
@@ -70,8 +30,8 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testSaveUsesBearerAndIfMatchWithoutChangingPollingURL() async throws {
-        let publicURL = try XCTUnwrap(URL(string: "https://public.example/live.md"))
-        let writeURL = try XCTUnwrap(URL(string: "https://bridge.example/api/live.md"))
+        let publicURL = try XCTUnwrap(URL(string: "https://public.example/save.md"))
+        let writeURL = try XCTUnwrap(URL(string: "https://bridge.example/api/save.md"))
         let source = try RemoteMarkdownSource(
             openedURL: publicURL,
             resolvedURL: publicURL,
@@ -80,33 +40,6 @@ final class RemoteMarkdownTransportTests: XCTestCase {
             pollingInterval: 1,
             validator: RemoteMarkdownValidator(etag: "\"v1\"", lastModified: nil)
         )
-        StubURLProtocol.handler = { request in
-            XCTAssertEqual(request.url, writeURL)
-            XCTAssertEqual(request.httpMethod, "PUT")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer secret")
-            XCTAssertEqual(request.value(forHTTPHeaderField: "If-Match"), "\"v1\"")
-            XCTAssertEqual(
-                request.value(forHTTPHeaderField: "X-Aviv-Source-ID"),
-                "seth-live-demo"
-            )
-            XCTAssertEqual(self.requestBody(request), Data("# Saved\n".utf8))
-            return (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: writeURL,
-                        statusCode: 204,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: [
-                            "ETag": "\"v2\"",
-                            "X-Aviv-Source-ID": "seth-live-demo",
-                            "X-Aviv-Write-URL": writeURL.absoluteString,
-                        ]
-                    )
-                ),
-                Data()
-            )
-        }
-
         let updated = try await makeTransport().save(
             markdown: "# Saved\n",
             to: source,
@@ -118,7 +51,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testSaveMapsPreconditionFailureToWriteConflict() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
+        let url = try XCTUnwrap(URL(string: "https://public.example/precondition.md"))
         let source = try RemoteMarkdownSource(
             openedURL: url,
             resolvedURL: url,
@@ -127,20 +60,6 @@ final class RemoteMarkdownTransportTests: XCTestCase {
             pollingInterval: 1,
             validator: RemoteMarkdownValidator(etag: "\"stale\"", lastModified: nil)
         )
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 412,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: nil
-                    )
-                ),
-                Data()
-            )
-        }
-
         do {
             _ = try await makeTransport().save(
                 markdown: "local",
@@ -154,7 +73,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testSaveMapsIdentityConflictToSourceIdentityChange() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
+        let url = try XCTUnwrap(URL(string: "https://public.example/identity-conflict.md"))
         let source = try RemoteMarkdownSource(
             openedURL: url,
             resolvedURL: url,
@@ -163,20 +82,6 @@ final class RemoteMarkdownTransportTests: XCTestCase {
             pollingInterval: 1,
             validator: RemoteMarkdownValidator(etag: "\"v1\"", lastModified: nil)
         )
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 409,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: nil
-                    )
-                ),
-                Data()
-            )
-        }
-
         do {
             _ = try await makeTransport().save(
                 markdown: "local",
@@ -190,7 +95,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testSaveRequiresFreshETagFromWriteResponse() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
+        let url = try XCTUnwrap(URL(string: "https://public.example/missing-write-etag.md"))
         let source = try RemoteMarkdownSource(
             openedURL: url,
             resolvedURL: url,
@@ -199,20 +104,6 @@ final class RemoteMarkdownTransportTests: XCTestCase {
             pollingInterval: 1,
             validator: RemoteMarkdownValidator(etag: "\"v1\"", lastModified: nil)
         )
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 204,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: nil
-                    )
-                ),
-                Data()
-            )
-        }
-
         do {
             _ = try await makeTransport().save(
                 markdown: "local",
@@ -226,23 +117,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testFetchRejectsWritableContractWithoutETag() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 200,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: [
-                            "X-Aviv-Source-ID": "seth-live-demo",
-                            "X-Aviv-Write-URL": "https://bridge.example/api/live.md",
-                        ]
-                    )
-                ),
-                Data("# Remote\n".utf8)
-            )
-        }
+        let url = try XCTUnwrap(URL(string: "https://public.example/writable-without-etag.md"))
 
         do {
             _ = try await makeTransport().fetch(from: url, openedURL: url, validator: nil)
@@ -253,20 +128,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testFetchRejectsNonFinitePollingInterval() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 200,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: ["X-Aviv-Poll-Interval": "nan"]
-                    )
-                ),
-                Data("# Remote\n".utf8)
-            )
-        }
+        let url = try XCTUnwrap(URL(string: "https://public.example/invalid-poll-interval.md"))
 
         do {
             _ = try await makeTransport().fetch(from: url, openedURL: url, validator: nil)
@@ -277,23 +139,7 @@ final class RemoteMarkdownTransportTests: XCTestCase {
     }
 
     func testFetchRejectsInsecureAdvertisedWriteURL() async throws {
-        let url = try XCTUnwrap(URL(string: "https://public.example/live.md"))
-        StubURLProtocol.handler = { request in
-            (
-                try XCTUnwrap(
-                    HTTPURLResponse(
-                        url: try XCTUnwrap(request.url),
-                        statusCode: 200,
-                        httpVersion: "HTTP/1.1",
-                        headerFields: [
-                            "ETag": "\"v1\"",
-                            "X-Aviv-Write-URL": "http://bridge.example/api/live.md",
-                        ]
-                    )
-                ),
-                Data("# Remote\n".utf8)
-            )
-        }
+        let url = try XCTUnwrap(URL(string: "https://public.example/insecure-write-url.md"))
 
         do {
             _ = try await makeTransport().fetch(from: url, openedURL: url, validator: nil)
@@ -308,8 +154,149 @@ final class RemoteMarkdownTransportTests: XCTestCase {
         configuration.protocolClasses = [StubURLProtocol.self]
         return URLSessionRemoteMarkdownTransport(session: URLSession(configuration: configuration))
     }
+}
 
-    private func requestBody(_ request: URLRequest) -> Data? {
+private final class StubURLProtocol: URLProtocol {
+    override class func canInit(with request: URLRequest) -> Bool {
+        true
+    }
+
+    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
+        request
+    }
+
+    override func startLoading() {
+        do {
+            let (response, data) = try Self.response(for: request)
+            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
+            client?.urlProtocol(self, didLoad: data)
+            client?.urlProtocolDidFinishLoading(self)
+        } catch {
+            client?.urlProtocol(self, didFailWithError: error)
+        }
+    }
+
+    override func stopLoading() {}
+
+    private static func response(for request: URLRequest) throws -> (HTTPURLResponse, Data) {
+        guard let url = request.url else {
+            throw RemoteMarkdownError.invalidResponse
+        }
+        switch url.path {
+        case "/fetch.md":
+            return try fetchResponse(for: request, url: url)
+        case "/api/save.md":
+            return try saveResponse(for: request, url: url)
+        case "/precondition.md":
+            return try response(url: url, statusCode: 412)
+        case "/identity-conflict.md":
+            return try response(url: url, statusCode: 409)
+        case "/missing-write-etag.md":
+            return try response(url: url, statusCode: 204)
+        case "/writable-without-etag.md":
+            return try response(
+                url: url,
+                statusCode: 200,
+                headers: [
+                    "X-Aviv-Source-ID": "seth-live-demo",
+                    "X-Aviv-Write-URL": "https://bridge.example/api/writable-without-etag.md",
+                ],
+                data: Data("# Remote\n".utf8)
+            )
+        case "/invalid-poll-interval.md":
+            return try response(
+                url: url,
+                statusCode: 200,
+                headers: ["X-Aviv-Poll-Interval": "nan"],
+                data: Data("# Remote\n".utf8)
+            )
+        case "/insecure-write-url.md":
+            return try response(
+                url: url,
+                statusCode: 200,
+                headers: [
+                    "ETag": "\"v1\"",
+                    "X-Aviv-Write-URL": "http://bridge.example/api/insecure-write-url.md",
+                ],
+                data: Data("# Remote\n".utf8)
+            )
+        default:
+            throw RemoteMarkdownError.invalidResponse
+        }
+    }
+
+    private static func fetchResponse(
+        for request: URLRequest,
+        url: URL
+    ) throws -> (HTTPURLResponse, Data) {
+        if url.host == "cdn.example" {
+            guard request.value(forHTTPHeaderField: "If-None-Match") == "\"v1\"" else {
+                throw RemoteMarkdownError.invalidResponse
+            }
+            return try response(url: url, statusCode: 304)
+        }
+        guard url.host == "public.example",
+            let resolvedURL = URL(string: "https://cdn.example/fetch.md")
+        else {
+            throw RemoteMarkdownError.invalidResponse
+        }
+        return try response(
+            url: resolvedURL,
+            statusCode: 200,
+            headers: [
+                "Content-Type": "text/markdown; charset=utf-8",
+                "ETag": "\"v1\"",
+                "X-Aviv-Source-ID": "seth-live-demo",
+                "X-Aviv-Write-URL": "https://bridge.example/api/fetch.md",
+                "X-Aviv-Poll-Interval": "0.2",
+            ],
+            data: Data("# Remote\n".utf8)
+        )
+    }
+
+    private static func saveResponse(
+        for request: URLRequest,
+        url: URL
+    ) throws -> (HTTPURLResponse, Data) {
+        guard request.httpMethod == "PUT",
+            request.value(forHTTPHeaderField: "Authorization") == "Bearer secret",
+            request.value(forHTTPHeaderField: "If-Match") == "\"v1\"",
+            request.value(forHTTPHeaderField: "X-Aviv-Source-ID") == "seth-live-demo",
+            requestBody(request) == Data("# Saved\n".utf8)
+        else {
+            throw RemoteMarkdownError.invalidResponse
+        }
+        return try response(
+            url: url,
+            statusCode: 204,
+            headers: [
+                "ETag": "\"v2\"",
+                "X-Aviv-Source-ID": "seth-live-demo",
+                "X-Aviv-Write-URL": "https://bridge.example/api/save.md",
+            ]
+        )
+    }
+
+    private static func response(
+        url: URL,
+        statusCode: Int,
+        headers: [String: String]? = nil,
+        data: Data = Data()
+    ) throws -> (HTTPURLResponse, Data) {
+        guard
+            let response = HTTPURLResponse(
+                url: url,
+                statusCode: statusCode,
+                httpVersion: "HTTP/1.1",
+                headerFields: headers
+            )
+        else {
+            throw RemoteMarkdownError.invalidResponse
+        }
+        return (response, data)
+    }
+
+    private static func requestBody(_ request: URLRequest) -> Data? {
         if let body = request.httpBody {
             return body
         }
@@ -325,33 +312,4 @@ final class RemoteMarkdownTransportTests: XCTestCase {
         }
         return data
     }
-}
-
-private final class StubURLProtocol: URLProtocol {
-    static var handler: ((URLRequest) throws -> (HTTPURLResponse, Data))?
-
-    override class func canInit(with request: URLRequest) -> Bool {
-        true
-    }
-
-    override class func canonicalRequest(for request: URLRequest) -> URLRequest {
-        request
-    }
-
-    override func startLoading() {
-        guard let handler = Self.handler else {
-            client?.urlProtocol(self, didFailWithError: RemoteMarkdownError.invalidResponse)
-            return
-        }
-        do {
-            let (response, data) = try handler(request)
-            client?.urlProtocol(self, didReceive: response, cacheStoragePolicy: .notAllowed)
-            client?.urlProtocol(self, didLoad: data)
-            client?.urlProtocolDidFinishLoading(self)
-        } catch {
-            client?.urlProtocol(self, didFailWithError: error)
-        }
-    }
-
-    override func stopLoading() {}
 }
