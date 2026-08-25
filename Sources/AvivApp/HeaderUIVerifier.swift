@@ -22,7 +22,7 @@ enum HeaderUIVerifier {
             }
             try await settleWindow(controller.window)
             try verifyLocalHeader(controller, expectedURL: options.localFile)
-            try resizeAndRender(
+            try await resizeAndRender(
                 controller,
                 width: 1080,
                 to: options.evidenceDirectory.appendingPathComponent(
@@ -44,7 +44,7 @@ enum HeaderUIVerifier {
             }
             try await settleWindow(controller.window)
             for width in widths {
-                let geometry = try verifyRemoteHeader(
+                let geometry = try await verifyRemoteHeader(
                     controller,
                     expectedURL: options.remoteURL,
                     width: width
@@ -54,7 +54,7 @@ enum HeaderUIVerifier {
                 )
             }
             for width in [CGFloat(720), 1080] {
-                try resizeAndRender(
+                try await resizeAndRender(
                     controller,
                     width: width,
                     to: options.evidenceDirectory.appendingPathComponent(
@@ -104,12 +104,12 @@ enum HeaderUIVerifier {
         _ controller: DocumentWindowController,
         expectedURL: URL,
         width: CGFloat
-    ) throws -> HeaderGeometry {
+    ) async throws -> HeaderGeometry {
         guard let window = controller.window else {
             throw HeaderUIVerificationError("The live document has no window.")
         }
         window.setContentSize(NSSize(width: width, height: 720))
-        layoutWindow(window)
+        try await settleWindow(window)
         controller.alignDocumentTitleForCurrentLayout()
         layoutWindow(window)
 
@@ -264,7 +264,7 @@ enum HeaderUIVerifier {
         _ controller: DocumentWindowController,
         width: CGFloat,
         to url: URL
-    ) throws {
+    ) async throws {
         guard let window = controller.window,
             let contentView = window.contentView,
             let frameView = contentView.superview
@@ -272,7 +272,7 @@ enum HeaderUIVerifier {
             throw HeaderUIVerificationError("The native window frame is unavailable for capture.")
         }
         window.setContentSize(NSSize(width: width, height: 720))
-        layoutWindow(window)
+        try await settleWindow(window)
         controller.alignDocumentTitleForCurrentLayout()
         layoutWindow(window)
         frameView.displayIfNeeded()
