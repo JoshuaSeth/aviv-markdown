@@ -15,7 +15,8 @@ branch, and land it through a pull request.
 
 The project is registered in the PitchAI PM database as `AVIV` (`Aviv Editor`), owned by Seth. Operationalization work
 is recorded in task `AVIV-OPS-20260824`; public-URL live sync and authenticated save-back are tracked in
-`AVIV-URL-SYNC-20260824`.
+`AVIV-URL-SYNC-20260824`; the production Live Documents integration and runbook are tracked in
+`AVIV-LIVE-DOCS-20260825`.
 
 ## Source inventory
 
@@ -76,6 +77,9 @@ dist/Aviv.app/Contents/MacOS/Aviv \
 ```
 
 See [REMOTE_MARKDOWN.md](REMOTE_MARKDOWN.md) for the source headers and exact verification sequence.
+For PitchAI's authenticated same-URL file service, use [LIVE_DOCUMENTS.md](LIVE_DOCUMENTS.md). That runbook records the
+production safe folder, snapshot store, separate read/write credentials, exact Aviv workflow, error handling, and
+deployment boundary without containing either secret.
 
 ### Windows
 
@@ -137,6 +141,11 @@ The token file is readable only by the service account and must never enter Git,
 release evidence. The source manifest is an allowlist. The bridge rejects traversal, unlisted files, invalid UTF-8,
 oversized documents, missing authentication, source-ID mismatches, and writes without a matching ETag. Writes for one
 source are serialized and committed by atomic rename.
+
+This demonstration bridge is separate from PitchAI Live Documents. The demo URL is public and its write endpoint uses
+one bearer token. Live Documents protects reads with a read-only query token, protects writes with a separate bearer
+token, automatically discovers safe regular files, and snapshots every overwritten version. Do not copy credentials,
+runtime files, or assumptions between the two services.
 
 Deploy bridge changes by syntax-checking the candidate, preserving the current installed file, restarting the service,
 then verifying `/healthz`, the public source headers, an authenticated conditional write, and public readback. The
