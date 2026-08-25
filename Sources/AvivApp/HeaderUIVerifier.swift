@@ -149,18 +149,20 @@ enum HeaderUIVerifier {
                 "The live status overlaps the macOS traffic lights at width \(Int(width))."
             )
         }
-        guard toolbarButtonFrames.allSatisfy({
-            !$0.intersects(titleFrame.insetBy(dx: -6, dy: -2))
-        }) else {
+        let titleCollisions = toolbarButtonFrames.filter {
+            $0.intersects(titleFrame.insetBy(dx: -6, dy: -2))
+        }
+        guard titleCollisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the centered title at width \(Int(width))."
+                "A native toolbar action overlaps the centered title at width \(Int(width)): title=\(format(titleFrame)) controls=\(titleCollisions.map(format).joined(separator: \";\"))."
             )
         }
-        guard toolbarButtonFrames.allSatisfy({
-            !$0.intersects(indicatorFrame.insetBy(dx: -2, dy: -2))
-        }) else {
+        let indicatorCollisions = toolbarButtonFrames.filter {
+            $0.intersects(indicatorFrame.insetBy(dx: -2, dy: -2))
+        }
+        guard indicatorCollisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the live status at width \(Int(width))."
+                "A native toolbar action overlaps the live status at width \(Int(width)): indicator=\(format(indicatorFrame)) controls=\(indicatorCollisions.map(format).joined(separator: \";\"))."
             )
         }
         return HeaderGeometry(
@@ -191,11 +193,12 @@ enum HeaderUIVerifier {
             in: controller.workspace,
             window: window
         )
-        guard toolbarFrames.allSatisfy({
-            !$0.intersects(frame.insetBy(dx: -6, dy: -2))
-        }) else {
+        let collisions = toolbarFrames.filter {
+            $0.intersects(frame.insetBy(dx: -6, dy: -2))
+        }
+        guard collisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the visible document title."
+                "A native toolbar action overlaps the visible document title: title=\(format(frame)) controls=\(collisions.map(format).joined(separator: \";\"))."
             )
         }
     }
