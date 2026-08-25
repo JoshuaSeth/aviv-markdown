@@ -68,6 +68,11 @@ The production demonstration source is
 [Remote Markdown sources](Docs/REMOTE_MARKDOWN.md) for the complete server contract, conflict behavior, and
 verification procedure.
 
+PitchAI operational documents use the authenticated Live Documents service at `https://livedocuments.pitchai.net`.
+Its read-only URL token and separate Keychain-backed write token preserve one stable `GET`/`PUT` URL without making
+the safe folder public. Operators should follow [PitchAI Live Documents in Aviv](Docs/LIVE_DOCUMENTS.md); never paste a
+credential-bearing Live Documents URL into an issue, screenshot, shell history, or chat.
+
 ![A clean external Markdown update applied in place](Docs/assets/aviv-remote-clean-update.png)
 
 ![A simultaneous external edit held for conflict resolution](Docs/assets/aviv-remote-conflict-preserved.png)
