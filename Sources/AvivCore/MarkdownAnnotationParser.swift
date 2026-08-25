@@ -4,6 +4,7 @@ public struct MarkdownAnnotationToken: Equatable {
     public enum Role: Equatable {
         case heading
         case inlineDelimiter
+        case listMarker
         case linkSource
         case linkTarget
         case codeFence
@@ -100,6 +101,20 @@ public enum MarkdownAnnotationParser {
                     ),
                     label: nsLine.substring(with: fence.range),
                     role: .codeFence
+                )
+            )
+        }
+
+        if let task = firstMatch(regex: MarkdownAnnotationRegex.taskList, in: line) {
+            let markerRange = task.range(at: 1)
+            tokens.append(
+                MarkdownAnnotationToken(
+                    range: NSRange(
+                        location: contentRange.location + markerRange.location,
+                        length: markerRange.length
+                    ),
+                    label: nsLine.substring(with: markerRange),
+                    role: .listMarker
                 )
             )
         }
@@ -368,6 +383,9 @@ public enum MarkdownAnnotationParser {
 private enum MarkdownAnnotationRegex {
     static let heading = try! NSRegularExpression(pattern: #"^(#{1,6})\s+"#)
     static let codeFence = try! NSRegularExpression(pattern: #"^\s*(```|~~~).*$"#)
+    static let taskList = try! NSRegularExpression(
+        pattern: #"^\s*((?:[-+*]|\d+[.)]))\s+\[[ xX]\]\s+"#
+    )
     static let inlineCode = try! NSRegularExpression(pattern: "`([^`\\n]+)`")
     static let image = try! NSRegularExpression(pattern: MarkdownPatterns.image)
     static let link = try! NSRegularExpression(pattern: MarkdownPatterns.link)

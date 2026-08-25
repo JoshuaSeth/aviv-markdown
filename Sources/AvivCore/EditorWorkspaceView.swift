@@ -73,7 +73,11 @@ public final class EditorWorkspaceView: NSView {
         self.theme = theme
         self.textView = MarkdownTextView(styler: MarkdownStyler(theme: theme))
         self.scrollView = NSScrollView(frame: .zero)
-        self.annotationOverlay = MarkdownAnnotationOverlayView(textView: textView, theme: theme)
+        self.annotationOverlay = MarkdownAnnotationOverlayView(
+            textView: textView,
+            theme: theme,
+            drawsRenderedElementsInOwnDraw: false
+        )
         self.minimapView = MarkdownMinimapView(textView: textView, theme: theme)
         self.remoteChangedLineMarkerView = RemoteChangedLineMarkerView(textView: textView)
         self.documentFormat = MarkdownDocumentFormat.stored()
@@ -89,6 +93,7 @@ public final class EditorWorkspaceView: NSView {
     public func loadMarkdown(_ markdown: String) {
         cancelDeferredViewUpdates()
         textView.loadMarkdown(markdown)
+        annotationOverlay.needsDisplay = true
         updateMetrics()
     }
 
@@ -245,6 +250,17 @@ public final class EditorWorkspaceView: NSView {
         textView.textContainer?.containerSize.width ?? 0
     }
 
+    public var styledMarkerFramesForTesting: [
+        (token: MarkdownAnnotationToken, frame: NSRect)
+    ] {
+        annotationOverlay.markerFrames(in: annotationOverlay).map { marker in
+            (
+                token: marker.token,
+                frame: annotationOverlay.convert(marker.frame, to: self)
+            )
+        }
+    }
+
     public override func layout() {
         super.layout()
         updateScaledChrome()
@@ -382,6 +398,8 @@ public final class EditorWorkspaceView: NSView {
         addSubview(remoteChangedLineMarkerView)
         addSubview(remoteEdgePulseView)
         addSubview(remoteSyncToastView)
+        annotationOverlay.frame = textView.visibleRect
+        textView.addSubview(annotationOverlay, positioned: .above, relativeTo: nil)
 
         NotificationCenter.default.addObserver(
             self,
@@ -504,6 +522,7 @@ public final class EditorWorkspaceView: NSView {
             self.updateTextInsets()
             self.needsLayout = true
             self.needsDisplay = true
+            self.annotationOverlay.needsDisplay = true
         }
         textView.onImageResolutionChange = { [weak self] in
             self?.textView.needsDisplay = true
@@ -523,6 +542,8 @@ public final class EditorWorkspaceView: NSView {
     @objc private func boundsDidChange() {
         updateTextInsets(preserveVisibleOrigin: true, refreshDocumentHeight: false)
         textView.needsDisplay = true
+        annotationOverlay.frame = textView.visibleRect
+        annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
 
@@ -533,11 +554,14 @@ public final class EditorWorkspaceView: NSView {
             updateTextInsets(preserveVisibleOrigin: true)
         }
         textView.needsDisplay = true
+        annotationOverlay.frame = textView.visibleRect
+        annotationOverlay.needsDisplay = true
         scheduleMinimapUpdate()
     }
 
     @objc private func selectionDidChange() {
         textView.needsDisplay = true
+        annotationOverlay.needsDisplay = true
         minimapView.updateAccessibilitySelection()
         scheduleMinimapUpdate()
     }
@@ -591,6 +615,8 @@ public final class EditorWorkspaceView: NSView {
             updateDocumentHeight(preserveVisibleOrigin: preserveVisibleOrigin)
         }
         textView.needsDisplay = true
+        annotationOverlay.frame = textView.visibleRect
+        annotationOverlay.needsDisplay = true
         minimapView.needsDisplay = true
     }
 

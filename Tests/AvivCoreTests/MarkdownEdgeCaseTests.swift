@@ -314,13 +314,13 @@ final class MarkdownEdgeCaseTests: XCTestCase {
             "checked task",
             "- [x] Done with **bold**",
             cursorNeedle: "bold",
-            expectedAnnotations: ["**", "**"]
+            expectedAnnotations: ["-", "**", "**"]
         ),
         EdgeCase(
             "unchecked task link",
             "- [ ] Read [docs](https://example.com)",
             cursorNeedle: "docs",
-            expectedAnnotations: ["[docs](https://example.com)"]
+            expectedAnnotations: ["-", "[docs](https://example.com)"]
         ),
         EdgeCase(
             "bullet list",

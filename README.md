@@ -124,10 +124,22 @@ This runs:
 - layout stability verifier
 - minimap viewport verifier
 - remote-source unit and zero-jump layout tests
+- real-click styled-marker reveal tests for local and URL-backed documents
 - typing, table-restoration, and 4,000-row huge-table performance verifiers
 - rendered snapshot generation
 
-Core invariants are tested directly: moving the cursor should not shift rendered content, the minimap should track the real scroll viewport, and native tabs/windows should behave like real macOS document tabs.
+Core invariants are tested directly: focusing styled Markdown should reveal its raw editing markers and restore the exact reading presentation on click-away, moving the cursor should not shift rendered content, the minimap should track the real scroll viewport, and native tabs/windows should behave like real macOS document tabs.
+
+To capture standalone proof using native AppKit click events against both a local fixture and a live URL-backed document:
+
+```bash
+dist/Aviv.app/Contents/MacOS/Aviv \
+  --verify-styled-marker-reveal https://pitchai.net/aviv-live/seth-live-demo.md \
+  --local-file Samples/styled-marker-reveal.md \
+  --evidence-dir dist/styled-marker-reveal
+```
+
+The verifier fails loudly unless the click moves the real caret, paints the exact heading marker, restores identical reading-mode pixels on click-away, preserves source text and viewport geometry, and retains the live-document title and sync indicator. It writes local and live screenshots plus a machine-readable JSON report.
 
 ## Project Shape 🧱
 

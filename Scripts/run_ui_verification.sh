@@ -8,6 +8,7 @@ swift test
 "$ROOT/Scripts/package_app.sh"
 
 mkdir -p "$ROOT/dist/snapshots"
+mkdir -p "$ROOT/dist/styled-marker-reveal"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-commands
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-tabs
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-default-app-prompt
@@ -19,6 +20,10 @@ mkdir -p "$ROOT/dist/snapshots"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-table-restoration "$ROOT/dist/table-restoration"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-huge-table-performance "$ROOT/dist/huge-table-performance"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-accessibility "$ROOT/dist/accessibility-audit"
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
+  --verify-styled-marker-reveal https://pitchai.net/aviv-live/seth-live-demo.md \
+  --local-file "$ROOT/Samples/styled-marker-reveal.md" \
+  --evidence-dir "$ROOT/dist/styled-marker-reveal"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/reading.png"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-heading.png" --cursor "Aviv Markdown"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --snapshot "$ROOT/dist/snapshots/editing-inline.png" --cursor "bold text"
@@ -56,3 +61,4 @@ echo "$ROOT/dist/huge-table-performance/huge-table-mid-scroll.png"
 echo "$ROOT/dist/huge-table-performance/huge-table-performance-result.json"
 echo "$ROOT/dist/accessibility-audit/accessibility-audit.json"
 echo "$ROOT/dist/accessibility-audit/accessibility-structured-conflict.png"
+echo "$ROOT/dist/styled-marker-reveal/styled-marker-reveal-result.json"
