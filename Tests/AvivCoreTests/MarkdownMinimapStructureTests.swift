@@ -50,4 +50,20 @@ final class MarkdownMinimapStructureTests: XCTestCase {
 
         XCTAssertEqual(lines.map(\.kind), [.codeFence, .code, .code, .codeFence])
     }
+
+    func testPreservesTerminalEmptyLineForEveryMarkdownLineEnding() {
+        let fixtures: [(String, Int)] = [
+            ("# LF\n", 2),
+            ("# CR\r", 2),
+            ("# CRLF\r\n", 2),
+            ("# Multiple\n\n", 3),
+            ("", 1),
+        ]
+
+        for (markdown, expectedCount) in fixtures {
+            let lines = MarkdownMinimapStructure.lines(in: markdown)
+            XCTAssertEqual(lines.count, expectedCount, "fixture: \(markdown.debugDescription)")
+            XCTAssertEqual(lines.last?.kind, .blank, "fixture: \(markdown.debugDescription)")
+        }
+    }
 }

@@ -49,7 +49,18 @@ public final class RemoteSyncIndicatorView: NSView {
         layer?.borderColor = NSColor.clear.cgColor
         accessibilitySummaryForTesting =
             "Live document from \(presentation.sourceHost), \(presentation.detail)"
-        setAccessibilityLabel(accessibilitySummaryForTesting)
+        setAccessibilityHidden(false)
+        setAccessibilityLabel("Live document")
+        setAccessibilityValue(
+            "\(presentation.phase.rawValue); source \(presentation.sourceHost); \(presentation.detail); \(presentation.isWritable ? "writable" : "read-only")"
+        )
+        setAccessibilityHelp(
+            "Live-document synchronization status for \(presentation.sourceHost). \(presentation.detail). The source is \(presentation.isWritable ? "writable" : "read-only")."
+        )
+        heartbeatView.setAccessibilityValue(presentation.phase.rawValue)
+        heartbeatView.setAccessibilityHelp(
+            "Current remote synchronization phase: \(presentation.phase.rawValue)."
+        )
         toolTip = accessibilitySummaryForTesting
         animateHeartbeat()
         if [.incomingApplied, .saved, .conflict].contains(presentation.phase) {
@@ -65,6 +76,12 @@ public final class RemoteSyncIndicatorView: NSView {
         layer?.borderWidth = 0
         setAccessibilityElement(true)
         setAccessibilityIdentifier("remote-source-badge")
+        setAccessibilityRole(.group)
+        setAccessibilityRoleDescription("Live document sync status")
+        setAccessibilityLabel("Live document")
+        setAccessibilityEnabled(true)
+        setAccessibilityHelp("Remote source and synchronization status for a live document.")
+        setAccessibilityHidden(true)
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.image = NSImage(
@@ -75,11 +92,18 @@ public final class RemoteSyncIndicatorView: NSView {
             pointSize: 12.5,
             weight: .medium
         )
+        iconView.setAccessibilityElement(false)
+        iconView.setAccessibilityHidden(true)
+        iconView.cell?.setAccessibilityElement(false)
+        iconView.cell?.setAccessibilityHidden(true)
         heartbeatView.translatesAutoresizingMaskIntoConstraints = false
         heartbeatView.wantsLayer = true
         heartbeatView.setAccessibilityElement(true)
         heartbeatView.setAccessibilityIdentifier("remote-source-heartbeat")
         heartbeatView.setAccessibilityLabel("Remote source heartbeat")
+        heartbeatView.setAccessibilityRole(.valueIndicator)
+        heartbeatView.setAccessibilityRoleDescription("Remote synchronization phase")
+        heartbeatView.setAccessibilityEnabled(true)
 
         layer?.addSublayer(shimmerLayer)
         shimmerLayer.colors = [

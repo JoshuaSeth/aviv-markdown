@@ -8,9 +8,7 @@ final class RemoteEdgePulseView: NSView {
         wantsLayer = true
         layer?.backgroundColor = MarkdownTheme.clean.accentColor.withAlphaComponent(0.58).cgColor
         alphaValue = 0
-        setAccessibilityElement(true)
-        setAccessibilityIdentifier("remote-edge-pulse")
-        setAccessibilityLabel("Incoming remote edit pulse")
+        setAccessibilityElement(false)
     }
 
     @available(*, unavailable)
@@ -40,15 +38,32 @@ final class RemoteEdgePulseView: NSView {
 final class RemoteChangedLineMarkerView: NSView {
     weak var textView: MarkdownTextView?
     var lineRanges: [NSRange] = [] {
-        didSet { needsDisplay = true }
+        didSet {
+            needsDisplay = true
+            setAccessibilityElement(!lineRanges.isEmpty)
+            setAccessibilityValue(
+                lineRanges.isEmpty
+                    ? "No externally changed lines"
+                    : "\(lineRanges.count) externally changed line regions"
+            )
+            setAccessibilityHidden(lineRanges.isEmpty)
+        }
     }
 
     init(textView: MarkdownTextView) {
         self.textView = textView
         super.init(frame: .zero)
-        setAccessibilityElement(true)
+        setAccessibilityElement(false)
         setAccessibilityIdentifier("remote-changed-lines")
         setAccessibilityLabel("Externally changed lines")
+        setAccessibilityRole(.group)
+        setAccessibilityRoleDescription("Remote document change markers")
+        setAccessibilityHelp(
+            "Marks document lines most recently changed by the remote source."
+        )
+        setAccessibilityEnabled(true)
+        setAccessibilityValue("No externally changed lines")
+        setAccessibilityHidden(true)
     }
 
     @available(*, unavailable)
@@ -102,18 +117,38 @@ final class RemoteSyncToastView: NSView {
         layer?.backgroundColor = NSColor(calibratedWhite: 0.12, alpha: 0.86).cgColor
         layer?.cornerRadius = 12
         alphaValue = 0
-        setAccessibilityElement(true)
+        isHidden = true
+        setAccessibilityElement(false)
         setAccessibilityIdentifier("remote-sync-toast")
+        setAccessibilityRole(.group)
+        setAccessibilityRoleDescription("Remote synchronization alert")
+        setAccessibilityLabel("Remote synchronization status")
+        setAccessibilityEnabled(true)
+        setAccessibilityHelp("Transient status for remote document changes and conflicts.")
+        setAccessibilityHidden(true)
         iconView.translatesAutoresizingMaskIntoConstraints = false
         iconView.image = NSImage(
             systemSymbolName: "arrow.triangle.2.circlepath",
             accessibilityDescription: nil
         )
         iconView.contentTintColor = .white
+        iconView.setAccessibilityElement(false)
+        iconView.setAccessibilityHidden(true)
+        iconView.cell?.setAccessibilityElement(false)
+        iconView.cell?.setAccessibilityHidden(true)
         label.translatesAutoresizingMaskIntoConstraints = false
         label.font = NSFont.systemFont(ofSize: 11.5, weight: .semibold)
         label.textColor = .white
         label.lineBreakMode = .byTruncatingTail
+        label.setAccessibilityElement(true)
+        label.setAccessibilityIdentifier("remote-sync-toast-message")
+        label.setAccessibilityRole(.staticText)
+        label.setAccessibilityRoleDescription("Remote synchronization message")
+        label.setAccessibilityLabel("Remote sync message")
+        label.setAccessibilityEnabled(true)
+        label.setAccessibilityHelp(
+            "Visible message describing the latest remote synchronization event."
+        )
         addSubview(iconView)
         addSubview(label)
         NSLayoutConstraint.activate([
@@ -135,7 +170,16 @@ final class RemoteSyncToastView: NSView {
     func show(message: String, conflict: Bool = false) {
         hideWorkItem?.cancel()
         label.stringValue = message
-        setAccessibilityLabel(message)
+        label.setAccessibilityValue(message)
+        isHidden = false
+        setAccessibilityElement(true)
+        setAccessibilityHidden(false)
+        setAccessibilityValue(message)
+        setAccessibilityHelp(
+            conflict
+                ? "Remote synchronization conflict. \(message). Open the conflict controls to choose which document version to keep."
+                : "Remote synchronization update. \(message)."
+        )
         layer?.backgroundColor =
             conflict
             ? NSColor(calibratedRed: 0.56, green: 0.16, blue: 0.13, alpha: 0.91).cgColor
@@ -150,8 +194,19 @@ final class RemoteSyncToastView: NSView {
                 context.duration = 0.36
                 self?.animator().alphaValue = 0
             }
+            self?.setAccessibilityElement(false)
+            self?.setAccessibilityHidden(true)
+            self?.isHidden = true
         }
         hideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + 2.4, execute: workItem)
+    }
+
+    func dismiss() {
+        hideWorkItem?.cancel()
+        alphaValue = 0
+        setAccessibilityElement(false)
+        setAccessibilityHidden(true)
+        isHidden = true
     }
 }

@@ -7,6 +7,7 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     public var onSelectionChange: (() -> Void)?
     public var onViewScaleChange: (() -> Void)?
     public var onImageResolutionChange: (() -> Void)?
+    public var onDocumentStructureChange: (() -> Void)?
     var onDrawAnnotations: (() -> Void)?
     public var markdownImageBaseURL: URL? {
         didSet {
@@ -48,6 +49,14 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         field.layer?.borderWidth = 1
         field.layer?.borderColor =
             NSColor(calibratedRed: 0.840, green: 0.858, blue: 0.878, alpha: 1).cgColor
+        field.setAccessibilityIdentifier("aviv.document.source-editor")
+        field.setAccessibilityRole(.textField)
+        field.setAccessibilityRoleDescription("Markdown source editor")
+        field.setAccessibilityLabel("Markdown source editor")
+        field.setAccessibilityEnabled(true)
+        field.setAccessibilityHelp(
+            "Edits the Markdown source for the selected formatted span. Press Return to apply the source change."
+        )
         return field
     }()
 
@@ -433,6 +442,18 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         documentRenderIndex.sourceLineRanges
     }
 
+    var outlineItemsForRendering: [MarkdownDocumentOutlineItem] {
+        documentRenderIndex.outlineItems
+    }
+
+    var totalOutlineItemCountForRendering: Int {
+        documentRenderIndex.totalOutlineItemCount
+    }
+
+    var omittedOutlineItemCountForRendering: Int {
+        documentRenderIndex.omittedOutlineItemCount
+    }
+
     private func refreshDocumentRenderIndexIfNeeded() {
         guard !documentRenderIndexIsCurrent else { return }
         rebuildDocumentRenderIndex()
@@ -443,6 +464,7 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         documentRenderIndexIsCurrent = true
         editedLineRangesAwaitingRenderIndexRefresh.removeAll(keepingCapacity: true)
         renderIndexRevision += 1
+        onDocumentStructureChange?()
     }
 
     private func startThumbnailLoad(for url: URL, cacheKey: String, displayName: String) {
@@ -465,6 +487,15 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
     }
 
     private func configure() {
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("aviv.document.editor")
+        setAccessibilityRole(.textArea)
+        setAccessibilityRoleDescription("Markdown document editor")
+        setAccessibilityLabel("Document editor")
+        setAccessibilityEnabled(true)
+        setAccessibilityHelp(
+            "Editable Markdown document. Native text selection, insertion, search, spelling, and undo actions are available. Use the document outline to navigate headings, tables, and lists."
+        )
         drawsBackground = false
         isRichText = false
         importsGraphics = false

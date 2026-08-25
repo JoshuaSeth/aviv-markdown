@@ -20,8 +20,45 @@ public enum MarkdownMinimapVerifier {
             if let viewScale = fixture.viewScale {
                 workspace.textView.setTextScale(viewScale)
             }
+            let documentURL =
+                fixture.isLive
+                ? URL(string: "https://pitchai.net/aviv-live/outline-verifier.md")!
+                : URL(fileURLWithPath: "/tmp/\(fixture.name).md")
+            workspace.setDocumentURL(documentURL)
+            workspace.updateDocumentTitle(url: documentURL, isEdited: false)
+            if fixture.isLive {
+                workspace.updateRemoteSyncPresentation(
+                    RemoteSyncPresentation(
+                        phase: .watching,
+                        sourceHost: "pitchai.net",
+                        isWritable: true,
+                        detail: "Live • Save enabled"
+                    )
+                )
+            }
             workspace.loadMarkdown(fixture.markdown)
             settle(workspace)
+
+            let minimapLines = workspace.textView.minimapLinesForRendering
+            let sourceRanges = workspace.textView.sourceLineRangesForRendering
+            if minimapLines.count != sourceRanges.count {
+                failures.append(
+                    "\(fixture.name): \(minimapLines.count) minimap lines != \(sourceRanges.count) source ranges"
+                )
+            }
+            if workspace.minimapForTesting.structureEntryCountForTesting == 0 {
+                failures.append("\(fixture.name): minimap rendered no document structure")
+            }
+            if workspace.minimapForTesting.accessibilityOutlineItemCountForTesting
+                < fixture.minimumOutlineItems
+            {
+                failures.append(
+                    "\(fixture.name): outline exposed \(workspace.minimapForTesting.accessibilityOutlineItemCountForTesting) items, expected at least \(fixture.minimumOutlineItems)"
+                )
+            }
+            if workspace.minimapForTesting.accessibilityIdentifier() != "aviv.document.outline" {
+                failures.append("\(fixture.name): outline accessibility identifier is missing")
+            }
 
             guard let initialMetrics = workspace.minimapForTesting.viewportMetrics() else {
                 failures.append("\(fixture.name): missing initial minimap metrics")
@@ -97,6 +134,8 @@ public enum MarkdownMinimapVerifier {
         let viewScale: CGFloat?
         let scrollRatios: [CGFloat]
         let expectNoScroll: Bool
+        let minimumOutlineItems: Int
+        let isLive: Bool
     }
 
     private static let fixtures: [Fixture] = [
@@ -107,7 +146,33 @@ public enum MarkdownMinimapVerifier {
             height: 620,
             viewScale: nil,
             scrollRatios: [0],
-            expectNoScroll: true
+            expectNoScroll: true,
+            minimumOutlineItems: 1,
+            isLive: false
+        ),
+        Fixture(
+            name: "local-trailing-newline",
+            markdown:
+                "# Local document\n\n- Reliable sidebar\n\n| Area | State |\n| --- | --- |\n| Outline | Loaded |\n",
+            width: 880,
+            height: 620,
+            viewScale: nil,
+            scrollRatios: [0],
+            expectNoScroll: true,
+            minimumOutlineItems: 3,
+            isLive: false
+        ),
+        Fixture(
+            name: "live-url-trailing-newline",
+            markdown:
+                "# Live document\n\n## Structure\n\n1. Watched remotely\n2. Saved securely\n\n| Sync | State |\n| --- | --- |\n| Polling | Active |\n",
+            width: 920,
+            height: 660,
+            viewScale: nil,
+            scrollRatios: [0],
+            expectNoScroll: true,
+            minimumOutlineItems: 5,
+            isLive: true
         ),
         Fixture(
             name: "structured-long",
@@ -116,7 +181,9 @@ public enum MarkdownMinimapVerifier {
             height: 740,
             viewScale: nil,
             scrollRatios: [0, 0.15, 0.5, 0.85, 1],
-            expectNoScroll: false
+            expectNoScroll: false,
+            minimumOutlineItems: 8,
+            isLive: false
         ),
         Fixture(
             name: "narrow-wrapped-zoomed",
@@ -125,7 +192,20 @@ public enum MarkdownMinimapVerifier {
             height: 560,
             viewScale: 1.18,
             scrollRatios: [0, 0.25, 0.5, 0.75, 1],
-            expectNoScroll: false
+            expectNoScroll: false,
+            minimumOutlineItems: 20,
+            isLive: false
+        ),
+        Fixture(
+            name: "large-structured-trailing-newline",
+            markdown: largeStructuredFixture,
+            width: 1_040,
+            height: 740,
+            viewScale: nil,
+            scrollRatios: [0, 0.5, 1],
+            expectNoScroll: false,
+            minimumOutlineItems: MarkdownDocumentOutline.maximumExposedItems,
+            isLive: false
         ),
     ]
 
@@ -254,5 +334,23 @@ public enum MarkdownMinimapVerifier {
 
             """
         }.joined(separator: "\n")
+    }
+
+    private static var largeStructuredFixture: String {
+        (0..<260).map { index in
+            """
+            ## Large section \(index + 1)
+
+            - List insight \(index + 1)
+            1. Numbered insight \(index + 1)
+            - [\(index.isMultiple(of: 2) ? "x" : " ")] Task insight \(index + 1)
+
+            | Signal | Value |
+            | --- | --- |
+            | Section | \(index + 1) |
+
+            This paragraph preserves realistic Markdown layout, selection, typing, and scrolling behavior while the outline remains bounded.
+            """
+        }.joined(separator: "\n\n") + "\n"
     }
 }
