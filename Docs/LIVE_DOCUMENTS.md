@@ -133,3 +133,12 @@ Production verification proved TLS and three public DNS resolvers; authenticated
 `GET`, `HEAD`, validators, same-URL `PUT`, exact restoration, private snapshots, automatic safe-folder discovery,
 Aviv query-token reads, bearer-only writes, traversal and symlink confinement, no CORS, and credential-free request
 logs.
+
+A disposable travel-Mac clone of Aviv commit `dffc926f8625429a934490b35821f6690fb6fdac` then passed strict formatting,
+59 tests with warnings-as-errors and complete Swift 6 concurrency, a strict build, release packaging, and code-signature
+verification. Against the production query-token URL, the native verifier applied a clean external edit in 1.092
+seconds with `0.000` point viewport movement and `0.000` text-container width change, preserved a dirty local buffer
+when a second external edit arrived, and completed an authenticated `Cmd-S` with a fresh ETag and public readback.
+All three rendered evidence frames were inspected and contained no credential. The temporary server fixture and its
+five private snapshots, Mac clone and token files, and local evidence copies were removed after verification; the
+historical travel-Mac checkout remained unchanged.
