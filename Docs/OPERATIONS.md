@@ -66,6 +66,22 @@ Scripts/package_app.sh
 Scripts/package_dmg.sh
 ```
 
+The packaged-app accessibility verifier loads normal local, URL-backed live, and large structured Markdown fixtures;
+checks that minimap and source-line metadata agree; enforces a two-second large-document load budget; exercises outline
+navigation; audits editor, toolbar, title, status, format, live-sync, and conflict metadata; and writes JSON plus a PNG:
+
+```sh
+dist/Aviv.app/Contents/MacOS/Aviv --verify-accessibility dist/accessibility-audit
+```
+
+For the real macOS Accessibility tree of a running build, grant Accessibility permission to the terminal or automation
+host once, then capture the bounded tab-separated audit. The script fails loudly if the process, window, permission, or
+child traversal is unavailable:
+
+```sh
+Scripts/audit_accessibility_tree.sh Aviv 7 > dist/accessibility-audit/system-events-tree.tsv
+```
+
 The URL-source verifier needs a public fixture, its write token in a mode-`0600` file, and an external process that
 edits the backing Markdown after each readiness line. It never accepts a token on the command line:
 

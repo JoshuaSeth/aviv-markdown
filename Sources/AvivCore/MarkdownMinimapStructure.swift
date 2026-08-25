@@ -30,20 +30,25 @@ public struct MarkdownMinimapLine: Equatable {
 
 public enum MarkdownMinimapStructure {
     public static func lines(in markdown: String) -> [MarkdownMinimapLine] {
-        lines(in: markdown, tableRowsByLocation: tableRowsByLocation(in: markdown))
+        lines(
+            in: markdown,
+            sourceLineRanges: MarkdownSourceLineScanner.contentRanges(in: markdown),
+            tableRowsByLocation: tableRowsByLocation(in: markdown)
+        )
     }
 
     static func lines(
         in markdown: String,
+        sourceLineRanges: [NSRange],
         tableRowsByLocation tableRows: [Int: MarkdownTableRow]
     ) -> [MarkdownMinimapLine] {
         let nsString = markdown as NSString
-        let documentLines = DocumentLine.lines(in: nsString)
         var insideFence = false
         var result: [MarkdownMinimapLine] = []
+        result.reserveCapacity(sourceLineRanges.count)
 
-        for line in documentLines {
-            let rawLine = nsString.substring(with: line.contentRange)
+        for contentRange in sourceLineRanges {
+            let rawLine = nsString.substring(with: contentRange)
             let quoteStripped = stripQuoteMarkers(from: rawLine)
             let content = quoteStripped.content
             let trimmed = content.trimmingCharacters(in: .whitespaces)
@@ -83,7 +88,7 @@ public enum MarkdownMinimapStructure {
                 continue
             }
 
-            if quoteStripped.quoteDepth == 0, let tableRow = tableRows[line.contentRange.location] {
+            if quoteStripped.quoteDepth == 0, let tableRow = tableRows[contentRange.location] {
                 result.append(
                     MarkdownMinimapLine(
                         kind: tableKind(for: tableRow),
@@ -138,44 +143,6 @@ public enum MarkdownMinimapStructure {
         }
 
         return result
-    }
-
-    private struct DocumentLine {
-        let contentRange: NSRange
-
-        static func lines(in nsString: NSString) -> [DocumentLine] {
-            if nsString.length == 0 {
-                return [DocumentLine(contentRange: NSRange(location: 0, length: 0))]
-            }
-
-            var lines: [DocumentLine] = []
-            var index = 0
-
-            while index < nsString.length {
-                let lineRange = nsString.lineRange(for: NSRange(location: index, length: 0))
-                lines.append(
-                    DocumentLine(contentRange: rangeWithoutLineEnding(lineRange, in: nsString))
-                )
-                index = NSMaxRange(lineRange)
-            }
-
-            return lines
-        }
-
-        private static func rangeWithoutLineEnding(
-            _ lineRange: NSRange,
-            in nsString: NSString
-        ) -> NSRange {
-            var length = lineRange.length
-            while length > 0 {
-                let character = nsString.character(at: lineRange.location + length - 1)
-                guard character == 10 || character == 13 else {
-                    break
-                }
-                length -= 1
-            }
-            return NSRange(location: lineRange.location, length: length)
-        }
     }
 
     private static func tableRowsByLocation(in markdown: String) -> [Int: MarkdownTableRow] {

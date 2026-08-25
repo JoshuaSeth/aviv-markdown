@@ -94,6 +94,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             defer: false
         )
         window.title = "Aviv"
+        window.setAccessibilityIdentifier("aviv.document.window")
+        window.setAccessibilityLabel("Aviv Markdown document window")
+        window.setAccessibilityEnabled(true)
+        window.setAccessibilityHelp(
+            "Document window containing Aviv's Markdown editor, document outline, toolbar, title, statistics, and synchronization status."
+        )
         // Keep the document title available to AppKit for tabs, Window menu entries,
         // accessibility, and represented-document behavior. Aviv presents one subtle
         // title through AppKit's centered toolbar slot, so the native title must not be
@@ -308,9 +314,15 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         let alert = NSAlert()
         alert.messageText = "Save changes?"
         alert.informativeText = "This document has unsaved changes."
-        alert.addButton(withTitle: "Save")
-        alert.addButton(withTitle: "Discard")
-        alert.addButton(withTitle: "Cancel")
+        let saveButton = alert.addButton(withTitle: "Save")
+        saveButton.setAccessibilityIdentifier("aviv.unsaved-changes.save")
+        saveButton.setAccessibilityHelp("Saves the current Markdown document before continuing.")
+        let discardButton = alert.addButton(withTitle: "Discard")
+        discardButton.setAccessibilityIdentifier("aviv.unsaved-changes.discard")
+        discardButton.setAccessibilityHelp("Discards unsaved Markdown changes and continues.")
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.setAccessibilityIdentifier("aviv.unsaved-changes.cancel")
+        cancelButton.setAccessibilityHelp("Keeps the document open with its unsaved changes.")
         let response = alert.runModal()
         if response == .alertFirstButtonReturn {
             saveDocument(nil)
@@ -324,8 +336,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         let alert = NSAlert()
         alert.messageText = "Revert changes?"
         alert.informativeText = "This will discard edits and reload the last saved document state."
-        alert.addButton(withTitle: "Revert")
-        alert.addButton(withTitle: "Cancel")
+        let revertButton = alert.addButton(withTitle: "Revert")
+        revertButton.setAccessibilityIdentifier("aviv.revert.confirm")
+        revertButton.setAccessibilityHelp("Discards local edits and reloads the saved document.")
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.setAccessibilityIdentifier("aviv.revert.cancel")
+        cancelButton.setAccessibilityHelp("Returns to the document without reverting changes.")
         return alert.runModal() == .alertFirstButtonReturn
     }
 
@@ -360,6 +376,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private func updateLiveDocumentToolbar(_ presentation: RemoteSyncPresentation?) {
         guard let toolbar = window?.toolbar else { return }
         guard let presentation else {
+            if let saveButton = toolbar.items.first(where: {
+                $0.itemIdentifier == .saveDocument
+            })?.view as? AccessibleToolbarButton {
+                saveButton.setAccessibilityValue("Local document save is available")
+                saveButton.setAccessibilityHelp(
+                    "Saves the current Markdown document to its local file."
+                )
+            }
             if let index = toolbar.items.firstIndex(where: {
                 $0.itemIdentifier == .liveDocument
             }) {
@@ -377,6 +401,20 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
         toolbar.items.first(where: { $0.itemIdentifier == .liveDocument })?.toolTip =
             remoteSyncToolbarView.accessibilitySummaryForTesting
+        if let saveButton = toolbar.items.first(where: {
+            $0.itemIdentifier == .saveDocument
+        })?.view as? AccessibleToolbarButton {
+            saveButton.setAccessibilityValue(
+                presentation.isWritable
+                    ? "Live document save is available"
+                    : "Live document source is read-only"
+            )
+            saveButton.setAccessibilityHelp(
+                presentation.isWritable
+                    ? "Saves this live Markdown document securely to its remote source."
+                    : "This live Markdown source is read-only, so remote save is unavailable."
+            )
+        }
         window?.contentView?.superview?.layoutSubtreeIfNeeded()
         alignDocumentTitleForCurrentLayout()
     }
@@ -407,20 +445,35 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
         switch itemIdentifier {
         case .newDocument:
-            item.image = NSImage(systemSymbolName: "doc", accessibilityDescription: "New")
-            item.label = "New"
-            item.action = #selector(newDocument(_:))
-        case .openDocument:
-            item.image = NSImage(systemSymbolName: "folder", accessibilityDescription: "Open")
-            item.label = "Open"
-            item.action = #selector(openDocument(_:))
-        case .saveDocument:
-            item.image = NSImage(
-                systemSymbolName: "square.and.arrow.down",
-                accessibilityDescription: "Save"
+            configureToolbarAction(
+                item,
+                image: NSImage(systemSymbolName: "doc", accessibilityDescription: "New"),
+                label: "New",
+                identifier: "aviv.toolbar.new-document",
+                help: "Creates a new untitled Markdown document.",
+                action: #selector(newDocument(_:))
             )
-            item.label = "Save"
-            item.action = #selector(saveDocument(_:))
+        case .openDocument:
+            configureToolbarAction(
+                item,
+                image: NSImage(systemSymbolName: "folder", accessibilityDescription: "Open"),
+                label: "Open",
+                identifier: "aviv.toolbar.open-document",
+                help: "Opens a local Markdown file. Use the File menu to open a live document URL.",
+                action: #selector(openDocument(_:))
+            )
+        case .saveDocument:
+            configureToolbarAction(
+                item,
+                image: NSImage(
+                    systemSymbolName: "square.and.arrow.down",
+                    accessibilityDescription: "Save"
+                ),
+                label: "Save",
+                identifier: "aviv.toolbar.save-document",
+                help: "Saves the current Markdown document to its local or writable live source.",
+                action: #selector(saveDocument(_:))
+            )
         case .liveDocument:
             item.view = remoteSyncToolbarView
             item.label = "Live Document"
@@ -432,64 +485,127 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.paletteLabel = "Document Title"
             item.visibilityPriority = .high
         case .zoomOut:
-            item.image = toolbarImage(
-                named: "minus.magnifyingglass",
-                fallback: "textformat.size.smaller",
-                description: "Zoom Out"
+            configureToolbarAction(
+                item,
+                image: toolbarImage(
+                    named: "minus.magnifyingglass",
+                    fallback: "textformat.size.smaller",
+                    description: "Zoom Out"
+                ),
+                label: "Zoom Out",
+                identifier: "aviv.toolbar.zoom-out",
+                help: "Decreases the document editor text size.",
+                action: #selector(decreaseTextSize(_:))
             )
-            item.label = "Zoom Out"
-            item.action = #selector(decreaseTextSize(_:))
         case .actualSize:
-            item.image = toolbarImage(
-                named: "1.magnifyingglass",
-                fallback: "text.magnifyingglass",
-                description: "Actual Size"
+            configureToolbarAction(
+                item,
+                image: toolbarImage(
+                    named: "1.magnifyingglass",
+                    fallback: "text.magnifyingglass",
+                    description: "Actual Size"
+                ),
+                label: "Actual Size",
+                identifier: "aviv.toolbar.actual-size",
+                help: "Restores the document editor's default text size.",
+                action: #selector(resetTextSize(_:))
             )
-            item.label = "Actual Size"
-            item.action = #selector(resetTextSize(_:))
         case .zoomIn:
-            item.image = toolbarImage(
-                named: "plus.magnifyingglass",
-                fallback: "textformat.size.larger",
-                description: "Zoom In"
+            configureToolbarAction(
+                item,
+                image: toolbarImage(
+                    named: "plus.magnifyingglass",
+                    fallback: "textformat.size.larger",
+                    description: "Zoom In"
+                ),
+                label: "Zoom In",
+                identifier: "aviv.toolbar.zoom-in",
+                help: "Increases the document editor text size.",
+                action: #selector(increaseTextSize(_:))
             )
-            item.label = "Zoom In"
-            item.action = #selector(increaseTextSize(_:))
         case .bold:
-            item.image = NSImage(systemSymbolName: "bold", accessibilityDescription: "Bold")
-            item.label = "Bold"
-            item.action = #selector(toggleBold(_:))
+            configureToolbarAction(
+                item,
+                image: NSImage(systemSymbolName: "bold", accessibilityDescription: "Bold"),
+                label: "Bold",
+                identifier: "aviv.toolbar.bold",
+                help: "Wraps the current selection in Markdown bold markers.",
+                action: #selector(toggleBold(_:))
+            )
         case .italic:
-            item.image = NSImage(systemSymbolName: "italic", accessibilityDescription: "Italic")
-            item.label = "Italic"
-            item.action = #selector(toggleItalic(_:))
+            configureToolbarAction(
+                item,
+                image: NSImage(systemSymbolName: "italic", accessibilityDescription: "Italic"),
+                label: "Italic",
+                identifier: "aviv.toolbar.italic",
+                help: "Wraps the current selection in Markdown italic markers.",
+                action: #selector(toggleItalic(_:))
+            )
         case .code:
-            item.image = NSImage(
-                systemSymbolName: "chevron.left.forwardslash.chevron.right",
-                accessibilityDescription: "Code"
+            configureToolbarAction(
+                item,
+                image: NSImage(
+                    systemSymbolName: "chevron.left.forwardslash.chevron.right",
+                    accessibilityDescription: "Code"
+                ),
+                label: "Code",
+                identifier: "aviv.toolbar.inline-code",
+                help: "Wraps the current selection in Markdown inline-code markers.",
+                action: #selector(toggleCode(_:))
             )
-            item.label = "Code"
-            item.action = #selector(toggleCode(_:))
         case .heading1:
-            item.image = NSImage(
-                systemSymbolName: "h.square",
-                accessibilityDescription: "Heading 1"
+            configureToolbarAction(
+                item,
+                image: NSImage(
+                    systemSymbolName: "h.square",
+                    accessibilityDescription: "Heading 1"
+                ),
+                label: "Heading 1",
+                identifier: "aviv.toolbar.heading-1",
+                help: "Formats the current source line as a level 1 Markdown heading.",
+                action: #selector(heading1(_:))
             )
-            item.label = "Heading 1"
-            item.action = #selector(heading1(_:))
         case .heading2:
-            item.image = NSImage(
-                systemSymbolName: "textformat.size",
-                accessibilityDescription: "Heading 2"
+            configureToolbarAction(
+                item,
+                image: NSImage(
+                    systemSymbolName: "textformat.size",
+                    accessibilityDescription: "Heading 2"
+                ),
+                label: "Heading 2",
+                identifier: "aviv.toolbar.heading-2",
+                help: "Formats the current source line as a level 2 Markdown heading.",
+                action: #selector(heading2(_:))
             )
-            item.label = "Heading 2"
-            item.action = #selector(heading2(_:))
         default:
             return nil
         }
 
-        item.toolTip = item.label
+        if item.toolTip == nil {
+            item.toolTip = item.label
+        }
         return item
+    }
+
+    private func configureToolbarAction(
+        _ item: NSToolbarItem,
+        image: NSImage?,
+        label: String,
+        identifier: String,
+        help: String,
+        action: Selector
+    ) {
+        item.label = label
+        item.paletteLabel = label
+        item.toolTip = help
+        item.view = AccessibleToolbarButton(
+            image: image,
+            label: label,
+            identifier: identifier,
+            help: help,
+            target: self,
+            action: action
+        )
     }
 
     private func toolbarImage(named name: String, fallback: String, description: String) -> NSImage?
@@ -542,7 +658,13 @@ private final class DocumentTitleToolbarView: NSView {
         label.textColor = MarkdownTheme.clean.secondaryTextColor
         label.alignment = .center
         label.lineBreakMode = .byTruncatingMiddle
-        label.setAccessibilityElement(false)
+        label.setAccessibilityElement(true)
+        label.setAccessibilityIdentifier("document-title-visible-text")
+        label.setAccessibilityRole(.staticText)
+        label.setAccessibilityRoleDescription("Visible Markdown document title")
+        label.setAccessibilityLabel("Visible document title")
+        label.setAccessibilityEnabled(true)
+        label.setAccessibilityHelp("Visible title of the current Markdown document.")
         addSubview(label)
         let centerConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
         titleCenterConstraint = centerConstraint
@@ -553,6 +675,11 @@ private final class DocumentTitleToolbarView: NSView {
         ])
         setAccessibilityElement(true)
         setAccessibilityIdentifier("document-title")
+        setAccessibilityRole(.staticText)
+        setAccessibilityRoleDescription("Markdown document title")
+        setAccessibilityLabel("Document title")
+        setAccessibilityEnabled(true)
+        setAccessibilityHelp("Title and unsaved-edit state of the current Markdown document.")
         update(title: "Untitled")
     }
 
@@ -563,11 +690,54 @@ private final class DocumentTitleToolbarView: NSView {
 
     func update(title: String) {
         label.stringValue = title
-        setAccessibilityLabel("Document title, \(title)")
+        label.setAccessibilityValue(title)
+        setAccessibilityValue(title)
+        setAccessibilityHelp(
+            title.hasSuffix(" *")
+                ? "Document title. The trailing asterisk means this document has unsaved changes."
+                : "Document title. This document has no unsaved changes."
+        )
     }
 
     func setHorizontalOffset(_ offset: CGFloat) {
         titleCenterConstraint?.constant = offset
+    }
+}
+
+private final class AccessibleToolbarButton: NSButton {
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 28, height: 28)
+    }
+
+    init(
+        image: NSImage?,
+        label: String,
+        identifier: String,
+        help: String,
+        target: AnyObject,
+        action: Selector
+    ) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 28, height: 28))
+        self.image = image
+        self.target = target
+        self.action = action
+        imagePosition = .imageOnly
+        imageScaling = .scaleProportionallyDown
+        bezelStyle = .toolbar
+        isBordered = false
+        setButtonType(.momentaryPushIn)
+        toolTip = help
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier(identifier)
+        setAccessibilityRole(.button)
+        setAccessibilityLabel(label)
+        setAccessibilityHelp(help)
+        setAccessibilityEnabled(true)
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
     }
 }
 

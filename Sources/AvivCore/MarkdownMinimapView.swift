@@ -6,6 +6,8 @@ public final class MarkdownMinimapView: NSView {
     private var activeThumbDragOffset: CGFloat?
     private var cachedStructureSignature: StructureSignature?
     private var cachedStructureImage: NSImage?
+    private var accessibilityOutlineElements: [MarkdownOutlineAccessibilityElement] = []
+    private var selectedAccessibilityOutlineIndex: Int?
 
     private struct StructureSignature: Equatable {
         let revision: Int
@@ -29,6 +31,7 @@ public final class MarkdownMinimapView: NSView {
         wantsLayer = true
         layer?.cornerRadius = theme.scaledMetric(7, minimum: 5)
         layer?.masksToBounds = true
+        configureAccessibility()
     }
 
     @available(*, unavailable)
@@ -37,6 +40,16 @@ public final class MarkdownMinimapView: NSView {
     }
 
     public override var isFlipped: Bool { true }
+
+    public override func layout() {
+        super.layout()
+        updateAccessibilityFrames()
+    }
+
+    public override func viewDidMoveToWindow() {
+        super.viewDidMoveToWindow()
+        updateAccessibilityFrames()
+    }
 
     public override func draw(_ dirtyRect: NSRect) {
         guard let textView, let metrics = viewportMetrics() else { return }
@@ -112,6 +125,124 @@ public final class MarkdownMinimapView: NSView {
     func scrollForTesting(thumbMinY y: CGFloat) {
         guard let metrics = viewportMetrics() else { return }
         scrollTextView(toThumbMinY: y, metrics: metrics)
+    }
+
+    func invalidateDocumentStructure() {
+        cachedStructureSignature = nil
+        cachedStructureImage = nil
+        rebuildAccessibilityOutline()
+        needsDisplay = true
+    }
+
+    func updateAccessibilitySelection() {
+        guard let textView else { return }
+        let selection = textView.selectedRange()
+        let selectedIndex = accessibilityOutlineElements.firstIndex {
+            $0.item.contains(selection.location)
+        }
+        guard selectedIndex != selectedAccessibilityOutlineIndex else { return }
+        if let previous = selectedAccessibilityOutlineIndex,
+            accessibilityOutlineElements.indices.contains(previous)
+        {
+            accessibilityOutlineElements[previous].setAccessibilitySelected(false)
+        }
+        if let selectedIndex {
+            accessibilityOutlineElements[selectedIndex].setAccessibilitySelected(true)
+        }
+        selectedAccessibilityOutlineIndex = selectedIndex
+        NSAccessibility.post(element: self, notification: .selectedChildrenChanged)
+    }
+
+    var structureEntryCountForTesting: Int {
+        guard let textView else { return 0 }
+        return structureEntries(in: textView).count
+    }
+
+    var accessibilityOutlineItemCountForTesting: Int {
+        accessibilityOutlineElements.count
+    }
+
+    var accessibilityOutlineIdentifiersForTesting: [String] {
+        accessibilityOutlineElements.compactMap { $0.accessibilityIdentifier() }
+    }
+
+    fileprivate func navigate(to item: MarkdownDocumentOutlineItem) -> Bool {
+        guard let textView else { return false }
+        let documentLength = (textView.string as NSString).length
+        let location = min(max(0, item.sourceRange.location), documentLength)
+        let targetRange = NSRange(location: location, length: 0)
+        textView.setSelectedRange(targetRange)
+        textView.scrollRangeToVisible(targetRange)
+        textView.window?.makeFirstResponder(textView)
+        updateAccessibilitySelection()
+        NSAccessibility.post(element: textView, notification: .focusedUIElementChanged)
+        return true
+    }
+
+    private func configureAccessibility() {
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("aviv.document.outline")
+        setAccessibilityRole(.outline)
+        setAccessibilityRoleDescription("Markdown document outline")
+        setAccessibilityLabel("Document outline")
+        setAccessibilityHelp(
+            "Structural overview of the document. Its heading, table, and list children can be pressed to move the document editor to that source line."
+        )
+        setAccessibilityOrientation(.vertical)
+        setAccessibilityEnabled(true)
+        rebuildAccessibilityOutline()
+    }
+
+    private func rebuildAccessibilityOutline() {
+        guard let textView else {
+            accessibilityOutlineElements = []
+            setAccessibilityChildren([])
+            setAccessibilityValue("No document structure")
+            return
+        }
+
+        accessibilityOutlineElements = textView.outlineItemsForRendering.map { item in
+            MarkdownOutlineAccessibilityElement(item: item, minimapView: self)
+        }
+        selectedAccessibilityOutlineIndex = nil
+        setAccessibilityChildren(accessibilityOutlineElements)
+
+        let items = textView.outlineItemsForRendering
+        let headingCount = items.filter { $0.isHeading }.count
+        let tableCount = items.filter { $0.isTable }.count
+        let listCount = items.count - headingCount - tableCount
+        var value = "\(headingCount) headings, \(tableCount) tables, \(listCount) list items"
+        let omitted = textView.omittedOutlineItemCountForRendering
+        if omitted > 0 {
+            value += "; \(omitted) additional items omitted to keep the outline responsive"
+        } else if textView.totalOutlineItemCountForRendering == 0 {
+            value = "No headings, tables, or list items"
+        }
+        setAccessibilityValue(value)
+        updateAccessibilityFrames()
+        updateAccessibilitySelection()
+        NSAccessibility.post(element: self, notification: .rowCountChanged)
+    }
+
+    private func updateAccessibilityFrames() {
+        guard let textView, let window, bounds.height > 0 else { return }
+        let documentLength = max(1, (textView.string as NSString).length)
+        let rowHeight = max(
+            4,
+            min(12, bounds.height / CGFloat(max(1, accessibilityOutlineElements.count)))
+        )
+        for element in accessibilityOutlineElements {
+            let progress = CGFloat(element.item.sourceRange.location) / CGFloat(documentLength)
+            let localY = min(
+                max(0, bounds.height * progress - rowHeight / 2),
+                bounds.height - rowHeight
+            )
+            let windowFrame = convert(
+                NSRect(x: 0, y: localY, width: bounds.width, height: rowHeight),
+                to: nil
+            )
+            element.setAccessibilityFrame(window.convertToScreen(windowFrame))
+        }
     }
 
     private func structureImage(
@@ -623,5 +754,119 @@ public final class MarkdownMinimapView: NSView {
 
     private var currentTheme: MarkdownTheme {
         textView?.styler.theme ?? fallbackTheme
+    }
+}
+
+private final class MarkdownOutlineAccessibilityElement: NSAccessibilityElement {
+    let item: MarkdownDocumentOutlineItem
+    private let pressAction: @MainActor @Sendable () -> Bool
+
+    init(item: MarkdownDocumentOutlineItem, minimapView: MarkdownMinimapView) {
+        self.item = item
+        self.pressAction = { [weak minimapView] in
+            minimapView?.navigate(to: item) ?? false
+        }
+        super.init()
+
+        setAccessibilityElement(true)
+        setAccessibilityParent(minimapView)
+        setAccessibilityRole(.row)
+        setAccessibilityRoleDescription(item.accessibilityRoleDescription)
+        setAccessibilityIdentifier(item.accessibilityIdentifier)
+        setAccessibilityLabel(item.accessibilityLabel)
+        setAccessibilityValue(item.accessibilityValue)
+        setAccessibilityHelp(
+            "\(item.accessibilityRoleDescription) at document line \(item.lineNumber). Press to focus the document editor at this item."
+        )
+        setAccessibilityEnabled(true)
+        setAccessibilitySelected(false)
+    }
+
+    nonisolated override func accessibilityPerformPress() -> Bool {
+        let pressAction = pressAction
+        if Thread.isMainThread {
+            return MainActor.assumeIsolated {
+                pressAction()
+            }
+        }
+
+        return DispatchQueue.main.sync {
+            MainActor.assumeIsolated {
+                pressAction()
+            }
+        }
+    }
+}
+
+extension MarkdownDocumentOutlineItem {
+    fileprivate var isHeading: Bool {
+        if case .heading = kind { return true }
+        return false
+    }
+
+    fileprivate var isTable: Bool {
+        if case .table = kind { return true }
+        return false
+    }
+
+    fileprivate func contains(_ location: Int) -> Bool {
+        if sourceRange.length == 0 {
+            return location == sourceRange.location
+        }
+        return NSLocationInRange(location, sourceRange)
+            || location == NSMaxRange(sourceRange)
+    }
+
+    fileprivate var accessibilityIdentifier: String {
+        "aviv.document.outline.\(accessibilityKindIdentifier).line-\(lineNumber)"
+    }
+
+    fileprivate var accessibilityRoleDescription: String {
+        switch kind {
+        case .heading:
+            return "Markdown heading"
+        case .table:
+            return "Markdown table"
+        case .unorderedList:
+            return "Markdown bullet list item"
+        case .orderedList:
+            return "Markdown numbered list item"
+        case .taskList:
+            return "Markdown task list item"
+        }
+    }
+
+    fileprivate var accessibilityLabel: String {
+        switch kind {
+        case .heading(let level):
+            return "Heading level \(level): \(title)"
+        case .table(let columns, let dataRows):
+            return "\(title), \(columns) columns and \(dataRows) data rows"
+        case .unorderedList(let depth):
+            return "Bullet list item, nesting level \(depth + 1): \(title)"
+        case .orderedList(let depth):
+            return "Numbered list item, nesting level \(depth + 1): \(title)"
+        case .taskList(let checked, let depth):
+            return "\(checked ? "Checked" : "Unchecked") task, nesting level \(depth + 1): \(title)"
+        }
+    }
+
+    fileprivate var accessibilityValue: String {
+        "\(title), line \(lineNumber)"
+    }
+
+    private var accessibilityKindIdentifier: String {
+        switch kind {
+        case .heading:
+            return "heading"
+        case .table:
+            return "table"
+        case .unorderedList:
+            return "bullet"
+        case .orderedList:
+            return "numbered-list"
+        case .taskList:
+            return "task"
+        }
     }
 }

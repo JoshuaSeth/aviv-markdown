@@ -9,14 +9,23 @@ extension DocumentWindowController {
         let input = NSTextField(string: "")
         input.placeholderString = "https://example.com/document.md"
         input.frame = NSRect(x: 0, y: 0, width: 430, height: 24)
+        input.setAccessibilityIdentifier("aviv.remote-open.url")
+        input.setAccessibilityLabel("Live document URL")
+        input.setAccessibilityHelp(
+            "HTTPS address of a public Markdown document that Aviv should open and monitor for changes."
+        )
 
         let alert = NSAlert()
         alert.messageText = "Open Markdown from URL"
         alert.informativeText =
             "Paste a public HTTPS Markdown URL. Aviv will watch it for external edits every second."
         alert.accessoryView = input
-        alert.addButton(withTitle: "Open")
-        alert.addButton(withTitle: "Cancel")
+        let openButton = alert.addButton(withTitle: "Open")
+        openButton.setAccessibilityIdentifier("aviv.remote-open.confirm")
+        openButton.setAccessibilityHelp("Opens and begins monitoring the live Markdown document.")
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.setAccessibilityIdentifier("aviv.remote-open.cancel")
+        cancelButton.setAccessibilityHelp("Closes this dialog without opening a live document.")
 
         guard alert.runModal() == .alertFirstButtonReturn else { return }
         let value = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -176,14 +185,7 @@ extension DocumentWindowController {
             guard let self, let pending = await controller.pendingIncomingSnapshot() else {
                 return
             }
-            let alert = NSAlert()
-            alert.alertStyle = .warning
-            alert.messageText = "Incoming edits are waiting"
-            alert.informativeText =
-                "Your local edits are untouched. Use the incoming version, replace the remote version with yours, or keep editing."
-            alert.addButton(withTitle: "Use Incoming")
-            alert.addButton(withTitle: "Replace Remote with Mine")
-            alert.addButton(withTitle: "Keep Editing")
+            let alert = self.makeRemoteConflictAlert()
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
                 await self.acceptIncoming(pending, controller: controller)
@@ -191,6 +193,36 @@ extension DocumentWindowController {
                 await self.saveRemoteDocument(replacingPendingIncoming: true)
             }
         }
+    }
+
+    func makeRemoteConflictAlert() -> NSAlert {
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = "Incoming edits are waiting"
+        alert.informativeText =
+            "Your local edits are untouched. Use the incoming version, replace the remote version with yours, or keep editing."
+        alert.window.setAccessibilityIdentifier("aviv.remote-conflict.dialog")
+        alert.window.setAccessibilityLabel("Remote document conflict")
+        alert.window.setAccessibilityHelp(
+            "Resolve the incoming remote Markdown version without losing the current local edits."
+        )
+        alert.window.setAccessibilityEnabled(true)
+        let useIncomingButton = alert.addButton(withTitle: "Use Incoming")
+        useIncomingButton.setAccessibilityIdentifier("aviv.remote-conflict.use-incoming")
+        useIncomingButton.setAccessibilityHelp(
+            "Replaces the local editor contents with the incoming remote document."
+        )
+        let replaceRemoteButton = alert.addButton(withTitle: "Replace Remote with Mine")
+        replaceRemoteButton.setAccessibilityIdentifier("aviv.remote-conflict.replace-remote")
+        replaceRemoteButton.setAccessibilityHelp(
+            "Keeps the local editor contents and writes them over the pending remote version."
+        )
+        let keepEditingButton = alert.addButton(withTitle: "Keep Editing")
+        keepEditingButton.setAccessibilityIdentifier("aviv.remote-conflict.keep-editing")
+        keepEditingButton.setAccessibilityHelp(
+            "Leaves both versions pending and returns focus to the local document editor."
+        )
+        return alert
     }
 
     func stopRemoteSync() {
@@ -283,6 +315,11 @@ extension DocumentWindowController {
         let input = NSSecureTextField(string: "")
         input.placeholderString = "Write token"
         input.frame = NSRect(x: 0, y: 0, width: 380, height: 24)
+        input.setAccessibilityIdentifier("aviv.remote-save.credential")
+        input.setAccessibilityLabel("Remote write credential")
+        input.setAccessibilityHelp(
+            "Write token for the remote Markdown source. The value is stored in macOS Keychain."
+        )
         let alert = NSAlert()
         alert.messageText = "Authenticate remote save"
         let writeHost =
@@ -292,8 +329,14 @@ extension DocumentWindowController {
         alert.informativeText =
             "Enter the write token for \(writeHost). Aviv stores it in your macOS Keychain and never puts it in the URL."
         alert.accessoryView = input
-        alert.addButton(withTitle: "Save Credential")
-        alert.addButton(withTitle: "Cancel")
+        let saveCredentialButton = alert.addButton(withTitle: "Save Credential")
+        saveCredentialButton.setAccessibilityIdentifier("aviv.remote-save.credential-confirm")
+        saveCredentialButton.setAccessibilityHelp(
+            "Stores the credential in macOS Keychain and continues the remote save."
+        )
+        let cancelButton = alert.addButton(withTitle: "Cancel")
+        cancelButton.setAccessibilityIdentifier("aviv.remote-save.credential-cancel")
+        cancelButton.setAccessibilityHelp("Cancels the remote save without storing a credential.")
         guard alert.runModal() == .alertFirstButtonReturn else { return nil }
 
         let token = input.stringValue.trimmingCharacters(in: .whitespacesAndNewlines)

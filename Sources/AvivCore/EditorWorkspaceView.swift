@@ -65,6 +65,7 @@ public final class EditorWorkspaceView: NSView {
     private var pendingMetricsWorkItem: DispatchWorkItem?
     private var pendingMinimapWorkItem: DispatchWorkItem?
     private var lastTextGeometry: TextGeometry?
+    private var currentRemoteSyncPresentation: RemoteSyncPresentation?
     private let geometryEpsilon: CGFloat = 0.25
     private let largeDocumentUpdateThreshold = 12_000
 
@@ -100,16 +101,27 @@ public final class EditorWorkspaceView: NSView {
 
     public func updateDocumentTitle(url: URL?, isEdited: Bool) {
         let base = url?.lastPathComponent ?? "Untitled"
-        titleLabel.stringValue = isEdited ? "\(base) *" : base
+        let title = isEdited ? "\(base) *" : base
+        titleLabel.stringValue = title
+        titleLabel.setAccessibilityValue(title)
+        titleLabel.setAccessibilityHelp(
+            isEdited
+                ? "Document title. The trailing asterisk means this document has unsaved changes."
+                : "Document title. This document has no unsaved changes."
+        )
+        refreshWorkspaceAccessibilityValue()
     }
 
     public func updateRemoteSyncPresentation(_ presentation: RemoteSyncPresentation?) {
+        currentRemoteSyncPresentation = presentation
         guard let presentation else {
             remoteChangedLineMarkerView.lineRanges = []
-            remoteSyncToastView.alphaValue = 0
+            remoteSyncToastView.dismiss()
+            refreshWorkspaceAccessibilityValue()
             onRemoteSyncPresentationChange?(nil)
             return
         }
+        refreshWorkspaceAccessibilityValue()
         onRemoteSyncPresentationChange?(presentation)
     }
 
@@ -181,7 +193,13 @@ public final class EditorWorkspaceView: NSView {
         let text = textView.string
         let words = text.split { $0.isWhitespace || $0.isNewline }.count
         let lines = max(1, text.components(separatedBy: .newlines).count)
-        statusLabel.stringValue = "\(words) words  \(lines) lines"
+        let status = "\(words) words  \(lines) lines"
+        statusLabel.stringValue = status
+        statusLabel.setAccessibilityValue(status)
+        statusLabel.setAccessibilityHelp(
+            "Document statistics: \(words) words across \(lines) source lines."
+        )
+        refreshWorkspaceAccessibilityValue()
     }
 
     public func scheduleMetricsUpdate() {
@@ -202,6 +220,25 @@ public final class EditorWorkspaceView: NSView {
 
     var minimapForTesting: MarkdownMinimapView {
         minimapView
+    }
+
+    public var minimapStructureEntryCountForTesting: Int {
+        minimapView.structureEntryCountForTesting
+    }
+
+    public var outlineAccessibilityItemCountForTesting: Int {
+        minimapView.accessibilityOutlineItemCountForTesting
+    }
+
+    public var outlineAccessibilityIdentifiersForTesting: [String] {
+        minimapView.accessibilityOutlineIdentifiersForTesting
+    }
+
+    public var minimapMetadataCountsForTesting: (lines: Int, ranges: Int) {
+        (
+            lines: textView.minimapLinesForRendering.count,
+            ranges: textView.sourceLineRangesForRendering.count
+        )
     }
 
     public var resolvedTextContainerWidthForTesting: CGFloat {
@@ -226,6 +263,15 @@ public final class EditorWorkspaceView: NSView {
         appearance = NSAppearance(named: .aqua)
         wantsLayer = true
         layer?.backgroundColor = theme.backgroundColor.cgColor
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("aviv.document.workspace")
+        setAccessibilityRole(.group)
+        setAccessibilityRoleDescription("Aviv Markdown document workspace")
+        setAccessibilityLabel("Markdown document workspace")
+        setAccessibilityEnabled(true)
+        setAccessibilityHelp(
+            "Contains the native text editor, document outline, title, document statistics, format control, and remote synchronization status."
+        )
 
         scrollView.translatesAutoresizingMaskIntoConstraints = false
         scrollView.borderType = .noBorder
@@ -237,6 +283,12 @@ public final class EditorWorkspaceView: NSView {
         scrollView.contentInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.scrollerInsets = NSEdgeInsets(top: 0, left: 0, bottom: 0, right: 0)
         scrollView.documentView = textView
+        scrollView.setAccessibilityIdentifier("aviv.document.scroll-area")
+        scrollView.setAccessibilityLabel("Document scroll area")
+        scrollView.setAccessibilityEnabled(true)
+        scrollView.setAccessibilityHelp(
+            "Scrollable container for the Markdown document editor."
+        )
 
         textView.frame = NSRect(x: 0, y: 0, width: 900, height: 1400)
         textView.minSize = NSSize(width: 0, height: 0)
@@ -250,12 +302,24 @@ public final class EditorWorkspaceView: NSView {
         titleLabel.textColor = theme.secondaryTextColor
         titleLabel.alignment = .center
         titleLabel.lineBreakMode = .byTruncatingMiddle
+        titleLabel.setAccessibilityIdentifier("aviv.document.title")
+        titleLabel.setAccessibilityRole(.staticText)
+        titleLabel.setAccessibilityRoleDescription("Markdown document title")
+        titleLabel.setAccessibilityLabel("Document title")
+        titleLabel.setAccessibilityEnabled(true)
+        titleLabel.setAccessibilityHelp("Title of the open Markdown document.")
 
         statusLabel.translatesAutoresizingMaskIntoConstraints = false
         statusLabel.font = theme.smallFont
         statusLabel.textColor = theme.secondaryTextColor
         statusLabel.alignment = .right
         statusLabel.lineBreakMode = .byTruncatingTail
+        statusLabel.setAccessibilityIdentifier("aviv.document.statistics")
+        statusLabel.setAccessibilityRole(.staticText)
+        statusLabel.setAccessibilityRoleDescription("Markdown document statistics")
+        statusLabel.setAccessibilityLabel("Document statistics")
+        statusLabel.setAccessibilityEnabled(true)
+        statusLabel.setAccessibilityHelp("Current document word and source-line counts.")
 
         remoteEdgePulseView.translatesAutoresizingMaskIntoConstraints = false
         remoteChangedLineMarkerView.translatesAutoresizingMaskIntoConstraints = false
@@ -266,6 +330,13 @@ public final class EditorWorkspaceView: NSView {
         formatLabel.font = theme.smallFont
         formatLabel.textColor = theme.secondaryTextColor
         formatLabel.alignment = .left
+        formatLabel.setAccessibilityIdentifier("aviv.document.format-label")
+        formatLabel.setAccessibilityRole(.staticText)
+        formatLabel.setAccessibilityRoleDescription("Document format label")
+        formatLabel.setAccessibilityLabel("Document format label")
+        formatLabel.setAccessibilityValue("Format")
+        formatLabel.setAccessibilityEnabled(true)
+        formatLabel.setAccessibilityHelp("Labels the adjacent document format selector.")
 
         formatButton.translatesAutoresizingMaskIntoConstraints = false
         formatButton.controlSize = .small
@@ -273,6 +344,14 @@ public final class EditorWorkspaceView: NSView {
         formatButton.isBordered = false
         formatButton.target = self
         formatButton.action = #selector(formatSelectionChanged)
+        formatButton.setAccessibilityIdentifier("aviv.document.format")
+        formatButton.setAccessibilityRole(.popUpButton)
+        formatButton.setAccessibilityRoleDescription("Document format selector")
+        formatButton.setAccessibilityLabel("Document format")
+        formatButton.setAccessibilityEnabled(true)
+        formatButton.setAccessibilityHelp(
+            "Selects the page-width and padding profile used to edit and print this document."
+        )
         for format in MarkdownDocumentFormat.allCases {
             formatButton.addItem(withTitle: format.menuTitle)
             formatButton.lastItem?.representedObject = format.rawValue
@@ -284,6 +363,11 @@ public final class EditorWorkspaceView: NSView {
         topBarBackdropView.translatesAutoresizingMaskIntoConstraints = false
         minimapBackdropView.translatesAutoresizingMaskIntoConstraints = false
         minimapView.translatesAutoresizingMaskIntoConstraints = false
+        topBarBackdropView.setAccessibilityElement(false)
+        minimapBackdropView.setAccessibilityElement(false)
+        formatBackdropView.setAccessibilityElement(false)
+        formatLabel.setAccessibilityElement(true)
+        rule.setAccessibilityElement(false)
 
         addSubview(scrollView)
         addSubview(topBarBackdropView)
@@ -424,12 +508,16 @@ public final class EditorWorkspaceView: NSView {
         textView.onImageResolutionChange = { [weak self] in
             self?.textView.needsDisplay = true
         }
+        textView.onDocumentStructureChange = { [weak self] in
+            self?.minimapView.invalidateDocumentStructure()
+        }
         textView.onDrawAnnotations = { [weak self] in
             guard let self else { return }
             self.annotationOverlay.renderAnnotations(in: self.textView)
         }
         updateScaledChrome()
         syncFormatControl()
+        updateMetrics()
     }
 
     @objc private func boundsDidChange() {
@@ -450,6 +538,7 @@ public final class EditorWorkspaceView: NSView {
 
     @objc private func selectionDidChange() {
         textView.needsDisplay = true
+        minimapView.updateAccessibilitySelection()
         scheduleMinimapUpdate()
     }
 
@@ -670,6 +759,7 @@ public final class EditorWorkspaceView: NSView {
                 continue
             }
             formatButton.selectItem(at: index)
+            formatButton.setAccessibilityValue(documentFormat.menuTitle)
             return
         }
     }
@@ -686,6 +776,20 @@ public final class EditorWorkspaceView: NSView {
 
     private var currentTheme: MarkdownTheme {
         textView.styler.theme
+    }
+
+    private func refreshWorkspaceAccessibilityValue() {
+        let title = titleLabel.stringValue.isEmpty ? "Untitled" : titleLabel.stringValue
+        let statistics =
+            statusLabel.stringValue.isEmpty ? "Statistics unavailable" : statusLabel.stringValue
+        let sync: String
+        if let currentRemoteSyncPresentation {
+            sync =
+                "Remote sync \(currentRemoteSyncPresentation.phase.rawValue): \(currentRemoteSyncPresentation.detail)"
+        } else {
+            sync = "Local document"
+        }
+        setAccessibilityValue("\(title); \(statistics); \(sync)")
     }
 
     private func roundedUpToDevicePixel(_ value: CGFloat) -> CGFloat {
