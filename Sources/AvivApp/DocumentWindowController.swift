@@ -544,9 +544,10 @@ private final class DocumentTitleToolbarView: NSView {
         label.lineBreakMode = .byTruncatingMiddle
         label.setAccessibilityElement(false)
         addSubview(label)
-        titleCenterConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
+        let centerConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
+        titleCenterConstraint = centerConstraint
         NSLayoutConstraint.activate([
-            titleCenterConstraint!,
+            centerConstraint,
             label.widthAnchor.constraint(equalToConstant: 184),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
