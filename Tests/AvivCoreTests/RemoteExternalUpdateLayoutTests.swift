@@ -72,6 +72,61 @@ final class RemoteExternalUpdateLayoutTests: XCTestCase {
         )
     }
 
+    @MainActor
+    func testLiveDocumentHeaderKeepsOneCenteredTitleAndTrailingStatusAtEveryWidth() {
+        for width in [CGFloat(720), 840, 1080, 1440] {
+            let workspace = EditorWorkspaceView(
+                frame: NSRect(x: 0, y: 0, width: width, height: 740)
+            )
+            let remoteURL = URL(string: "https://pitchai.net/aviv-live/seth-live-demo.md")!
+            workspace.updateDocumentTitle(url: remoteURL, isEdited: false)
+            workspace.updateRemoteSyncPresentation(
+                RemoteSyncPresentation(
+                    phase: .watching,
+                    sourceHost: "pitchai.net",
+                    isWritable: true,
+                    detail: "Live • Save enabled"
+                )
+            )
+            workspace.layoutSubtreeIfNeeded()
+
+            let titleFrame = workspace.documentTitleFrameForTesting
+            let indicatorFrame = workspace.remoteIndicatorFrameForTesting
+            XCTAssertEqual(workspace.documentTitleTextForTesting, "seth-live-demo.md")
+            XCTAssertEqual(titleFrame.midX, width / 2, accuracy: 0.5)
+            XCTAssertFalse(workspace.remoteIndicatorIsHiddenForTesting)
+            XCTAssertEqual(indicatorFrame.width, 28, accuracy: 0.01)
+            XCTAssertEqual(indicatorFrame.maxX, width - 14, accuracy: 0.5)
+            XCTAssertGreaterThan(indicatorFrame.minX, width / 2)
+            XCTAssertFalse(indicatorFrame.intersects(titleFrame))
+            XCTAssertFalse(
+                indicatorFrame.intersects(
+                    NSRect(x: 0, y: 0, width: 100, height: workspace.bounds.height)
+                )
+            )
+            XCTAssertEqual(workspace.remoteIndicatorVisibleTextForTesting, "")
+            XCTAssertEqual(
+                workspace.remoteIndicatorAccessibilitySummaryForTesting,
+                "Live document from pitchai.net, Live • Save enabled"
+            )
+        }
+    }
+
+    @MainActor
+    func testLocalDocumentHeaderHasCenteredTitleWithoutLiveStatus() {
+        let workspace = EditorWorkspaceView(
+            frame: NSRect(x: 0, y: 0, width: 720, height: 740)
+        )
+        let localURL = URL(fileURLWithPath: "/tmp/normal-local-document.md")
+        workspace.updateDocumentTitle(url: localURL, isEdited: false)
+        workspace.updateRemoteSyncPresentation(nil)
+        workspace.layoutSubtreeIfNeeded()
+
+        XCTAssertEqual(workspace.documentTitleTextForTesting, "normal-local-document.md")
+        XCTAssertEqual(workspace.documentTitleFrameForTesting.midX, 360, accuracy: 0.5)
+        XCTAssertTrue(workspace.remoteIndicatorIsHiddenForTesting)
+    }
+
     private func fixture(prefix: String) -> String {
         var lines = ["# \(prefix)", ""]
         for index in 0..<1_000 {

@@ -62,6 +62,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             defer: false
         )
         window.title = "Aviv"
+        // Keep the document title available to AppKit for tabs, Window menu entries,
+        // accessibility, and represented-document behavior. Aviv draws its own subtle,
+        // centered title in the full-size content view, so the native title must not be
+        // painted a second time on top of it.
+        window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unifiedCompact
         window.isReleasedWhenClosed = false

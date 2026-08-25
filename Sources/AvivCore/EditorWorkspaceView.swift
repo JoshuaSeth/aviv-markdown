@@ -164,6 +164,30 @@ public final class EditorWorkspaceView: NSView {
         remoteChangedLineMarkerView.lineRanges.count
     }
 
+    public var documentTitleFrameForTesting: NSRect {
+        titleLabel.frame
+    }
+
+    public var documentTitleTextForTesting: String {
+        titleLabel.stringValue
+    }
+
+    public var remoteIndicatorFrameForTesting: NSRect {
+        remoteSyncIndicatorView.frame
+    }
+
+    public var remoteIndicatorIsHiddenForTesting: Bool {
+        remoteSyncIndicatorView.isHidden
+    }
+
+    public var remoteIndicatorVisibleTextForTesting: String {
+        remoteSyncIndicatorView.visibleTextForTesting
+    }
+
+    public var remoteIndicatorAccessibilitySummaryForTesting: String {
+        remoteSyncIndicatorView.accessibilitySummaryForTesting
+    }
+
     public func updateMetrics() {
         let text = textView.string
         let words = text.split { $0.isWhitespace || $0.isNewline }.count
@@ -397,10 +421,13 @@ public final class EditorWorkspaceView: NSView {
             remoteEdgePulseView.topAnchor.constraint(equalTo: topAnchor),
             remoteEdgePulseView.heightAnchor.constraint(equalToConstant: 2),
 
-            remoteSyncIndicatorView.leadingAnchor.constraint(equalTo: leadingAnchor, constant: 14),
+            remoteSyncIndicatorView.trailingAnchor.constraint(
+                equalTo: trailingAnchor,
+                constant: -14
+            ),
             remoteSyncIndicatorView.topAnchor.constraint(equalTo: topAnchor, constant: 9),
             remoteSyncIndicatorView.heightAnchor.constraint(equalToConstant: 28),
-            remoteSyncIndicatorView.widthAnchor.constraint(equalToConstant: 270),
+            remoteSyncIndicatorView.widthAnchor.constraint(equalToConstant: 28),
 
             remoteSyncToastView.trailingAnchor.constraint(equalTo: trailingAnchor, constant: -22),
             remoteSyncToastView.bottomAnchor.constraint(equalTo: bottomAnchor, constant: -46),
