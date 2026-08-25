@@ -46,7 +46,7 @@ enum RemoteMarkdownLiveVerifier {
             controller.workspace.textView.scrollRangeToVisible(anchorRange)
             controller.workspace.layoutSubtreeIfNeeded()
 
-            let indicatorCount = Set(controller.workspace.remoteIndicatorIdentifiersForTesting)
+            let indicatorCount = Set(controller.remoteIndicatorIdentifiersForTesting)
                 .count
             guard indicatorCount >= 5 else {
                 throw VerificationError("Fewer than five external-edit indicators are installed.")

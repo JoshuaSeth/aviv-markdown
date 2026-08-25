@@ -75,6 +75,15 @@ MainActor.assumeIsolated {
         app.run()
     }
 
+    if arguments.contains("--verify-header-ui") {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in
+            exit(await HeaderUIVerifier.runCLI(arguments: arguments))
+        }
+        app.run()
+    }
+
     if let snapshotIndex = arguments.firstIndex(of: "--snapshot"),
         arguments.indices.contains(snapshotIndex + 1)
     {
