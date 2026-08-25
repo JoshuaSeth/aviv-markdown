@@ -245,13 +245,6 @@ enum HeaderUIVerifier {
                 let frame = workspace.convert(view.bounds, from: view)
                 if frame.intersects(toolbarBand) {
                     frames.append(frame)
-                    if ProcessInfo.processInfo.environment["AVIV_HEADER_TRACE"] == "1",
-                        let button = view as? NSButton
-                    {
-                        emit(
-                            "AVIV_HEADER_CONTROL frame=\(format(frame)) class=\(String(describing: type(of: button))) title=\(button.title) tooltip=\(button.toolTip ?? "")"
-                        )
-                    }
                 }
             }
             view.subviews.forEach { collectButtons(from: $0) }
