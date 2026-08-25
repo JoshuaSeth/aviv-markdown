@@ -43,9 +43,9 @@ cat > "$CONTENTS/Info.plist" <<'PLIST'
     <key>CFBundleIconFile</key>
     <string>Aviv</string>
     <key>CFBundleShortVersionString</key>
-    <string>1.1.2</string>
+    <string>1.1.3</string>
     <key>CFBundleVersion</key>
-    <string>4</string>
+    <string>5</string>
     <key>LSMinimumSystemVersion</key>
     <string>13.0</string>
     <key>NSHighResolutionCapable</key>
