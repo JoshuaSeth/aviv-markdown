@@ -74,6 +74,18 @@ navigation; audits editor, toolbar, title, status, format, live-sync, and confli
 dist/Aviv.app/Contents/MacOS/Aviv --verify-accessibility dist/accessibility-audit
 ```
 
+The styled-marker verifier drives native AppKit click events in a real document window for a normal local Markdown
+file and a URL-backed live document. It proves that focus mounts the exact raw heading marker, click-away restores the
+same reading-mode pixels, and source text, caret geometry, scroll position, title, and live-sync status remain intact.
+It writes focused, restored, and native-window screenshots plus a JSON report:
+
+```sh
+dist/Aviv.app/Contents/MacOS/Aviv \
+  --verify-styled-marker-reveal https://pitchai.net/aviv-live/seth-live-demo.md \
+  --local-file Samples/styled-marker-reveal.md \
+  --evidence-dir dist/styled-marker-reveal
+```
+
 For the real macOS Accessibility tree of a running build, grant Accessibility permission to the terminal or automation
 host once, then capture the bounded tab-separated audit. The script fails loudly if the process, window, permission, or
 child traversal is unavailable:
