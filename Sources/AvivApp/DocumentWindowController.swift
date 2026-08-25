@@ -29,11 +29,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     var documentTitleFrameForTesting: NSRect {
-        workspace.convert(documentTitleToolbarLabel.bounds, from: documentTitleToolbarLabel)
+        workspace.convert(documentTitleToolbarView.bounds, from: documentTitleToolbarView)
     }
 
     var documentTitleTextForTesting: String {
-        documentTitleToolbarLabel.stringValue
+        documentTitleToolbarView.stringValue
     }
 
     var canRevertToSaved: Bool {
@@ -58,7 +58,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private let remoteSyncToolbarView = RemoteSyncIndicatorView(
         frame: NSRect(x: 0, y: 0, width: 28, height: 28)
     )
-    private let documentTitleToolbarLabel = NSTextField(labelWithString: "Untitled")
+    private let documentTitleToolbarView = DocumentTitleToolbarView()
     let remoteTransport: any RemoteMarkdownTransport
     let remoteCredentialStore: any RemoteWriteCredentialStoring
     var documentURL: URL?
@@ -111,7 +111,6 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window.delegate = self
         workspace.showsDocumentTitle = false
         window.contentView = workspace
-        configureDocumentTitleToolbarLabel()
         configureToolbar()
         workspace.onRemoteSyncPresentationChange = { [weak self] presentation in
             self?.updateLiveDocumentToolbar(presentation)
@@ -325,19 +324,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     func updateWindowTitle() {
         let base = documentURL?.lastPathComponent ?? "Untitled"
         window?.title = base
-        documentTitleToolbarLabel.stringValue = isEdited ? "\(base) *" : base
-        documentTitleToolbarLabel.setAccessibilityLabel(
-            "Document title, \(documentTitleToolbarLabel.stringValue)"
-        )
-    }
-
-    private func configureDocumentTitleToolbarLabel() {
-        documentTitleToolbarLabel.font = MarkdownTheme.clean.smallFont
-        documentTitleToolbarLabel.textColor = MarkdownTheme.clean.secondaryTextColor
-        documentTitleToolbarLabel.alignment = .center
-        documentTitleToolbarLabel.lineBreakMode = .byTruncatingMiddle
-        documentTitleToolbarLabel.frame = NSRect(x: 0, y: 0, width: 200, height: 18)
-        documentTitleToolbarLabel.setAccessibilityIdentifier("document-title")
+        documentTitleToolbarView.update(title: isEdited ? "\(base) *" : base)
     }
 
     private func configureToolbar() {
@@ -418,7 +405,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.paletteLabel = "Live Document"
             item.toolTip = remoteSyncToolbarView.accessibilitySummaryForTesting
         case .documentTitle:
-            item.view = documentTitleToolbarLabel
+            item.view = documentTitleToolbarView
             item.label = "Document Title"
             item.paletteLabel = "Document Title"
             item.visibilityPriority = .high
@@ -507,6 +494,47 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     @objc private func heading2(_ sender: Any?) {
         workspace.textView.makeHeading(level: 2)
+    }
+}
+
+private final class DocumentTitleToolbarView: NSView {
+    private let label = NSTextField(labelWithString: "Untitled")
+
+    var stringValue: String {
+        label.stringValue
+    }
+
+    override var intrinsicContentSize: NSSize {
+        NSSize(width: 200, height: 24)
+    }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: NSRect(x: 0, y: 0, width: 200, height: 24))
+        label.translatesAutoresizingMaskIntoConstraints = false
+        label.font = MarkdownTheme.clean.smallFont
+        label.textColor = MarkdownTheme.clean.secondaryTextColor
+        label.alignment = .center
+        label.lineBreakMode = .byTruncatingMiddle
+        label.setAccessibilityElement(false)
+        addSubview(label)
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: leadingAnchor),
+            label.trailingAnchor.constraint(equalTo: trailingAnchor),
+            label.centerYAnchor.constraint(equalTo: centerYAnchor),
+        ])
+        setAccessibilityElement(true)
+        setAccessibilityIdentifier("document-title")
+        update(title: "Untitled")
+    }
+
+    @available(*, unavailable)
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func update(title: String) {
+        label.stringValue = title
+        setAccessibilityLabel("Document title, \(title)")
     }
 }
 
