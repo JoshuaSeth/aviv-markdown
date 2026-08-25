@@ -566,7 +566,7 @@ private final class DocumentTitleToolbarView: NSView {
     }
 
     func setHorizontalOffset(_ offset: CGFloat) {
-        titleCenterConstraint?.constant = min(8, max(-8, offset))
+        titleCenterConstraint?.constant = offset
     }
 }
 
