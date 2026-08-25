@@ -353,6 +353,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     func alignDocumentTitleForCurrentLayout() {
         guard documentTitleToolbarView.window != nil else { return }
+        documentTitleToolbarView.setTitleWidth(maximumCenteredTitleWidth())
+        documentTitleToolbarView.layoutSubtreeIfNeeded()
         let itemFrame = workspace.convert(
             documentTitleToolbarView.bounds,
             from: documentTitleToolbarView
@@ -361,6 +363,47 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             workspace.bounds.midX - itemFrame.midX
         )
         documentTitleToolbarView.layoutSubtreeIfNeeded()
+    }
+
+    private func maximumCenteredTitleWidth() -> CGFloat {
+        let fullTitleWidth: CGFloat = 184
+        let minimumTitleWidth: CGFloat = 112
+        let controlClearance: CGFloat = 8
+        guard let frameView = window?.contentView?.superview else { return fullTitleWidth }
+
+        let centerX = workspace.bounds.midX
+        let toolbarBand = NSRect(
+            x: workspace.bounds.minX,
+            y: workspace.bounds.maxY - 54,
+            width: workspace.bounds.width,
+            height: 54
+        )
+        var leftBoundary = workspace.bounds.minX
+        var rightBoundary = workspace.bounds.maxX
+
+        func measureButtons(in view: NSView) {
+            if view is NSButton, !view.isHidden, view.alphaValue > 0 {
+                let frame = workspace.convert(view.bounds, from: view)
+                if frame.intersects(toolbarBand) {
+                    if frame.maxX <= centerX {
+                        leftBoundary = max(leftBoundary, frame.maxX)
+                    } else if frame.minX >= centerX {
+                        rightBoundary = min(rightBoundary, frame.minX)
+                    }
+                }
+            }
+            view.subviews.forEach { measureButtons(in: $0) }
+        }
+        measureButtons(in: frameView)
+
+        let availableHalfWidth = max(
+            0,
+            min(centerX - leftBoundary, rightBoundary - centerX) - controlClearance
+        )
+        return min(
+            fullTitleWidth,
+            max(minimumTitleWidth, floor(availableHalfWidth * 2))
+        )
     }
 
     private func configureToolbar() {
@@ -638,6 +681,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 private final class DocumentTitleToolbarView: NSView {
     private let label = NSTextField(labelWithString: "Untitled")
     private var titleCenterConstraint: NSLayoutConstraint?
+    private var titleWidthConstraint: NSLayoutConstraint?
 
     var visibleTitleView: NSView {
         label
@@ -667,10 +711,12 @@ private final class DocumentTitleToolbarView: NSView {
         label.setAccessibilityHelp("Visible title of the current Markdown document.")
         addSubview(label)
         let centerConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
+        let widthConstraint = label.widthAnchor.constraint(equalToConstant: 184)
         titleCenterConstraint = centerConstraint
+        titleWidthConstraint = widthConstraint
         NSLayoutConstraint.activate([
             centerConstraint,
-            label.widthAnchor.constraint(equalToConstant: 184),
+            widthConstraint,
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
         setAccessibilityElement(true)
@@ -701,6 +747,10 @@ private final class DocumentTitleToolbarView: NSView {
 
     func setHorizontalOffset(_ offset: CGFloat) {
         titleCenterConstraint?.constant = offset
+    }
+
+    func setTitleWidth(_ width: CGFloat) {
+        titleWidthConstraint?.constant = width
     }
 }
 

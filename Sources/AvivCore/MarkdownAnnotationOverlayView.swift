@@ -4,6 +4,7 @@ import CoreText
 public final class MarkdownAnnotationOverlayView: NSView {
     public weak var textView: MarkdownTextView?
     private let fallbackTheme: MarkdownTheme
+    private let drawsRenderedElementsInOwnDraw: Bool
     private var tableLayoutRevision = -1
     private var tableColumnWidths: [TableLayoutKey: [CGFloat]] = [:]
     private var tableCellLines: [TableCellLineKey: CTLine] = [:]
@@ -30,9 +31,14 @@ public final class MarkdownAnnotationOverlayView: NSView {
         let isHeader: Bool
     }
 
-    public init(textView: MarkdownTextView, theme: MarkdownTheme = .clean) {
+    public init(
+        textView: MarkdownTextView,
+        theme: MarkdownTheme = .clean,
+        drawsRenderedElementsInOwnDraw: Bool = true
+    ) {
         self.textView = textView
         self.fallbackTheme = theme
+        self.drawsRenderedElementsInOwnDraw = drawsRenderedElementsInOwnDraw
         super.init(frame: .zero)
         wantsLayer = false
     }
@@ -51,15 +57,18 @@ public final class MarkdownAnnotationOverlayView: NSView {
     }
 
     public override func draw(_ dirtyRect: NSRect) {
-        render(in: self)
+        if drawsRenderedElementsInOwnDraw {
+            renderRenderedElements(in: self)
+        }
+        renderMarkers(in: self)
     }
 
     func renderAnnotations(in textView: MarkdownTextView) {
         precondition(self.textView === textView, "annotation renderer used with another text view")
-        render(in: textView)
+        renderRenderedElements(in: textView)
     }
 
-    private func render(in targetView: NSView) {
+    private func renderRenderedElements(in targetView: NSView) {
         guard
             let textView,
             let layoutManager = textView.layoutManager,
@@ -91,17 +100,43 @@ public final class MarkdownAnnotationOverlayView: NSView {
             textContainer: textContainer,
             visibleRange: visibleRange
         )
+    }
 
+    private func renderMarkers(in targetView: NSView) {
+        for marker in markerFrames(in: targetView) {
+            draw(token: marker.token, in: marker.frame)
+        }
+    }
+
+    func markerFrames(
+        in targetView: NSView
+    ) -> [(token: MarkdownAnnotationToken, frame: NSRect)] {
+        guard
+            let textView,
+            let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer
+        else { return [] }
+
+        let ranges = textView.selectedRanges.compactMap { $0.rangeValue }
         let tokens = MarkdownAnnotationParser.tokens(in: textView.string, selectedRanges: ranges)
-        guard !tokens.isEmpty else { return }
+        guard !tokens.isEmpty else { return [] }
+        let visibleRange = visibleCharacterRange(
+            in: textView,
+            layoutManager: layoutManager,
+            textContainer: textContainer
+        )
+        let visibleTokens = tokens.filter {
+            NSIntersectionRange($0.range, visibleRange).length > 0
+        }
+        guard !visibleTokens.isEmpty else { return [] }
 
-        layoutManager.ensureLayout(for: textContainer)
-
+        var markers: [(token: MarkdownAnnotationToken, frame: NSRect)] = []
         var occupiedRects: [NSRect] = []
-        for token in tokens.sorted(by: { $0.range.location < $1.range.location }) {
+        for token in visibleTokens.sorted(by: { $0.range.location < $1.range.location }) {
             guard token.range.location != NSNotFound,
                 token.range.location < textView.string.utf16.count
             else { continue }
+            layoutManager.ensureLayout(forCharacterRange: token.range)
             let glyphRange = layoutManager.glyphRange(
                 forCharacterRange: token.range,
                 actualCharacterRange: nil
@@ -119,11 +154,12 @@ public final class MarkdownAnnotationOverlayView: NSView {
             )
             rect.origin.x += textView.textContainerOrigin.x
             rect.origin.y += textView.textContainerOrigin.y
-            rect = textView.convert(rect, to: self)
+            rect = textView.convert(rect, to: targetView)
             let drawRect = annotationRect(for: token, near: rect, occupiedRects: occupiedRects)
             occupiedRects.append(drawRect.insetBy(dx: -4, dy: -2))
-            draw(token: token, in: drawRect)
+            markers.append((token, drawRect))
         }
+        return markers
     }
 
     private func drawImages(
@@ -668,6 +704,11 @@ public final class MarkdownAnnotationOverlayView: NSView {
             origin = NSPoint(
                 x: max(8, rect.minX - size.width - theme.scaledMetric(9, minimum: 6)),
                 y: rect.minY + theme.scaledMetric(8, minimum: 5)
+            )
+        case .listMarker:
+            origin = NSPoint(
+                x: max(8, rect.minX - size.width - theme.scaledMetric(5, minimum: 3)),
+                y: rect.minY + theme.scaledMetric(2, minimum: 1)
             )
         case .linkSource:
             origin = NSPoint(

@@ -84,6 +84,15 @@ MainActor.assumeIsolated {
         app.run()
     }
 
+    if arguments.contains("--verify-styled-marker-reveal") {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in
+            exit(await StyledMarkerRevealVerifier.runCLI(arguments: arguments))
+        }
+        app.run()
+    }
+
     if let accessibilityIndex = arguments.firstIndex(of: "--verify-accessibility") {
         let evidenceDirectory: URL?
         if arguments.indices.contains(accessibilityIndex + 1) {
