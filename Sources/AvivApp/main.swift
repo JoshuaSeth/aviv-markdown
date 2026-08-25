@@ -84,6 +84,18 @@ MainActor.assumeIsolated {
         app.run()
     }
 
+    if let accessibilityIndex = arguments.firstIndex(of: "--verify-accessibility") {
+        let evidenceDirectory: URL?
+        if arguments.indices.contains(accessibilityIndex + 1) {
+            evidenceDirectory = URL(fileURLWithPath: arguments[accessibilityIndex + 1])
+        } else {
+            evidenceDirectory = nil
+        }
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        exit(AccessibilityVerifier.runCLI(evidenceDirectory: evidenceDirectory))
+    }
+
     if let snapshotIndex = arguments.firstIndex(of: "--snapshot"),
         arguments.indices.contains(snapshotIndex + 1)
     {
