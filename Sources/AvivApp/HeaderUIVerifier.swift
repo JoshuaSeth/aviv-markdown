@@ -37,7 +37,9 @@ enum HeaderUIVerifier {
                     "local-workspace-header-1080.png"
                 )
             )
-            emit("AVIV_HEADER_LOCAL title=\(options.localFile.lastPathComponent) live_status=hidden")
+            emit(
+                "AVIV_HEADER_LOCAL title=\(options.localFile.lastPathComponent) live_status=hidden"
+            )
 
             guard await controller.openRemote(url: options.remoteURL) else {
                 throw HeaderUIVerificationError("Aviv could not open the public Markdown URL.")
@@ -141,10 +143,14 @@ enum HeaderUIVerifier {
             window: window
         )
         guard abs(titleFrame.midX - controller.workspace.bounds.midX) <= 0.5 else {
-            throw HeaderUIVerificationError("The document title is not centered at width \(Int(width)).")
+            throw HeaderUIVerificationError(
+                "The document title is not centered at width \(Int(width))."
+            )
         }
         guard !indicatorFrame.intersects(titleFrame) else {
-            throw HeaderUIVerificationError("The live status overlaps the title at width \(Int(width)).")
+            throw HeaderUIVerificationError(
+                "The live status overlaps the title at width \(Int(width))."
+            )
         }
         guard !indicatorFrame.intersects(trafficLightFrame.insetBy(dx: -8, dy: -8)) else {
             throw HeaderUIVerificationError(
@@ -221,7 +227,8 @@ enum HeaderUIVerifier {
         guard buttons.count == 3 else {
             throw HeaderUIVerificationError("The native traffic-light controls are unavailable.")
         }
-        return buttons
+        return
+            buttons
             .map { workspace.convert($0.bounds, from: $0) }
             .reduce(NSRect.null) { $0.union($1) }
     }
