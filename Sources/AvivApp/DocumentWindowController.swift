@@ -29,7 +29,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     var documentTitleFrameForTesting: NSRect {
-        workspace.convert(documentTitleToolbarView.bounds, from: documentTitleToolbarView)
+        let visibleTitleView = documentTitleToolbarView.visibleTitleView
+        return workspace.convert(visibleTitleView.bounds, from: visibleTitleView)
     }
 
     var documentTitleTextForTesting: String {
@@ -500,6 +501,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 private final class DocumentTitleToolbarView: NSView {
     private let label = NSTextField(labelWithString: "Untitled")
 
+    var visibleTitleView: NSView {
+        label
+    }
+
     var stringValue: String {
         label.stringValue
     }
@@ -518,8 +523,8 @@ private final class DocumentTitleToolbarView: NSView {
         label.setAccessibilityElement(false)
         addSubview(label)
         NSLayoutConstraint.activate([
-            label.leadingAnchor.constraint(equalTo: leadingAnchor),
-            label.trailingAnchor.constraint(equalTo: trailingAnchor),
+            label.centerXAnchor.constraint(equalTo: centerXAnchor, constant: 8),
+            label.widthAnchor.constraint(equalToConstant: 184),
             label.centerYAnchor.constraint(equalTo: centerYAnchor),
         ])
         setAccessibilityElement(true)
