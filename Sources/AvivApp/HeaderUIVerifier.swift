@@ -26,7 +26,7 @@ enum HeaderUIVerifier {
                 controller,
                 width: 1080,
                 to: options.evidenceDirectory.appendingPathComponent(
-                    "local-native-window-1080.png"
+                    "local-native-header-1080.png"
                 )
             )
             try renderWorkspaceEvidence(
@@ -58,7 +58,7 @@ enum HeaderUIVerifier {
                     controller,
                     width: width,
                     to: options.evidenceDirectory.appendingPathComponent(
-                        "remote-native-window-\(Int(width)).png"
+                        "remote-native-header-\(Int(width)).png"
                     )
                 )
                 try renderWorkspaceEvidence(
@@ -132,7 +132,7 @@ enum HeaderUIVerifier {
             throw HeaderUIVerificationError("The compact live status lost its source description.")
         }
 
-        let titleFrame = controller.workspace.documentTitleFrameForTesting
+        let titleFrame = controller.documentTitleFrameForTesting
         let trafficLightFrame = try trafficLightFrame(in: controller.workspace, window: window)
         let toolbarButtonFrames = try toolbarButtonFrames(
             in: controller.workspace,
@@ -182,10 +182,10 @@ enum HeaderUIVerifier {
         guard window.title == expectedTitle else {
             throw HeaderUIVerificationError("AppKit document metadata has the wrong title.")
         }
-        guard controller.workspace.documentTitleTextForTesting == expectedTitle else {
+        guard controller.documentTitleTextForTesting == expectedTitle else {
             throw HeaderUIVerificationError("The centered document title has the wrong text.")
         }
-        let frame = controller.workspace.documentTitleFrameForTesting
+        let frame = controller.documentTitleFrameForTesting
         guard abs(frame.midX - controller.workspace.bounds.midX) <= 0.5 else {
             throw HeaderUIVerificationError("The visible document title is not centered.")
         }
@@ -261,11 +261,17 @@ enum HeaderUIVerifier {
         window.setContentSize(NSSize(width: width, height: 720))
         layoutWindow(window)
         frameView.displayIfNeeded()
-        guard let bitmap = frameView.bitmapImageRepForCachingDisplay(in: frameView.bounds) else {
+        let captureBounds = NSRect(
+            x: frameView.bounds.minX,
+            y: frameView.bounds.maxY - min(48, frameView.bounds.height),
+            width: frameView.bounds.width,
+            height: min(48, frameView.bounds.height)
+        )
+        guard let bitmap = frameView.bitmapImageRepForCachingDisplay(in: captureBounds) else {
             throw HeaderUIVerificationError("Could not allocate a native-window evidence bitmap.")
         }
-        bitmap.size = frameView.bounds.size
-        frameView.cacheDisplay(in: frameView.bounds, to: bitmap)
+        bitmap.size = captureBounds.size
+        frameView.cacheDisplay(in: captureBounds, to: bitmap)
         guard let png = bitmap.representation(using: .png, properties: [:]) else {
             throw HeaderUIVerificationError("Could not encode the native-window evidence PNG.")
         }

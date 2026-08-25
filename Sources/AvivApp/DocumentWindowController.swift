@@ -28,6 +28,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         remoteSyncToolbarView.accessibilitySummaryForTesting
     }
 
+    var documentTitleFrameForTesting: NSRect {
+        workspace.convert(documentTitleToolbarLabel.bounds, from: documentTitleToolbarLabel)
+    }
+
+    var documentTitleTextForTesting: String {
+        documentTitleToolbarLabel.stringValue
+    }
+
     var canRevertToSaved: Bool {
         isEdited || documentURL != nil
     }
@@ -50,6 +58,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private let remoteSyncToolbarView = RemoteSyncIndicatorView(
         frame: NSRect(x: 0, y: 0, width: 28, height: 28)
     )
+    private let documentTitleToolbarLabel = NSTextField(labelWithString: "Untitled")
     let remoteTransport: any RemoteMarkdownTransport
     let remoteCredentialStore: any RemoteWriteCredentialStoring
     var documentURL: URL?
@@ -85,8 +94,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         )
         window.title = "Aviv"
         // Keep the document title available to AppKit for tabs, Window menu entries,
-        // accessibility, and represented-document behavior. Aviv draws its own subtle,
-        // centered title in the full-size content view, so the native title must not be
+        // accessibility, and represented-document behavior. Aviv presents one subtle
+        // title through AppKit's centered toolbar slot, so the native title must not be
         // painted a second time on top of it.
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
@@ -100,7 +109,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         super.init(window: window)
 
         window.delegate = self
+        workspace.showsDocumentTitle = false
         window.contentView = workspace
+        configureDocumentTitleToolbarLabel()
         configureToolbar()
         workspace.onRemoteSyncPresentationChange = { [weak self] presentation in
             self?.updateLiveDocumentToolbar(presentation)
@@ -312,7 +323,26 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func updateWindowTitle() {
-        window?.title = documentURL?.lastPathComponent ?? "Untitled"
+        let base = documentURL?.lastPathComponent ?? "Untitled"
+        window?.title = base
+        documentTitleToolbarLabel.stringValue = isEdited ? "\(base) *" : base
+        documentTitleToolbarLabel.setAccessibilityLabel(
+            "Document title, \(documentTitleToolbarLabel.stringValue)"
+        )
+        let fittingSize = documentTitleToolbarLabel.fittingSize
+        documentTitleToolbarLabel.frame.size = NSSize(
+            width: min(280, max(80, fittingSize.width)),
+            height: max(18, fittingSize.height)
+        )
+        window?.contentView?.superview?.needsLayout = true
+    }
+
+    private func configureDocumentTitleToolbarLabel() {
+        documentTitleToolbarLabel.font = MarkdownTheme.clean.smallFont
+        documentTitleToolbarLabel.textColor = MarkdownTheme.clean.secondaryTextColor
+        documentTitleToolbarLabel.alignment = .center
+        documentTitleToolbarLabel.lineBreakMode = .byTruncatingMiddle
+        documentTitleToolbarLabel.setAccessibilityIdentifier("document-title")
     }
 
     private func configureToolbar() {
@@ -321,6 +351,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         toolbar.displayMode = .iconOnly
         toolbar.sizeMode = .small
         toolbar.allowsUserCustomization = false
+        toolbar.centeredItemIdentifier = .documentTitle
         window?.toolbar = toolbar
     }
 
@@ -348,15 +379,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
-            .newDocument, .openDocument, .saveDocument, .liveDocument, .flexibleSpace, .zoomOut,
-            .actualSize, .zoomIn, .bold, .italic, .code, .heading1, .heading2,
+            .newDocument, .openDocument, .saveDocument, .liveDocument, .flexibleSpace,
+            .documentTitle, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold, .italic, .code,
+            .heading1, .heading2,
         ]
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
-            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
-            .zoomIn, .bold, .italic, .code, .heading1, .heading2,
+            .newDocument, .openDocument, .saveDocument, .flexibleSpace, .documentTitle,
+            .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold, .italic, .code, .heading1,
+            .heading2,
         ]
     }
 
@@ -389,6 +422,10 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.label = "Live Document"
             item.paletteLabel = "Live Document"
             item.toolTip = remoteSyncToolbarView.accessibilitySummaryForTesting
+        case .documentTitle:
+            item.view = documentTitleToolbarLabel
+            item.label = "Document Title"
+            item.paletteLabel = "Document Title"
         case .zoomOut:
             item.image = toolbarImage(
                 named: "minus.magnifyingglass",
@@ -482,6 +519,7 @@ extension NSToolbarItem.Identifier {
     fileprivate static let openDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Open")
     fileprivate static let saveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Save")
     fileprivate static let liveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.LiveDocument")
+    fileprivate static let documentTitle = NSToolbarItem.Identifier("Aviv.Toolbar.DocumentTitle")
     fileprivate static let zoomOut = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomOut")
     fileprivate static let actualSize = NSToolbarItem.Identifier("Aviv.Toolbar.ActualSize")
     fileprivate static let zoomIn = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomIn")

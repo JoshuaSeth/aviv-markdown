@@ -16,6 +16,11 @@ public final class EditorWorkspaceView: NSView {
     }
     public var onDocumentFormatChange: ((MarkdownDocumentFormat) -> Void)?
     public var onRemoteSyncPresentationChange: ((RemoteSyncPresentation?) -> Void)?
+    public var showsDocumentTitle = true {
+        didSet {
+            titleLabel.isHidden = !showsDocumentTitle
+        }
+    }
 
     private let theme: MarkdownTheme
     private let annotationOverlay: MarkdownAnnotationOverlayView
