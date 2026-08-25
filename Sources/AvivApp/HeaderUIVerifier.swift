@@ -154,7 +154,7 @@ enum HeaderUIVerifier {
         }
         guard titleCollisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the centered title at width \(Int(width)): title=\(format(titleFrame)) controls=\(titleCollisions.map(format).joined(separator: \";\"))."
+                "A native toolbar action overlaps the centered title at width \(Int(width)): title=\(format(titleFrame)) controls=\(format(titleCollisions))."
             )
         }
         let indicatorCollisions = toolbarButtonFrames.filter {
@@ -162,7 +162,7 @@ enum HeaderUIVerifier {
         }
         guard indicatorCollisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the live status at width \(Int(width)): indicator=\(format(indicatorFrame)) controls=\(indicatorCollisions.map(format).joined(separator: \";\"))."
+                "A native toolbar action overlaps the live status at width \(Int(width)): indicator=\(format(indicatorFrame)) controls=\(format(indicatorCollisions))."
             )
         }
         return HeaderGeometry(
@@ -198,7 +198,7 @@ enum HeaderUIVerifier {
         }
         guard collisions.isEmpty else {
             throw HeaderUIVerificationError(
-                "A native toolbar action overlaps the visible document title: title=\(format(frame)) controls=\(collisions.map(format).joined(separator: \";\"))."
+                "A native toolbar action overlaps the visible document title: title=\(format(frame)) controls=\(format(collisions))."
             )
         }
     }
@@ -320,6 +320,10 @@ enum HeaderUIVerifier {
             rect.width,
             rect.height
         )
+    }
+
+    private static func format(_ rects: [NSRect]) -> String {
+        rects.map { format($0) }.joined(separator: ";")
     }
 
     private static func emit(_ message: String) {
