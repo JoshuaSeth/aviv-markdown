@@ -349,14 +349,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
             .newDocument, .openDocument, .saveDocument, .liveDocument, .flexibleSpace, .zoomOut,
-            .actualSize, .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+            .actualSize, .zoomIn, .bold, .italic, .code, .heading1, .heading2,
         ]
     }
 
     func toolbarDefaultItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
             .newDocument, .openDocument, .saveDocument, .flexibleSpace, .zoomOut, .actualSize,
-            .zoomIn, .flexibleSpace, .bold, .italic, .code, .heading1, .heading2,
+            .zoomIn, .bold, .italic, .code, .heading1, .heading2,
         ]
     }
 

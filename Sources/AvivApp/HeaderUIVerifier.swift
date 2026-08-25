@@ -134,6 +134,10 @@ enum HeaderUIVerifier {
 
         let titleFrame = controller.workspace.documentTitleFrameForTesting
         let trafficLightFrame = try trafficLightFrame(in: controller.workspace, window: window)
+        let toolbarButtonFrames = try toolbarButtonFrames(
+            in: controller.workspace,
+            window: window
+        )
         guard abs(titleFrame.midX - controller.workspace.bounds.midX) <= 0.5 else {
             throw HeaderUIVerificationError("The document title is not centered at width \(Int(width)).")
         }
@@ -143,6 +147,20 @@ enum HeaderUIVerifier {
         guard !indicatorFrame.intersects(trafficLightFrame.insetBy(dx: -8, dy: -8)) else {
             throw HeaderUIVerificationError(
                 "The live status overlaps the macOS traffic lights at width \(Int(width))."
+            )
+        }
+        guard toolbarButtonFrames.allSatisfy({
+            !$0.intersects(titleFrame.insetBy(dx: -6, dy: -2))
+        }) else {
+            throw HeaderUIVerificationError(
+                "A native toolbar action overlaps the centered title at width \(Int(width))."
+            )
+        }
+        guard toolbarButtonFrames.allSatisfy({
+            !$0.intersects(indicatorFrame.insetBy(dx: -2, dy: -2))
+        }) else {
+            throw HeaderUIVerificationError(
+                "A native toolbar action overlaps the live status at width \(Int(width))."
             )
         }
         return HeaderGeometry(
@@ -169,6 +187,17 @@ enum HeaderUIVerifier {
         guard abs(frame.midX - controller.workspace.bounds.midX) <= 0.5 else {
             throw HeaderUIVerificationError("The visible document title is not centered.")
         }
+        let toolbarFrames = try toolbarButtonFrames(
+            in: controller.workspace,
+            window: window
+        )
+        guard toolbarFrames.allSatisfy({
+            !$0.intersects(frame.insetBy(dx: -6, dy: -2))
+        }) else {
+            throw HeaderUIVerificationError(
+                "A native toolbar action overlaps the visible document title."
+            )
+        }
     }
 
     private static func trafficLightFrame(
@@ -186,6 +215,33 @@ enum HeaderUIVerifier {
         return buttons
             .map { workspace.convert($0.bounds, from: $0) }
             .reduce(NSRect.null) { $0.union($1) }
+    }
+
+    private static func toolbarButtonFrames(
+        in workspace: EditorWorkspaceView,
+        window: NSWindow
+    ) throws -> [NSRect] {
+        guard let frameView = window.contentView?.superview else {
+            throw HeaderUIVerificationError("The native toolbar hierarchy is unavailable.")
+        }
+        let toolbarBand = NSRect(
+            x: workspace.bounds.minX,
+            y: workspace.bounds.maxY - 54,
+            width: workspace.bounds.width,
+            height: 54
+        )
+        var frames: [NSRect] = []
+        func collectButtons(from view: NSView) {
+            if view is NSButton, !view.isHidden, view.alphaValue > 0 {
+                let frame = workspace.convert(view.bounds, from: view)
+                if frame.intersects(toolbarBand) {
+                    frames.append(frame)
+                }
+            }
+            view.subviews.forEach { collectButtons(from: $0) }
+        }
+        collectButtons(from: frameView)
+        return frames
     }
 
     private static func resizeAndRender(
