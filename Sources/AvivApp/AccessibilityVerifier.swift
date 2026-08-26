@@ -148,7 +148,11 @@ enum AccessibilityVerifier {
         )
         settle(controller.workspace)
 
-        let views = accessibilityViews(in: window)
+        let standardViews = accessibilityViews(in: window)
+        controller.showDocumentSearchForTesting(query: "Accessibility")
+        settle(controller.workspace)
+        let searchViews = accessibilityViews(in: window)
+        let views = uniqueViews(standardViews + searchViews)
         let conflictAlert = controller.makeRemoteConflictAlert()
         let conflictViews =
             conflictAlert.window.contentView.map {
@@ -216,6 +220,14 @@ enum AccessibilityVerifier {
                     "\(child.accessibilityIdentifier() ?? "outline child"): incomplete label/help/value metadata"
                 )
             }
+        }
+        if !outlineChildren.contains(where: {
+            ($0.accessibilityValue() as? String)?.contains("contains search matches") == true
+                && $0.accessibilityHelp()?.contains("contains search matches") == true
+        }) {
+            failures.append(
+                "Document outline search-hit rows do not expose their highlighted state"
+            )
         }
         if let table = outlineChildren.first(where: {
             $0.accessibilityIdentifier()?.contains(".table.") == true
@@ -360,6 +372,12 @@ enum AccessibilityVerifier {
         "aviv.toolbar.inline-code",
         "aviv.toolbar.heading-1",
         "aviv.toolbar.heading-2",
+        "aviv.toolbar.search",
+        "aviv.toolbar.search-field",
+        "aviv.toolbar.search-previous",
+        "aviv.toolbar.search-next",
+        "aviv.toolbar.search-status",
+        "aviv.toolbar.search-close",
         "remote-source-badge",
         "remote-source-heartbeat",
         "remote-changed-lines",
@@ -379,6 +397,7 @@ enum AccessibilityVerifier {
         "aviv.document.statistics",
         "aviv.document.format",
         "aviv.toolbar.save-document",
+        "aviv.toolbar.search-status",
         "remote-source-badge",
         "remote-source-heartbeat",
         "remote-changed-lines",

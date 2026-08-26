@@ -37,6 +37,54 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         documentTitleToolbarView.stringValue
     }
 
+    var isDocumentSearchActiveForTesting: Bool {
+        isDocumentSearchActive
+    }
+
+    var documentSearchQueryForTesting: String {
+        searchToolbarView.query
+    }
+
+    var documentSearchMatchRangesForTesting: [NSRange] {
+        documentSearchIndex.matchRanges
+    }
+
+    var currentDocumentSearchResultIndexForTesting: Int? {
+        currentDocumentSearchResultIndex
+    }
+
+    var documentSearchToolbarFrameForTesting: NSRect? {
+        guard
+            window?.toolbar?.items.contains(where: { $0.itemIdentifier == .documentSearch }) == true
+        else { return nil }
+        return workspace.convert(searchToolbarView.bounds, from: searchToolbarView)
+    }
+
+    var documentSearchControlFramesForTesting: [String: NSRect] {
+        [
+            "field": workspace.convert(
+                searchToolbarView.searchFieldFrameForTesting,
+                from: searchToolbarView
+            ),
+            "previous": workspace.convert(
+                searchToolbarView.previousButtonFrameForTesting,
+                from: searchToolbarView
+            ),
+            "next": workspace.convert(
+                searchToolbarView.nextButtonFrameForTesting,
+                from: searchToolbarView
+            ),
+            "status": workspace.convert(
+                searchToolbarView.resultLabelFrameForTesting,
+                from: searchToolbarView
+            ),
+            "close": workspace.convert(
+                searchToolbarView.closeButtonFrameForTesting,
+                from: searchToolbarView
+            ),
+        ]
+    }
+
     var canRevertToSaved: Bool {
         isEdited || documentURL != nil
     }
@@ -60,6 +108,11 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         frame: NSRect(x: 0, y: 0, width: 28, height: 28)
     )
     private let documentTitleToolbarView = DocumentTitleToolbarView()
+    private let searchToolbarView = DocumentSearchToolbarView()
+    private var isDocumentSearchActive = false
+    private var documentSearchIndex = MarkdownSearchIndex(markdown: "", query: "")
+    private var currentDocumentSearchResultIndex: Int?
+    private var liveToolbarPresentation: RemoteSyncPresentation?
     let remoteTransport: any RemoteMarkdownTransport
     let remoteCredentialStore: any RemoteWriteCredentialStoring
     var documentURL: URL?
@@ -119,6 +172,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         workspace.showsDocumentTitle = false
         window.contentView = workspace
         configureToolbar()
+        configureDocumentSearch()
         workspace.onRemoteSyncPresentationChange = { [weak self] presentation in
             self?.updateLiveDocumentToolbar(presentation)
         }
@@ -132,6 +186,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         workspace.textView.onContentChange = { [weak self] text in
             guard let self else { return }
             self.isEdited = text != self.savedText
+            self.refreshDocumentSearchAfterContentChange()
             self.workspace.scheduleMetricsUpdate()
         }
         workspace.textView.onSelectionChange = { [weak self] in
@@ -296,6 +351,52 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         workspace.textView.resetTextSize()
     }
 
+    @objc func performDocumentFindAction(_ sender: Any?) {
+        let tag: Int?
+        if let item = sender as? NSMenuItem {
+            tag = item.tag
+        } else if let control = sender as? NSControl {
+            tag = control.tag
+        } else {
+            tag = nil
+        }
+
+        guard let tag else {
+            NSSound.beep()
+            return
+        }
+
+        switch tag {
+        case NSTextFinder.Action.showFindInterface.rawValue:
+            showDocumentSearch()
+        case NSTextFinder.Action.nextMatch.rawValue:
+            showNextDocumentSearchResult()
+        case NSTextFinder.Action.previousMatch.rawValue:
+            showPreviousDocumentSearchResult()
+        case NSTextFinder.Action.setSearchString.rawValue:
+            useSelectionForDocumentSearch()
+        default:
+            closeDocumentSearch(returnFocusToEditor: true)
+            workspace.textView.performFindPanelAction(sender)
+        }
+    }
+
+    func showDocumentSearchForTesting(query: String) {
+        showDocumentSearch(query: query)
+    }
+
+    func showNextDocumentSearchResultForTesting() {
+        showNextDocumentSearchResult()
+    }
+
+    func showPreviousDocumentSearchResultForTesting() {
+        showPreviousDocumentSearchResult()
+    }
+
+    func closeDocumentSearchForTesting() {
+        closeDocumentSearch(returnFocusToEditor: true)
+    }
+
     func windowShouldClose(_ sender: NSWindow) -> Bool {
         confirmDiscardIfNeeded()
     }
@@ -416,8 +517,69 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window?.toolbar = toolbar
     }
 
+    private func configureDocumentSearch() {
+        searchToolbarView.onQueryChange = { [weak self] query in
+            self?.updateDocumentSearchQuery(query)
+        }
+        searchToolbarView.onPrevious = { [weak self] in
+            self?.showPreviousDocumentSearchResult()
+        }
+        searchToolbarView.onNext = { [weak self] in
+            self?.showNextDocumentSearchResult()
+        }
+        searchToolbarView.onClose = { [weak self] in
+            self?.closeDocumentSearch(returnFocusToEditor: true)
+        }
+    }
+
+    private func applyToolbarMode() {
+        guard let toolbar = window?.toolbar else { return }
+        var identifiers: [NSToolbarItem.Identifier] = [
+            .newDocument, .openDocument, .saveDocument,
+        ]
+        if liveToolbarPresentation != nil {
+            identifiers.append(.liveDocument)
+        }
+        let centeredIdentifier: NSToolbarItem.Identifier
+        if isDocumentSearchActive {
+            identifiers += [.flexibleSpace, .documentSearch, .flexibleSpace]
+            centeredIdentifier = .documentSearch
+        } else {
+            identifiers += [
+                .flexibleSpace, .documentTitle, .flexibleSpace, .zoomOut, .actualSize, .zoomIn,
+                .bold, .italic, .code, .heading1, .heading2,
+            ]
+            centeredIdentifier = .documentTitle
+        }
+
+        guard toolbar.items.map(\.itemIdentifier) != identifiers else {
+            toolbar.centeredItemIdentifier = centeredIdentifier
+            window?.contentView?.superview?.layoutSubtreeIfNeeded()
+            if !isDocumentSearchActive {
+                alignDocumentTitleForCurrentLayout()
+            }
+            return
+        }
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 0
+            while !toolbar.items.isEmpty {
+                toolbar.removeItem(at: toolbar.items.count - 1)
+            }
+            for (index, identifier) in identifiers.enumerated() {
+                toolbar.insertItem(withItemIdentifier: identifier, at: index)
+            }
+            toolbar.centeredItemIdentifier = centeredIdentifier
+        }
+        window?.contentView?.superview?.layoutSubtreeIfNeeded()
+        if !isDocumentSearchActive {
+            alignDocumentTitleForCurrentLayout()
+        }
+    }
+
     private func updateLiveDocumentToolbar(_ presentation: RemoteSyncPresentation?) {
         guard let toolbar = window?.toolbar else { return }
+        liveToolbarPresentation = presentation
         guard let presentation else {
             if let saveButton = toolbar.items.first(where: {
                 $0.itemIdentifier == .saveDocument
@@ -427,21 +589,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
                     "Saves the current Markdown document to its local file."
                 )
             }
-            if let index = toolbar.items.firstIndex(where: {
-                $0.itemIdentifier == .liveDocument
-            }) {
-                toolbar.removeItem(at: index)
-            }
+            applyToolbarMode()
             return
         }
 
         remoteSyncToolbarView.update(presentation, theme: .clean)
-        if !toolbar.items.contains(where: { $0.itemIdentifier == .liveDocument }) {
-            toolbar.insertItem(
-                withItemIdentifier: .liveDocument,
-                at: min(3, toolbar.items.count)
-            )
-        }
+        applyToolbarMode()
         toolbar.items.first(where: { $0.itemIdentifier == .liveDocument })?.toolTip =
             remoteSyncToolbarView.accessibilitySummaryForTesting
         if let saveButton = toolbar.items.first(where: {
@@ -459,14 +612,141 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             )
         }
         window?.contentView?.superview?.layoutSubtreeIfNeeded()
-        alignDocumentTitleForCurrentLayout()
+        if !isDocumentSearchActive {
+            alignDocumentTitleForCurrentLayout()
+        }
+    }
+
+    private func showDocumentSearch(query: String? = nil) {
+        if let query {
+            searchToolbarView.setQuery(query)
+        }
+        if !isDocumentSearchActive {
+            isDocumentSearchActive = true
+            applyToolbarMode()
+        }
+        recomputeDocumentSearch(selectResult: true)
+        DispatchQueue.main.async { [weak self] in
+            self?.searchToolbarView.focusAndSelectQuery()
+        }
+    }
+
+    private func closeDocumentSearch(returnFocusToEditor: Bool) {
+        guard isDocumentSearchActive else { return }
+        isDocumentSearchActive = false
+        currentDocumentSearchResultIndex = nil
+        documentSearchIndex = MarkdownSearchIndex(markdown: "", query: searchToolbarView.query)
+        workspace.updateSearchMatches([])
+        applyToolbarMode()
+        if returnFocusToEditor {
+            window?.makeFirstResponder(workspace.textView)
+        }
+    }
+
+    private func updateDocumentSearchQuery(_ query: String) {
+        guard isDocumentSearchActive else { return }
+        recomputeDocumentSearch(query: query, selectResult: true)
+    }
+
+    private func refreshDocumentSearchAfterContentChange() {
+        guard isDocumentSearchActive else { return }
+        recomputeDocumentSearch(selectResult: false)
+    }
+
+    private func recomputeDocumentSearch(query suppliedQuery: String? = nil, selectResult: Bool) {
+        let query = suppliedQuery ?? searchToolbarView.query
+        documentSearchIndex = MarkdownSearchIndex(
+            markdown: workspace.textView.string,
+            query: query
+        )
+        let matches = documentSearchIndex.matchRanges
+        workspace.updateSearchMatches(matches)
+
+        guard !matches.isEmpty else {
+            currentDocumentSearchResultIndex = nil
+            searchToolbarView.updateResultPosition(currentIndex: nil, totalCount: 0)
+            return
+        }
+
+        let selection = workspace.textView.selectedRange()
+        let exactSelectionIndex = matches.firstIndex(of: selection)
+        let nextSelectionIndex = matches.firstIndex { range in
+            range.location >= selection.location
+        }
+        currentDocumentSearchResultIndex =
+            exactSelectionIndex ?? nextSelectionIndex ?? matches.startIndex
+        searchToolbarView.updateResultPosition(
+            currentIndex: currentDocumentSearchResultIndex,
+            totalCount: matches.count
+        )
+        if selectResult {
+            selectCurrentDocumentSearchResult()
+        }
+    }
+
+    private func showNextDocumentSearchResult() {
+        if !isDocumentSearchActive {
+            showDocumentSearch()
+            guard !documentSearchIndex.matchRanges.isEmpty else { return }
+        }
+        guard !documentSearchIndex.matchRanges.isEmpty else {
+            searchToolbarView.focusAndSelectQuery()
+            return
+        }
+        let current = currentDocumentSearchResultIndex ?? -1
+        currentDocumentSearchResultIndex = (current + 1) % documentSearchIndex.matchRanges.count
+        searchToolbarView.updateResultPosition(
+            currentIndex: currentDocumentSearchResultIndex,
+            totalCount: documentSearchIndex.matchRanges.count
+        )
+        selectCurrentDocumentSearchResult()
+    }
+
+    private func showPreviousDocumentSearchResult() {
+        if !isDocumentSearchActive {
+            showDocumentSearch()
+            guard !documentSearchIndex.matchRanges.isEmpty else { return }
+        }
+        guard !documentSearchIndex.matchRanges.isEmpty else {
+            searchToolbarView.focusAndSelectQuery()
+            return
+        }
+        let count = documentSearchIndex.matchRanges.count
+        let current = currentDocumentSearchResultIndex ?? 0
+        currentDocumentSearchResultIndex = (current - 1 + count) % count
+        searchToolbarView.updateResultPosition(
+            currentIndex: currentDocumentSearchResultIndex,
+            totalCount: count
+        )
+        selectCurrentDocumentSearchResult()
+    }
+
+    private func selectCurrentDocumentSearchResult() {
+        guard let index = currentDocumentSearchResultIndex,
+            documentSearchIndex.matchRanges.indices.contains(index)
+        else { return }
+        let match = documentSearchIndex.matchRanges[index]
+        workspace.textView.setSelectedRange(match)
+        workspace.textView.scrollRangeToVisible(match)
+        NSAccessibility.post(element: workspace.textView, notification: .selectedTextChanged)
+    }
+
+    private func useSelectionForDocumentSearch() {
+        let selection = workspace.textView.selectedRange()
+        let source = workspace.textView.string as NSString
+        guard selection.length > 0, NSMaxRange(selection) <= source.length else {
+            NSSound.beep()
+            showDocumentSearch()
+            return
+        }
+        showDocumentSearch(query: source.substring(with: selection))
     }
 
     func toolbarAllowedItemIdentifiers(_ toolbar: NSToolbar) -> [NSToolbarItem.Identifier] {
         [
             .newDocument, .openDocument, .saveDocument, .liveDocument, .flexibleSpace,
-            .documentTitle, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold, .italic, .code,
-            .heading1, .heading2,
+            .documentTitle, .documentSearch, .flexibleSpace, .zoomOut, .actualSize, .zoomIn, .bold,
+            .italic, .code, .heading1, .heading2,
         ]
     }
 
@@ -526,6 +806,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             item.view = documentTitleToolbarView
             item.label = "Document Title"
             item.paletteLabel = "Document Title"
+            item.visibilityPriority = .high
+        case .documentSearch:
+            item.view = searchToolbarView
+            item.label = "Document Search"
+            item.paletteLabel = "Document Search"
+            item.toolTip = "Find text in this Markdown document."
             item.visibilityPriority = .high
         case .zoomOut:
             configureToolbarAction(
@@ -797,6 +1083,7 @@ extension NSToolbarItem.Identifier {
     fileprivate static let saveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.Save")
     fileprivate static let liveDocument = NSToolbarItem.Identifier("Aviv.Toolbar.LiveDocument")
     fileprivate static let documentTitle = NSToolbarItem.Identifier("Aviv.Toolbar.DocumentTitle")
+    fileprivate static let documentSearch = NSToolbarItem.Identifier("Aviv.Toolbar.DocumentSearch")
     fileprivate static let zoomOut = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomOut")
     fileprivate static let actualSize = NSToolbarItem.Identifier("Aviv.Toolbar.ActualSize")
     fileprivate static let zoomIn = NSToolbarItem.Identifier("Aviv.Toolbar.ZoomIn")

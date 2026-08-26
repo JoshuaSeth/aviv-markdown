@@ -386,10 +386,10 @@ public enum AppCommandCatalog {
         AppCommandSpec(
             identifier: identifier,
             title: title,
-            actionName: "performFindPanelAction:",
+            actionName: "performDocumentFindAction:",
             keyEquivalent: key,
             modifierMask: modifiers,
-            targetRoute: .firstResponder,
+            targetRoute: .appDelegate,
             tag: action.rawValue
         )
     }

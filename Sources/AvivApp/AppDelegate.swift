@@ -125,6 +125,10 @@ final class AppDelegate: NSObject, NSApplicationDelegate, NSMenuItemValidation, 
         activeDocumentController()?.resetTextSize(sender)
     }
 
+    @objc func performDocumentFindAction(_ sender: Any?) {
+        activeDocumentController()?.performDocumentFindAction(sender)
+    }
+
     @objc func toggleBold(_ sender: Any?) {
         activeDocumentController()?.workspace.textView.wrapSelection(prefix: "**", suffix: "**")
     }

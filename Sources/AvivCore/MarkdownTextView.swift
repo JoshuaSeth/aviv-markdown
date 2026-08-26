@@ -494,13 +494,16 @@ public final class MarkdownTextView: NSTextView, NSTextFieldDelegate {
         setAccessibilityLabel("Document editor")
         setAccessibilityEnabled(true)
         setAccessibilityHelp(
-            "Editable Markdown document. Native text selection, insertion, search, spelling, and undo actions are available. Use the document outline to navigate headings, tables, and lists."
+            "Editable Markdown document. Native text selection, insertion, spelling, and undo actions are available. Use Command-F for the non-overlapping toolbar search and the document outline to locate matching sections."
         )
         drawsBackground = false
         isRichText = false
         importsGraphics = false
         allowsUndo = true
-        usesFindBar = true
+        // Aviv presents search in the unified toolbar. AppKit's inline find bar is
+        // intentionally disabled because the scroll view extends beneath that
+        // toolbar and an inline bar can therefore cover unrelated toolbar controls.
+        usesFindBar = false
         isIncrementalSearchingEnabled = true
         isAutomaticQuoteSubstitutionEnabled = false
         isAutomaticDashSubstitutionEnabled = false

@@ -37,6 +37,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Native **Open Recent** menu for quickly returning to recent Markdown documents.
 - Multiple windows and native macOS document tabs.
 - `Cmd-T` for a new tab, `Cmd-W` to close the active tab/window.
+- Compact `Cmd-F` toolbar search that never covers document controls, with attached previous/next buttons, `Cmd-G` and `Shift-Cmd-G` navigation, and yellow hit sections in the minimap.
 - Drag tabs out into new windows and merge windows back together.
 - Clean minimap/sidebar that follows the actual rendered viewport.
 - Top bar and sidebar use subtle blur/tint so overlays stay readable.
@@ -119,6 +120,7 @@ This runs:
 
 - Swift unit tests
 - command/menu verifier
+- compact search-toolbar, shortcut, outline-hit, no-overlap, and no-layout-shift verifier
 - open-recent menu behavior verifier
 - tab/window verifier
 - layout stability verifier
@@ -129,6 +131,8 @@ This runs:
 - rendered snapshot generation
 
 Core invariants are tested directly: focusing styled Markdown should reveal its raw editing markers and restore the exact reading presentation on click-away, moving the cursor should not shift rendered content, the minimap should track the real scroll viewport, and native tabs/windows should behave like real macOS document tabs.
+
+The search verifier checks local and live-document toolbars at the 720-point minimum width plus 840, 1080, and 1440 points. It drives previous/next buttons and shortcuts, confirms yellow outline sections, proves editor geometry is unchanged, benchmarks a 2.1 MB document, and writes compositor screenshots plus JSON evidence.
 
 To capture standalone proof using native AppKit click events against both a local fixture and a live URL-backed document:
 
