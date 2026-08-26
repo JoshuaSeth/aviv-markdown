@@ -8,6 +8,8 @@ public final class MarkdownMinimapView: NSView {
     private var cachedStructureImage: NSImage?
     private var accessibilityOutlineElements: [MarkdownOutlineAccessibilityElement] = []
     private var selectedAccessibilityOutlineIndex: Int?
+    private var searchMatchRanges: [NSRange] = []
+    private var searchHitOutlineItemIndexes = IndexSet()
 
     private struct StructureSignature: Equatable {
         let revision: Int
@@ -67,6 +69,8 @@ public final class MarkdownMinimapView: NSView {
         )
         border.lineWidth = 1
         border.stroke()
+
+        drawSearchHitSections(in: textView, metrics: metrics)
 
         let structureImage = structureImage(in: textView, metrics: metrics)
         structureImage.draw(
@@ -130,7 +134,16 @@ public final class MarkdownMinimapView: NSView {
     func invalidateDocumentStructure() {
         cachedStructureSignature = nil
         cachedStructureImage = nil
+        refreshSearchHitOutlineItemIndexes()
         rebuildAccessibilityOutline()
+        needsDisplay = true
+    }
+
+    func updateSearchMatches(_ matchRanges: [NSRange]) {
+        guard matchRanges != searchMatchRanges else { return }
+        searchMatchRanges = matchRanges
+        refreshSearchHitOutlineItemIndexes()
+        refreshAccessibilitySearchHits()
         needsDisplay = true
     }
 
@@ -164,6 +177,22 @@ public final class MarkdownMinimapView: NSView {
 
     var accessibilityOutlineIdentifiersForTesting: [String] {
         accessibilityOutlineElements.compactMap { $0.accessibilityIdentifier() }
+    }
+
+    var searchHitOutlineItemCountForTesting: Int {
+        searchHitOutlineItemIndexes.count
+    }
+
+    var searchHitOutlineIdentifiersForTesting: [String] {
+        searchHitOutlineItemIndexes.compactMap { index in
+            guard accessibilityOutlineElements.indices.contains(index) else { return nil }
+            return accessibilityOutlineElements[index].accessibilityIdentifier()
+        }
+    }
+
+    var searchHitFramesForTesting: [NSRect] {
+        guard let textView, let metrics = viewportMetrics() else { return [] }
+        return searchHitMarkerRects(in: textView, metrics: metrics)
     }
 
     fileprivate func navigate(to item: MarkdownDocumentOutlineItem) -> Bool {
@@ -201,11 +230,49 @@ public final class MarkdownMinimapView: NSView {
             return
         }
 
-        accessibilityOutlineElements = textView.outlineItemsForRendering.map { item in
-            MarkdownOutlineAccessibilityElement(item: item, minimapView: self)
+        accessibilityOutlineElements = textView.outlineItemsForRendering.enumerated().map {
+            index,
+            item in
+            MarkdownOutlineAccessibilityElement(
+                item: item,
+                containsSearchHit: searchHitOutlineItemIndexes.contains(index),
+                minimapView: self
+            )
         }
         selectedAccessibilityOutlineIndex = nil
         setAccessibilityChildren(accessibilityOutlineElements)
+
+        refreshAccessibilityOutlineValue()
+        updateAccessibilityFrames()
+        updateAccessibilitySelection()
+        NSAccessibility.post(element: self, notification: .rowCountChanged)
+    }
+
+    private func refreshSearchHitOutlineItemIndexes() {
+        guard let textView else {
+            searchHitOutlineItemIndexes = []
+            return
+        }
+        searchHitOutlineItemIndexes = MarkdownSearchIndex.outlineHitItemIndexes(
+            outlineItems: textView.outlineItemsForRendering,
+            matchRanges: searchMatchRanges,
+            documentLength: (textView.string as NSString).length
+        )
+    }
+
+    private func refreshAccessibilitySearchHits() {
+        for (index, element) in accessibilityOutlineElements.enumerated() {
+            element.updateContainsSearchHit(searchHitOutlineItemIndexes.contains(index))
+        }
+        refreshAccessibilityOutlineValue()
+        NSAccessibility.post(element: self, notification: .valueChanged)
+    }
+
+    private func refreshAccessibilityOutlineValue() {
+        guard let textView else {
+            setAccessibilityValue("No document structure")
+            return
+        }
 
         let items = textView.outlineItemsForRendering
         let headingCount = items.filter { $0.isHeading }.count
@@ -218,10 +285,10 @@ public final class MarkdownMinimapView: NSView {
         } else if textView.totalOutlineItemCountForRendering == 0 {
             value = "No headings, tables, or list items"
         }
+        if !searchHitOutlineItemIndexes.isEmpty {
+            value += "; \(searchHitOutlineItemIndexes.count) sections contain search matches"
+        }
         setAccessibilityValue(value)
-        updateAccessibilityFrames()
-        updateAccessibilitySelection()
-        NSAccessibility.post(element: self, notification: .rowCountChanged)
     }
 
     private func updateAccessibilityFrames() {
@@ -274,6 +341,73 @@ public final class MarkdownMinimapView: NSView {
         cachedStructureSignature = signature
         cachedStructureImage = image
         return image
+    }
+
+    private func drawSearchHitSections(
+        in textView: MarkdownTextView,
+        metrics: MarkdownMinimapViewportMetrics
+    ) {
+        let rects = searchHitMarkerRects(in: textView, metrics: metrics)
+        guard !rects.isEmpty else { return }
+
+        let fillColor = NSColor(
+            calibratedRed: 1.0,
+            green: 0.78,
+            blue: 0.12,
+            alpha: 0.36
+        )
+        let strokeColor = NSColor(
+            calibratedRed: 0.88,
+            green: 0.58,
+            blue: 0.02,
+            alpha: 0.58
+        )
+        for rect in rects {
+            let path = NSBezierPath(roundedRect: rect, xRadius: 2.5, yRadius: 2.5)
+            fillColor.setFill()
+            path.fill()
+            strokeColor.setStroke()
+            path.lineWidth = backingScaleAdjustedPixel
+            path.stroke()
+        }
+    }
+
+    private func searchHitMarkerRects(
+        in textView: MarkdownTextView,
+        metrics: MarkdownMinimapViewportMetrics
+    ) -> [NSRect] {
+        guard !searchHitOutlineItemIndexes.isEmpty,
+            let layoutManager = textView.layoutManager,
+            let textContainer = textView.textContainer
+        else { return [] }
+
+        let items = textView.outlineItemsForRendering
+        let documentLength = (textView.string as NSString).length
+        guard documentLength > 0 else { return [] }
+
+        layoutManager.ensureLayout(for: textContainer)
+        return searchHitOutlineItemIndexes.compactMap { index in
+            guard items.indices.contains(index) else { return nil }
+            let location = min(max(0, items[index].sourceRange.location), documentLength - 1)
+            let glyphIndex = layoutManager.glyphIndexForCharacter(at: location)
+            var lineRect = layoutManager.lineFragmentUsedRect(
+                forGlyphAt: glyphIndex,
+                effectiveRange: nil
+            )
+            lineRect.origin.y += textView.textContainerOrigin.y
+            let y = metrics.projectedY(forDocumentY: lineRect.minY)
+            let lineStep = max(
+                1.2,
+                metrics.projectedHeight(forDocumentHeight: lineRect.height)
+            )
+            let height = min(7, max(4, lineStep + 2))
+            return NSRect(
+                x: 3,
+                y: y - 1,
+                width: max(1, bounds.width - 6),
+                height: height
+            ).intersection(bounds)
+        }.filter { !$0.isEmpty }
     }
 
     private func structureEntries(in textView: MarkdownTextView) -> [StructureEntry] {
@@ -760,9 +894,15 @@ public final class MarkdownMinimapView: NSView {
 private final class MarkdownOutlineAccessibilityElement: NSAccessibilityElement {
     let item: MarkdownDocumentOutlineItem
     private let pressAction: @MainActor @Sendable () -> Bool
+    private var containsSearchHit: Bool
 
-    init(item: MarkdownDocumentOutlineItem, minimapView: MarkdownMinimapView) {
+    init(
+        item: MarkdownDocumentOutlineItem,
+        containsSearchHit: Bool,
+        minimapView: MarkdownMinimapView
+    ) {
         self.item = item
+        self.containsSearchHit = containsSearchHit
         self.pressAction = { [weak minimapView] in
             minimapView?.navigate(to: item) ?? false
         }
@@ -774,12 +914,24 @@ private final class MarkdownOutlineAccessibilityElement: NSAccessibilityElement 
         setAccessibilityRoleDescription(item.accessibilityRoleDescription)
         setAccessibilityIdentifier(item.accessibilityIdentifier)
         setAccessibilityLabel(item.accessibilityLabel)
-        setAccessibilityValue(item.accessibilityValue)
-        setAccessibilityHelp(
-            "\(item.accessibilityRoleDescription) at document line \(item.lineNumber). Press to focus the document editor at this item."
-        )
         setAccessibilityEnabled(true)
         setAccessibilitySelected(false)
+        refreshSearchMetadata()
+    }
+
+    func updateContainsSearchHit(_ containsSearchHit: Bool) {
+        guard containsSearchHit != self.containsSearchHit else { return }
+        self.containsSearchHit = containsSearchHit
+        refreshSearchMetadata()
+        NSAccessibility.post(element: self, notification: .valueChanged)
+    }
+
+    private func refreshSearchMetadata() {
+        let searchDescription = containsSearchHit ? ", contains search matches" : ""
+        setAccessibilityValue(item.accessibilityValue + searchDescription)
+        setAccessibilityHelp(
+            "\(item.accessibilityRoleDescription) at document line \(item.lineNumber)\(searchDescription). Press to focus the document editor at this item."
+        )
     }
 
     nonisolated override func accessibilityPerformPress() -> Bool {

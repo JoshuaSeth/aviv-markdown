@@ -146,34 +146,34 @@ final class AppCommandCatalogTests: XCTestCase {
         assertCommand(
             "find",
             title: "Find...",
-            action: "performFindPanelAction:",
+            action: "performDocumentFindAction:",
             key: "f",
             modifiers: [.command],
-            target: .firstResponder
+            target: .appDelegate
         )
         assertCommand(
             "findNext",
             title: "Find Next",
-            action: "performFindPanelAction:",
+            action: "performDocumentFindAction:",
             key: "g",
             modifiers: [.command],
-            target: .firstResponder
+            target: .appDelegate
         )
         assertCommand(
             "findPrevious",
             title: "Find Previous",
-            action: "performFindPanelAction:",
+            action: "performDocumentFindAction:",
             key: "G",
             modifiers: [.command, .shift],
-            target: .firstResponder
+            target: .appDelegate
         )
         assertCommand(
             "useSelectionForFind",
             title: "Use Selection for Find",
-            action: "performFindPanelAction:",
+            action: "performDocumentFindAction:",
             key: "e",
             modifiers: [.command],
-            target: .firstResponder
+            target: .appDelegate
         )
         assertCommand(
             "jumpToSelection",

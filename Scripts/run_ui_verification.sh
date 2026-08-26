@@ -9,6 +9,7 @@ swift test
 
 mkdir -p "$ROOT/dist/snapshots"
 mkdir -p "$ROOT/dist/styled-marker-reveal"
+mkdir -p "$ROOT/dist/search-toolbar"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-commands
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-tabs
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-default-app-prompt
@@ -20,6 +21,9 @@ mkdir -p "$ROOT/dist/styled-marker-reveal"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-table-restoration "$ROOT/dist/table-restoration"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-huge-table-performance "$ROOT/dist/huge-table-performance"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-accessibility "$ROOT/dist/accessibility-audit"
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
+  --verify-search-ui "$ROOT/Samples/search-layout-proof.md" \
+  --evidence-dir "$ROOT/dist/search-toolbar"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
   --verify-styled-marker-reveal https://pitchai.net/aviv-live/seth-live-demo.md \
   --local-file "$ROOT/Samples/styled-marker-reveal.md" \
@@ -61,4 +65,8 @@ echo "$ROOT/dist/huge-table-performance/huge-table-mid-scroll.png"
 echo "$ROOT/dist/huge-table-performance/huge-table-performance-result.json"
 echo "$ROOT/dist/accessibility-audit/accessibility-audit.json"
 echo "$ROOT/dist/accessibility-audit/accessibility-structured-conflict.png"
+echo "$ROOT/dist/search-toolbar/search-ui-results.json"
+echo "$ROOT/dist/search-toolbar/search-native-720.png"
+echo "$ROOT/dist/search-toolbar/search-native-720-live.png"
+echo "$ROOT/dist/search-toolbar/search-native-1080.png"
 echo "$ROOT/dist/styled-marker-reveal/styled-marker-reveal-result.json"

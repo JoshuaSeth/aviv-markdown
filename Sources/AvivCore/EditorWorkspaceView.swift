@@ -223,6 +223,10 @@ public final class EditorWorkspaceView: NSView {
         DispatchQueue.main.asyncAfter(deadline: .now() + .milliseconds(180), execute: workItem)
     }
 
+    public func updateSearchMatches(_ matchRanges: [NSRange]) {
+        minimapView.updateSearchMatches(matchRanges)
+    }
+
     var minimapForTesting: MarkdownMinimapView {
         minimapView
     }
@@ -239,6 +243,18 @@ public final class EditorWorkspaceView: NSView {
         minimapView.accessibilityOutlineIdentifiersForTesting
     }
 
+    public var outlineSearchHitCountForTesting: Int {
+        minimapView.searchHitOutlineItemCountForTesting
+    }
+
+    public var outlineSearchHitIdentifiersForTesting: [String] {
+        minimapView.searchHitOutlineIdentifiersForTesting
+    }
+
+    public var outlineSearchHitFramesForTesting: [NSRect] {
+        minimapView.searchHitFramesForTesting
+    }
+
     public var minimapMetadataCountsForTesting: (lines: Int, ranges: Int) {
         (
             lines: textView.minimapLinesForRendering.count,
@@ -250,9 +266,7 @@ public final class EditorWorkspaceView: NSView {
         textView.textContainer?.containerSize.width ?? 0
     }
 
-    public var styledMarkerFramesForTesting: [
-        (token: MarkdownAnnotationToken, frame: NSRect)
-    ] {
+    public var styledMarkerFramesForTesting: [(token: MarkdownAnnotationToken, frame: NSRect)] {
         annotationOverlay.markerFrames(in: annotationOverlay).map { marker in
             (
                 token: marker.token,

@@ -84,6 +84,15 @@ MainActor.assumeIsolated {
         app.run()
     }
 
+    if arguments.contains("--verify-search-ui") {
+        let app = NSApplication.shared
+        app.setActivationPolicy(.accessory)
+        Task { @MainActor in
+            exit(await SearchUIVerifier.runCLI(arguments: arguments))
+        }
+        app.run()
+    }
+
     if arguments.contains("--verify-styled-marker-reveal") {
         let app = NSApplication.shared
         app.setActivationPolicy(.accessory)
