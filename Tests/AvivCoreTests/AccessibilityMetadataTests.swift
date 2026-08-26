@@ -92,6 +92,72 @@ final class AccessibilityMetadataTests: XCTestCase {
         XCTAssertFalse(indicator.isAccessibilityHidden())
     }
 
+    @MainActor
+    func testSearchMatchesMarkOutlineSectionsWithoutChangingDocumentGeometry() throws {
+        let workspace = EditorWorkspaceView(
+            frame: NSRect(x: 0, y: 0, width: 900, height: 680)
+        )
+        let window = NSWindow(
+            contentRect: workspace.bounds,
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = workspace
+        let markdown = """
+            # Planning
+
+            Search target is inside Planning.
+
+            ## Details
+
+            - Another target is in this row.
+
+            # Appendix
+
+            No match here.
+            """ + "\n"
+        workspace.loadMarkdown(markdown)
+        workspace.layoutSubtreeIfNeeded()
+        let textContainerWidth = workspace.resolvedTextContainerWidthForTesting
+        let textFrame = workspace.textView.frame
+
+        let matches = MarkdownSearchIndex.findMatches(in: markdown, query: "target")
+        workspace.updateSearchMatches(matches)
+        workspace.displayIfNeeded()
+
+        XCTAssertEqual(workspace.outlineSearchHitCountForTesting, 3)
+        XCTAssertTrue(
+            workspace.outlineSearchHitIdentifiersForTesting.contains {
+                $0.contains("heading.line-1")
+            }
+        )
+        XCTAssertEqual(workspace.outlineSearchHitFramesForTesting.count, 3)
+        XCTAssertEqual(workspace.resolvedTextContainerWidthForTesting, textContainerWidth)
+        XCTAssertEqual(workspace.textView.frame, textFrame)
+
+        let children = try XCTUnwrap(
+            workspace.minimapForTesting.accessibilityChildren() as? [NSAccessibilityElement]
+        )
+        let matchedChildren = children.filter {
+            ($0.accessibilityValue() as? String)?.contains("contains search matches") == true
+        }
+        XCTAssertEqual(matchedChildren.count, 3)
+        XCTAssertTrue(
+            matchedChildren.allSatisfy {
+                $0.accessibilityHelp()?.contains("contains search matches") == true
+            }
+        )
+
+        workspace.updateSearchMatches([])
+        XCTAssertEqual(workspace.outlineSearchHitCountForTesting, 0)
+        XCTAssertFalse(
+            children.contains {
+                ($0.accessibilityValue() as? String)?.contains("contains search matches") == true
+            }
+        )
+    }
+
     private var structuredFixture: String {
         """
         # Accessible heading

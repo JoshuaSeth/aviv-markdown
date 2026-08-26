@@ -182,6 +182,39 @@ enum AppCommandVerifier {
             failures.append("Zoom commands changed the markdown source")
         }
 
+        controller.workspace.textView.loadMarkdown("alpha target beta target")
+        controller.workspace.textView.setSelectedRange(NSRange(location: 6, length: 6))
+        if let useSelection = commandItems(in: NSApp.mainMenu?.items ?? []).first(where: {
+            $0.identifier?.rawValue == "useSelectionForFind"
+        }),
+            let next = commandItems(in: NSApp.mainMenu?.items ?? []).first(where: {
+                $0.identifier?.rawValue == "findNext"
+            }),
+            let previous = commandItems(in: NSApp.mainMenu?.items ?? []).first(where: {
+                $0.identifier?.rawValue == "findPrevious"
+            })
+        {
+            delegate.performDocumentFindAction(useSelection)
+            if !controller.isDocumentSearchActiveForTesting
+                || controller.documentSearchQueryForTesting != "target"
+                || controller.documentSearchMatchRangesForTesting.count != 2
+            {
+                failures.append("Use Selection for Find did not open Aviv document search")
+            }
+            let initialSearchIndex = controller.currentDocumentSearchResultIndexForTesting
+            delegate.performDocumentFindAction(next)
+            if controller.currentDocumentSearchResultIndexForTesting == initialSearchIndex {
+                failures.append("Find Next did not advance Aviv document search")
+            }
+            delegate.performDocumentFindAction(previous)
+            if controller.currentDocumentSearchResultIndexForTesting != initialSearchIndex {
+                failures.append("Find Previous did not return Aviv document search")
+            }
+            controller.closeDocumentSearchForTesting()
+        } else {
+            failures.append("Document search commands are missing from the native menu")
+        }
+
         controller.workspace.textView.loadMarkdown("word")
         controller.workspace.textView.setSelectedRange(NSRange(location: 0, length: 4))
         delegate.toggleBold(nil)

@@ -86,6 +86,17 @@ dist/Aviv.app/Contents/MacOS/Aviv \
   --evidence-dir dist/styled-marker-reveal
 ```
 
+The search verifier exercises the compact toolbar at the minimum supported window width and three wider layouts. It
+fails on any toolbar or traffic-light overlap, missing previous/next control or shortcut, outline hit that is not
+exposed, or editor geometry change. It also checks the live-document badge at 720 points, benchmarks 16,000 matches in
+a 2.1 MB document, and writes compositor PNGs plus JSON:
+
+```sh
+dist/Aviv.app/Contents/MacOS/Aviv \
+  --verify-search-ui Samples/search-layout-proof.md \
+  --evidence-dir dist/search-toolbar
+```
+
 For the real macOS Accessibility tree of a running build, grant Accessibility permission to the terminal or automation
 host once, then capture the bounded tab-separated audit. The script fails loudly if the process, window, permission, or
 child traversal is unavailable:
