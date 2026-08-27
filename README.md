@@ -34,6 +34,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Native open/save panels for `.md` files.
 - On macOS, open a public HTTPS Markdown URL and follow external edits live.
 - Conflict-safe authenticated `Cmd-S` save-back for URL sources that advertise an Aviv write bridge.
+- Click the live-document indicator to inspect, select, or copy the exact URL backing the current Markdown.
 - Native **Open Recent** menu for quickly returning to recent Markdown documents.
 - Multiple windows and native macOS document tabs.
 - `Cmd-T` for a new tab, `Cmd-W` to close the active tab/window.
@@ -41,6 +42,7 @@ Most Markdown editors make you choose between raw source and rendered preview. A
 - Drag tabs out into new windows and merge windows back together.
 - Clean minimap/sidebar that follows the actual rendered viewport.
 - Top bar and sidebar use subtle blur/tint so overlays stay readable.
+- Drag the centered document title to move the macOS window without turning editor or toolbar controls into drag targets.
 - A native bottom-left format selector for a focused blog-width view or wider A4 document view.
 - A4-aware printing that avoids double-padding the editor and the paper margins.
 - Zoom controls that change view size without changing Markdown source.
@@ -54,6 +56,9 @@ Choose **File → Open from URL…** or press `Shift-Cmd-O`, then paste a public
 public URL and stable source identity attached to the document and checks for changes with conditional requests at
 least once per second. Clean external edits appear in place. The caret, selection, visible text anchor, scroll
 position, and text-container width are preserved.
+
+Click the compact live-document indicator in the toolbar to reveal the exact opened URL in a transient, selectable
+popover. Its copy button copies the complete address without widening or shifting the toolbar.
 
 If the local buffer is dirty, Aviv does not overwrite it. The source badge changes to **Incoming edit waiting**, the
 changed lines are marked, and **File → Resolve Incoming Changes…** offers three explicit choices: use the incoming
@@ -121,6 +126,7 @@ This runs:
 - Swift unit tests
 - command/menu verifier
 - compact search-toolbar, shortcut, outline-hit, no-overlap, and no-layout-shift verifier
+- live-link click/copy, centered-title drag-surface, and header no-overlap verifier
 - open-recent menu behavior verifier
 - tab/window verifier
 - layout stability verifier
@@ -133,6 +139,10 @@ This runs:
 Core invariants are tested directly: focusing styled Markdown should reveal its raw editing markers and restore the exact reading presentation on click-away, moving the cursor should not shift rendered content, the minimap should track the real scroll viewport, and native tabs/windows should behave like real macOS document tabs.
 
 The search verifier checks local and live-document toolbars at the 720-point minimum width plus 840, 1080, and 1440 points. It drives previous/next buttons and shortcuts, confirms yellow outline sections, proves editor geometry is unchanged, benchmarks a 2.1 MB document, and writes compositor screenshots plus JSON evidence.
+
+The header verifier clicks the real live-document indicator, checks the exact selectable and copyable URL, enforces a
+zero-shift popover, and verifies that the centered title exposes a bounded native window-drag surface that does not
+overlap traffic lights or toolbar controls at the same four widths.
 
 To capture standalone proof using native AppKit click events against both a local fixture and a live URL-backed document:
 

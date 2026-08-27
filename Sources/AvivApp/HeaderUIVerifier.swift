@@ -14,7 +14,10 @@ enum HeaderUIVerifier {
                 withIntermediateDirectories: true
             )
 
-            let controller = DocumentWindowController()
+            let verificationPasteboard = NSPasteboard.withUniqueName()
+            let controller = DocumentWindowController(
+                liveDocumentPasteboard: verificationPasteboard
+            )
             controller.showWindow(nil)
             controller.window?.makeKeyAndOrderFront(nil)
             guard controller.open(url: options.localFile) else {
@@ -38,13 +41,22 @@ enum HeaderUIVerifier {
                 )
             )
             emit(
-                "AVIV_HEADER_LOCAL title=\(options.localFile.lastPathComponent) live_status=hidden"
+                "AVIV_HEADER_LOCAL title=\(options.localFile.lastPathComponent) live_status=hidden drag_surface=verified"
             )
 
             guard await controller.openRemote(url: options.remoteURL) else {
                 throw HeaderUIVerificationError("Aviv could not open the public Markdown URL.")
             }
             try await settleWindow(controller.window)
+            let liveLinkGeometry = try await verifyLiveLinkInteraction(
+                controller,
+                expectedURL: options.remoteURL,
+                pasteboard: verificationPasteboard,
+                evidenceDirectory: options.evidenceDirectory
+            )
+            emit(
+                "AVIV_HEADER_LIVE_LINK exact_url=true selectable=true copied=true popover=\(format(liveLinkGeometry.popoverSize)) drag_surface=\(format(liveLinkGeometry.dragSurfaceFrame)) layout_shift=false"
+            )
             for width in widths {
                 let geometry = try await verifyRemoteHeader(
                     controller,
@@ -100,6 +112,7 @@ enum HeaderUIVerifier {
         guard controller.liveDocumentIndicatorFrameForTesting == nil else {
             throw HeaderUIVerificationError("The local document incorrectly shows a live status.")
         }
+        try verifyTitleDragSurface(controller, window: window)
     }
 
     private static func verifyRemoteHeader(
@@ -128,6 +141,7 @@ enum HeaderUIVerifier {
         guard controller.liveDocumentIndicatorVisibleTextForTesting.isEmpty else {
             throw HeaderUIVerificationError("The live status still paints duplicate side text.")
         }
+        try verifyTitleDragSurface(controller, window: window)
         guard
             controller.liveDocumentIndicatorAccessibilitySummaryForTesting.contains(
                 expectedURL.host ?? ""
@@ -166,7 +180,8 @@ enum HeaderUIVerifier {
             )
         }
         let indicatorCollisions = toolbarButtonFrames.filter {
-            $0.intersects(indicatorFrame.insetBy(dx: -2, dy: -2))
+            $0 != indicatorFrame
+                && $0.intersects(indicatorFrame.insetBy(dx: -2, dy: -2))
         }
         guard indicatorCollisions.isEmpty else {
             throw HeaderUIVerificationError(
@@ -213,6 +228,125 @@ enum HeaderUIVerifier {
                 "A native toolbar action overlaps the visible document title: title=\(format(frame)) controls=\(format(collisions))."
             )
         }
+    }
+
+    private static func verifyTitleDragSurface(
+        _ controller: DocumentWindowController,
+        window: NSWindow
+    ) throws {
+        guard controller.documentTitleProvidesWindowDragForTesting else {
+            throw HeaderUIVerificationError(
+                "The visible document title does not route mouse-down events to native window dragging."
+            )
+        }
+        let dragFrame = controller.documentTitleDragSurfaceFrameForTesting
+        guard dragFrame.width >= 112, dragFrame.height >= 20 else {
+            throw HeaderUIVerificationError(
+                "The document title drag target is too small: \(format(dragFrame))."
+            )
+        }
+        let trafficLights = try trafficLightFrame(in: controller.workspace, window: window)
+        guard !dragFrame.intersects(trafficLights.insetBy(dx: -8, dy: -8)) else {
+            throw HeaderUIVerificationError(
+                "The document title drag target overlaps the macOS traffic lights."
+            )
+        }
+        let collisions = try toolbarButtonFrames(
+            in: controller.workspace,
+            window: window
+        ).filter { $0.intersects(dragFrame) }
+        guard collisions.isEmpty else {
+            throw HeaderUIVerificationError(
+                "The document title drag target overlaps toolbar controls: drag=\(format(dragFrame)) controls=\(format(collisions))."
+            )
+        }
+    }
+
+    private static func verifyLiveLinkInteraction(
+        _ controller: DocumentWindowController,
+        expectedURL: URL,
+        pasteboard: NSPasteboard,
+        evidenceDirectory: URL
+    ) async throws -> LiveLinkGeometry {
+        guard let window = controller.window,
+            let indicatorBefore = controller.liveDocumentIndicatorFrameForTesting
+        else {
+            throw HeaderUIVerificationError("The live link interaction has no toolbar indicator.")
+        }
+        let workspaceFrameBefore = controller.workspace.frame
+        let scrollFrameBefore = controller.workspace.scrollView.frame
+        let textContainerWidthBefore = controller.workspace.resolvedTextContainerWidthForTesting
+        let contentLayoutBefore = window.contentLayoutRect
+        let dragSurfaceBefore = controller.documentTitleDragSurfaceFrameForTesting
+
+        controller.showLiveDocumentLinkForTesting()
+        try await settleWindow(window)
+        guard controller.liveDocumentLinkPopoverVisibleForTesting else {
+            throw HeaderUIVerificationError("Clicking the live status did not show its link.")
+        }
+        guard controller.liveDocumentLinkURLForTesting == expectedURL.absoluteString else {
+            throw HeaderUIVerificationError(
+                "The live status showed a URL other than the opened URL."
+            )
+        }
+        guard controller.liveDocumentLinkIsSelectableForTesting else {
+            throw HeaderUIVerificationError("The shown live document URL is not selectable.")
+        }
+        let expectedIdentifiers: Set = [
+            "aviv.live-document-link.popover",
+            "aviv.live-document-link.url",
+            "aviv.live-document-link.copy",
+        ]
+        guard
+            expectedIdentifiers.isSubset(
+                of: controller.liveDocumentLinkElementIdentifiersForTesting
+            )
+        else {
+            throw HeaderUIVerificationError(
+                "The live link popover is missing accessibility-addressable URL or copy controls."
+            )
+        }
+
+        controller.copyLiveDocumentLinkForTesting()
+        guard pasteboard.string(forType: .string) == expectedURL.absoluteString else {
+            throw HeaderUIVerificationError(
+                "The live link copy action did not write the exact opened URL."
+            )
+        }
+
+        guard controller.workspace.frame == workspaceFrameBefore,
+            controller.workspace.scrollView.frame == scrollFrameBefore,
+            abs(
+                controller.workspace.resolvedTextContainerWidthForTesting
+                    - textContainerWidthBefore
+            ) <= 0.01,
+            window.contentLayoutRect == contentLayoutBefore,
+            controller.documentTitleDragSurfaceFrameForTesting == dragSurfaceBefore,
+            controller.liveDocumentIndicatorFrameForTesting == indicatorBefore
+        else {
+            throw HeaderUIVerificationError(
+                "Showing the live link shifted the toolbar or document geometry."
+            )
+        }
+
+        guard let popoverView = controller.liveDocumentLinkViewForTesting else {
+            throw HeaderUIVerificationError("The live link popover has no renderable view.")
+        }
+        popoverView.layoutSubtreeIfNeeded()
+        popoverView.displayIfNeeded()
+        try renderViewEvidence(
+            popoverView,
+            to: evidenceDirectory.appendingPathComponent("remote-live-link-popover.png")
+        )
+        let geometry = LiveLinkGeometry(
+            popoverSize: popoverView.bounds.size,
+            dragSurfaceFrame: dragSurfaceBefore
+        )
+        controller.closeLiveDocumentLinkForTesting()
+        guard !controller.liveDocumentLinkPopoverVisibleForTesting else {
+            throw HeaderUIVerificationError("The transient live link popover did not close.")
+        }
+        return geometry
     }
 
     private static func trafficLightFrame(
@@ -318,6 +452,18 @@ enum HeaderUIVerifier {
         try png.write(to: url, options: .atomic)
     }
 
+    private static func renderViewEvidence(_ view: NSView, to url: URL) throws {
+        guard let bitmap = view.bitmapImageRepForCachingDisplay(in: view.bounds) else {
+            throw HeaderUIVerificationError("Could not allocate live-link evidence.")
+        }
+        bitmap.size = view.bounds.size
+        view.cacheDisplay(in: view.bounds, to: bitmap)
+        guard let png = bitmap.representation(using: .png, properties: [:]) else {
+            throw HeaderUIVerificationError("Could not encode live-link evidence PNG.")
+        }
+        try png.write(to: url, options: .atomic)
+    }
+
     private static func settleWindow(_ window: NSWindow?) async throws {
         guard let window else {
             throw HeaderUIVerificationError("The verifier window was not created.")
@@ -347,6 +493,10 @@ enum HeaderUIVerifier {
         rects.map { format($0) }.joined(separator: ";")
     }
 
+    private static func format(_ size: NSSize) -> String {
+        String(format: "%.0fx%.0f", size.width, size.height)
+    }
+
     private static func emit(_ message: String) {
         fputs("\(message)\n", stdout)
         fflush(stdout)
@@ -355,6 +505,11 @@ enum HeaderUIVerifier {
     private struct HeaderGeometry {
         let indicatorFrame: NSRect
         let trafficLightFrame: NSRect
+    }
+
+    private struct LiveLinkGeometry {
+        let popoverSize: NSSize
+        let dragSurfaceFrame: NSRect
     }
 
     private struct Options {
@@ -384,7 +539,7 @@ enum HeaderUIVerifier {
             }
             self.remoteURL = remoteURL
             self.localFile = localFile
-            self.evidenceDirectory = URL(fileURLWithPath: arguments[evidenceIndex + 1])
+            evidenceDirectory = URL(fileURLWithPath: arguments[evidenceIndex + 1])
         }
     }
 }

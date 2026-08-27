@@ -1,6 +1,6 @@
 import AppKit
 
-public final class RemoteSyncIndicatorView: NSView {
+public final class RemoteSyncIndicatorView: NSButton {
     public static let indicatorIdentifiers = [
         "remote-source-badge",
         "remote-source-heartbeat",
@@ -17,11 +17,11 @@ public final class RemoteSyncIndicatorView: NSView {
         ""
     }
 
-    public override var intrinsicContentSize: NSSize {
+    override public var intrinsicContentSize: NSSize {
         NSSize(width: 28, height: 28)
     }
 
-    public override init(frame frameRect: NSRect) {
+    override public init(frame frameRect: NSRect) {
         super.init(frame: frameRect)
         setup()
     }
@@ -31,11 +31,16 @@ public final class RemoteSyncIndicatorView: NSView {
         fatalError("init(coder:) has not been implemented")
     }
 
-    public override func layout() {
+    override public func layout() {
         super.layout()
         layer?.cornerRadius = bounds.height / 2
         shimmerLayer.frame = bounds
         heartbeatView.layer?.cornerRadius = heartbeatView.bounds.height / 2
+    }
+
+    override public func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, bounds.contains(point) else { return nil }
+        return self
     }
 
     public func update(_ presentation: RemoteSyncPresentation, theme: MarkdownTheme) {
@@ -55,7 +60,7 @@ public final class RemoteSyncIndicatorView: NSView {
             "\(presentation.phase.rawValue); source \(presentation.sourceHost); \(presentation.detail); \(presentation.isWritable ? "writable" : "read-only")"
         )
         setAccessibilityHelp(
-            "Live-document synchronization status for \(presentation.sourceHost). \(presentation.detail). The source is \(presentation.isWritable ? "writable" : "read-only")."
+            "Shows the link for the live document from \(presentation.sourceHost). \(presentation.detail). The source is \(presentation.isWritable ? "writable" : "read-only")."
         )
         heartbeatView.setAccessibilityValue(presentation.phase.rawValue)
         heartbeatView.setAccessibilityHelp(
@@ -74,13 +79,21 @@ public final class RemoteSyncIndicatorView: NSView {
         layer?.backgroundColor = NSColor.clear.cgColor
         layer?.borderColor = NSColor.clear.cgColor
         layer?.borderWidth = 0
+        title = ""
+        imagePosition = .noImage
+        isBordered = false
+        bezelStyle = .toolbar
+        setButtonType(.momentaryPushIn)
+        focusRingType = .none
         setAccessibilityElement(true)
         setAccessibilityIdentifier("remote-source-badge")
-        setAccessibilityRole(.group)
-        setAccessibilityRoleDescription("Live document sync status")
+        setAccessibilityRole(.button)
+        setAccessibilityRoleDescription("Live document link and sync status")
         setAccessibilityLabel("Live document")
         setAccessibilityEnabled(true)
-        setAccessibilityHelp("Remote source and synchronization status for a live document.")
+        setAccessibilityHelp(
+            "Shows the remote link and synchronization status for a live document."
+        )
         setAccessibilityHidden(true)
 
         iconView.translatesAutoresizingMaskIntoConstraints = false
@@ -133,13 +146,13 @@ public final class RemoteSyncIndicatorView: NSView {
     private func phaseColor(_ phase: RemoteSyncPhase, theme: MarkdownTheme) -> NSColor {
         switch phase {
         case .conflict, .error:
-            return NSColor(calibratedRed: 0.78, green: 0.23, blue: 0.18, alpha: 1)
+            NSColor(calibratedRed: 0.78, green: 0.23, blue: 0.18, alpha: 1)
         case .saving, .connecting, .checking:
-            return NSColor(calibratedRed: 0.73, green: 0.48, blue: 0.08, alpha: 1)
+            NSColor(calibratedRed: 0.73, green: 0.48, blue: 0.08, alpha: 1)
         case .readOnly:
-            return theme.secondaryTextColor
+            theme.secondaryTextColor
         case .watching, .incomingApplied, .saved:
-            return NSColor(calibratedRed: 0.08, green: 0.53, blue: 0.38, alpha: 1)
+            NSColor(calibratedRed: 0.08, green: 0.53, blue: 0.38, alpha: 1)
         }
     }
 

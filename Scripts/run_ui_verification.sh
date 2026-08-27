@@ -10,6 +10,7 @@ swift test
 mkdir -p "$ROOT/dist/snapshots"
 mkdir -p "$ROOT/dist/styled-marker-reveal"
 mkdir -p "$ROOT/dist/search-toolbar"
+mkdir -p "$ROOT/dist/header-ui"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-commands
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-tabs
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" --verify-default-app-prompt
@@ -24,6 +25,10 @@ mkdir -p "$ROOT/dist/search-toolbar"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
   --verify-search-ui "$ROOT/Samples/search-layout-proof.md" \
   --evidence-dir "$ROOT/dist/search-toolbar"
+"$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
+  --verify-header-ui https://pitchai.net/aviv-live/seth-live-demo.md \
+  --local-file "$ROOT/Samples/styled-marker-reveal.md" \
+  --evidence-dir "$ROOT/dist/header-ui"
 "$ROOT/dist/Aviv.app/Contents/MacOS/Aviv" \
   --verify-styled-marker-reveal https://pitchai.net/aviv-live/seth-live-demo.md \
   --local-file "$ROOT/Samples/styled-marker-reveal.md" \
@@ -69,4 +74,8 @@ echo "$ROOT/dist/search-toolbar/search-ui-results.json"
 echo "$ROOT/dist/search-toolbar/search-native-720.png"
 echo "$ROOT/dist/search-toolbar/search-native-720-live.png"
 echo "$ROOT/dist/search-toolbar/search-native-1080.png"
+echo "$ROOT/dist/header-ui/local-native-header-1080.png"
+echo "$ROOT/dist/header-ui/remote-native-header-720.png"
+echo "$ROOT/dist/header-ui/remote-native-header-1080.png"
+echo "$ROOT/dist/header-ui/remote-live-link-popover.png"
 echo "$ROOT/dist/styled-marker-reveal/styled-marker-reveal-result.json"
