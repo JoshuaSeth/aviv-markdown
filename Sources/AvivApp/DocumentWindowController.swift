@@ -3,7 +3,9 @@ import AvivCore
 import UniformTypeIdentifiers
 
 @MainActor
-final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate {
+final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSToolbarDelegate,
+    NSPopoverDelegate
+{
     let workspace = EditorWorkspaceView()
     var onRequestNewDocument: ((Any?) -> Void)?
     var onWindowWillClose: ((DocumentWindowController) -> Void)?
@@ -28,6 +30,26 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         remoteSyncToolbarView.accessibilitySummaryForTesting
     }
 
+    var liveDocumentLinkPopoverVisibleForTesting: Bool {
+        liveDocumentPopover?.isShown == true
+    }
+
+    var liveDocumentLinkURLForTesting: String? {
+        liveDocumentLinkController?.sourceURLStringForTesting
+    }
+
+    var liveDocumentLinkIsSelectableForTesting: Bool {
+        liveDocumentLinkController?.linkFieldIsSelectableForTesting == true
+    }
+
+    var liveDocumentLinkElementIdentifiersForTesting: Set<String> {
+        liveDocumentLinkController?.elementIdentifiersForTesting ?? []
+    }
+
+    var liveDocumentLinkViewForTesting: NSView? {
+        liveDocumentLinkController?.view
+    }
+
     var documentTitleFrameForTesting: NSRect {
         let visibleTitleView = documentTitleToolbarView.visibleTitleView
         return workspace.convert(visibleTitleView.bounds, from: visibleTitleView)
@@ -35,6 +57,17 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
 
     var documentTitleTextForTesting: String {
         documentTitleToolbarView.stringValue
+    }
+
+    var documentTitleDragSurfaceFrameForTesting: NSRect {
+        workspace.convert(
+            documentTitleToolbarView.dragSurfaceFrameForTesting,
+            from: documentTitleToolbarView
+        )
+    }
+
+    var documentTitleProvidesWindowDragForTesting: Bool {
+        documentTitleToolbarView.providesWindowDragForTesting
     }
 
     var isDocumentSearchActiveForTesting: Bool {
@@ -113,12 +146,16 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     private var documentSearchIndex = MarkdownSearchIndex(markdown: "", query: "")
     private var currentDocumentSearchResultIndex: Int?
     private var liveToolbarPresentation: RemoteSyncPresentation?
+    private let liveDocumentPasteboard: NSPasteboard
+    private var liveDocumentPopover: NSPopover?
+    private var liveDocumentLinkController: LiveDocumentLinkPopoverViewController?
     let remoteTransport: any RemoteMarkdownTransport
     let remoteCredentialStore: any RemoteWriteCredentialStoring
     var documentURL: URL?
     var savedText = MarkdownSamples.starter
     var remoteSyncController: RemoteDocumentSyncController?
     var remoteOpeningController: RemoteDocumentSyncController?
+    var remoteOpeningURL: URL?
     var remoteSource: RemoteMarkdownSource?
     var remoteOpenGeneration: UInt64 = 0
     var lastExternalUpdateResult: ExternalMarkdownUpdateResult?
@@ -135,11 +172,13 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         printService: DocumentPrintService? = nil,
         remoteTransport: any RemoteMarkdownTransport = URLSessionRemoteMarkdownTransport(),
         remoteCredentialStore: any RemoteWriteCredentialStoring =
-            KeychainRemoteWriteCredentialStore()
+            KeychainRemoteWriteCredentialStore(),
+        liveDocumentPasteboard: NSPasteboard = .general
     ) {
         self.printService = printService ?? AppKitDocumentPrintService()
         self.remoteTransport = remoteTransport
         self.remoteCredentialStore = remoteCredentialStore
+        self.liveDocumentPasteboard = liveDocumentPasteboard
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 1080, height: 860),
             styleMask: [.titled, .closable, .miniaturizable, .resizable, .fullSizeContentView],
@@ -160,6 +199,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         window.titleVisibility = .hidden
         window.titlebarAppearsTransparent = true
         window.toolbarStyle = .unifiedCompact
+        window.isMovable = true
         window.isReleasedWhenClosed = false
         window.minSize = NSSize(width: 720, height: 520)
         window.tabbingMode = .preferred
@@ -185,9 +225,9 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
         workspace.textView.onContentChange = { [weak self] text in
             guard let self else { return }
-            self.isEdited = text != self.savedText
-            self.refreshDocumentSearchAfterContentChange()
-            self.workspace.scheduleMetricsUpdate()
+            isEdited = text != savedText
+            refreshDocumentSearchAfterContentChange()
+            workspace.scheduleMetricsUpdate()
         }
         workspace.textView.onSelectionChange = { [weak self] in
             self?.workspace.scheduleMetricsUpdate()
@@ -352,14 +392,14 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     @objc func performDocumentFindAction(_ sender: Any?) {
-        let tag: Int?
-        if let item = sender as? NSMenuItem {
-            tag = item.tag
-        } else if let control = sender as? NSControl {
-            tag = control.tag
-        } else {
-            tag = nil
-        }
+        let tag: Int? =
+            if let item = sender as? NSMenuItem {
+                item.tag
+            } else if let control = sender as? NSControl {
+                control.tag
+            } else {
+                nil
+            }
 
         guard let tag else {
             NSSound.beep()
@@ -393,6 +433,19 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         showPreviousDocumentSearchResult()
     }
 
+    func showLiveDocumentLinkForTesting() {
+        guard liveDocumentPopover?.isShown != true else { return }
+        remoteSyncToolbarView.performClick(nil)
+    }
+
+    func copyLiveDocumentLinkForTesting() {
+        liveDocumentLinkController?.copyLinkForTesting()
+    }
+
+    func closeLiveDocumentLinkForTesting() {
+        dismissLiveDocumentLink()
+    }
+
     func closeDocumentSearchForTesting() {
         closeDocumentSearch(returnFocusToEditor: true)
     }
@@ -402,6 +455,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
     }
 
     func windowWillClose(_ notification: Notification) {
+        dismissLiveDocumentLink()
         stopRemoteSync()
         onWindowWillClose?(self)
     }
@@ -581,6 +635,7 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         guard let toolbar = window?.toolbar else { return }
         liveToolbarPresentation = presentation
         guard let presentation else {
+            dismissLiveDocumentLink()
             if let saveButton = toolbar.items.first(where: {
                 $0.itemIdentifier == .saveDocument
             })?.view as? AccessibleToolbarButton {
@@ -594,6 +649,12 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
         }
 
         remoteSyncToolbarView.update(presentation, theme: .clean)
+        if let sourceURL = currentLiveDocumentURL {
+            liveDocumentLinkController?.update(
+                sourceURL: sourceURL,
+                presentation: presentation
+            )
+        }
         applyToolbarMode()
         toolbar.items.first(where: { $0.itemIdentifier == .liveDocument })?.toolTip =
             remoteSyncToolbarView.accessibilitySummaryForTesting
@@ -799,6 +860,8 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             )
         case .liveDocument:
             item.view = remoteSyncToolbarView
+            remoteSyncToolbarView.target = self
+            remoteSyncToolbarView.action = #selector(toggleLiveDocumentLink(_:))
             item.label = "Live Document"
             item.paletteLabel = "Live Document"
             item.toolTip = remoteSyncToolbarView.accessibilitySummaryForTesting
@@ -943,6 +1006,60 @@ final class DocumentWindowController: NSWindowController, NSWindowDelegate, NSTo
             ?? NSImage(systemSymbolName: fallback, accessibilityDescription: description)
     }
 
+    private var currentLiveDocumentURL: URL? {
+        if let remoteOpeningURL {
+            return remoteOpeningURL
+        }
+        if let remoteSource {
+            return remoteSource.openedURL
+        }
+        guard let documentURL, !documentURL.isFileURL else { return nil }
+        return documentURL
+    }
+
+    @objc private func toggleLiveDocumentLink(_ sender: Any?) {
+        if liveDocumentPopover?.isShown == true {
+            dismissLiveDocumentLink()
+            return
+        }
+        guard let presentation = liveToolbarPresentation,
+            let sourceURL = currentLiveDocumentURL
+        else {
+            NSSound.beep()
+            return
+        }
+
+        let linkController = LiveDocumentLinkPopoverViewController(
+            sourceURL: sourceURL,
+            presentation: presentation,
+            pasteboard: liveDocumentPasteboard
+        )
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.animates = false
+        popover.delegate = self
+        popover.contentViewController = linkController
+        liveDocumentLinkController = linkController
+        liveDocumentPopover = popover
+        popover.show(
+            relativeTo: remoteSyncToolbarView.bounds,
+            of: remoteSyncToolbarView,
+            preferredEdge: .minY
+        )
+    }
+
+    private func dismissLiveDocumentLink() {
+        liveDocumentPopover?.performClose(nil)
+        liveDocumentPopover = nil
+        liveDocumentLinkController = nil
+    }
+
+    func popoverDidClose(_ notification: Notification) {
+        guard notification.object as? NSPopover === liveDocumentPopover else { return }
+        liveDocumentPopover = nil
+        liveDocumentLinkController = nil
+    }
+
     @objc private func toggleBold(_ sender: Any?) {
         workspace.textView.wrapSelection(prefix: "**", suffix: "**")
     }
@@ -977,6 +1094,19 @@ private final class DocumentTitleToolbarView: NSView {
         label.stringValue
     }
 
+    var dragSurfaceFrameForTesting: NSRect {
+        dragSurfaceFrame
+    }
+
+    var providesWindowDragForTesting: Bool {
+        let point = NSPoint(x: dragSurfaceFrame.midX, y: dragSurfaceFrame.midY)
+        return mouseDownCanMoveWindow && hitTest(point) === self
+    }
+
+    override var mouseDownCanMoveWindow: Bool {
+        true
+    }
+
     override var intrinsicContentSize: NSSize {
         NSSize(width: 200, height: 24)
     }
@@ -994,7 +1124,9 @@ private final class DocumentTitleToolbarView: NSView {
         label.setAccessibilityRoleDescription("Visible Markdown document title")
         label.setAccessibilityLabel("Visible document title")
         label.setAccessibilityEnabled(true)
-        label.setAccessibilityHelp("Visible title of the current Markdown document.")
+        label.setAccessibilityHelp(
+            "Visible title of the current Markdown document. Drag the title to move the window."
+        )
         addSubview(label)
         let centerConstraint = label.centerXAnchor.constraint(equalTo: centerXAnchor)
         let widthConstraint = label.widthAnchor.constraint(equalToConstant: 184)
@@ -1011,7 +1143,9 @@ private final class DocumentTitleToolbarView: NSView {
         setAccessibilityRoleDescription("Markdown document title")
         setAccessibilityLabel("Document title")
         setAccessibilityEnabled(true)
-        setAccessibilityHelp("Title and unsaved-edit state of the current Markdown document.")
+        setAccessibilityHelp(
+            "Title and unsaved-edit state of the current Markdown document. Drag here to move the window."
+        )
         update(title: "Untitled")
     }
 
@@ -1037,6 +1171,19 @@ private final class DocumentTitleToolbarView: NSView {
 
     func setTitleWidth(_ width: CGFloat) {
         titleWidthConstraint?.constant = width
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        guard !isHidden, dragSurfaceFrame.contains(point) else { return nil }
+        return self
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        window?.performDrag(with: event)
+    }
+
+    private var dragSurfaceFrame: NSRect {
+        label.frame.insetBy(dx: -8, dy: -4).intersection(bounds)
     }
 }
 
