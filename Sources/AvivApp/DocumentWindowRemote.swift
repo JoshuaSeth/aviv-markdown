@@ -52,19 +52,20 @@ extension DocumentWindowController {
         let previousSource = remoteSource
         let controller = RemoteDocumentSyncController(transport: remoteTransport)
         remoteOpeningController = controller
+        remoteOpeningURL = url
         controller.markdownStateProvider = { [weak self] in
             guard let self else { return ("", "") }
-            return (self.workspace.textView.string, self.savedText)
+            return (workspace.textView.string, savedText)
         }
         controller.onOutcome = { [weak self, weak controller] outcome in
-            guard let self, let controller, self.shouldHandleRemoteCallbacks(from: controller)
+            guard let self, let controller, shouldHandleRemoteCallbacks(from: controller)
             else { return }
-            self.handleRemotePollOutcome(outcome)
+            handleRemotePollOutcome(outcome)
         }
         controller.onPresentation = { [weak self, weak controller] presentation in
-            guard let self, let controller, self.shouldHandleRemoteCallbacks(from: controller)
+            guard let self, let controller, shouldHandleRemoteCallbacks(from: controller)
             else { return }
-            self.workspace.updateRemoteSyncPresentation(presentation)
+            workspace.updateRemoteSyncPresentation(presentation)
         }
         controller.onPollingError = { error in
             NSLog("Aviv remote sync error: %@", error.localizedDescription)
@@ -78,6 +79,7 @@ extension DocumentWindowController {
                 return false
             }
             remoteOpeningController = nil
+            remoteOpeningURL = nil
             previousController?.stop()
             remoteSyncController = controller
             remoteSource = snapshot.source
@@ -98,6 +100,7 @@ extension DocumentWindowController {
                 remoteOpeningController === controller
             else { return false }
             remoteOpeningController = nil
+            remoteOpeningURL = nil
             if let previousSource {
                 workspace.updateRemoteSyncPresentation(
                     RemoteSyncPresentation(
@@ -185,12 +188,12 @@ extension DocumentWindowController {
             guard let self, let pending = await controller.pendingIncomingSnapshot() else {
                 return
             }
-            let alert = self.makeRemoteConflictAlert()
+            let alert = makeRemoteConflictAlert()
             let response = alert.runModal()
             if response == .alertFirstButtonReturn {
-                await self.acceptIncoming(pending, controller: controller)
+                await acceptIncoming(pending, controller: controller)
             } else if response == .alertSecondButtonReturn {
-                await self.saveRemoteDocument(replacingPendingIncoming: true)
+                await saveRemoteDocument(replacingPendingIncoming: true)
             }
         }
     }
@@ -229,6 +232,7 @@ extension DocumentWindowController {
         remoteOpenGeneration &+= 1
         remoteOpeningController?.stop()
         remoteOpeningController = nil
+        remoteOpeningURL = nil
         remoteSyncController?.stop()
         remoteSyncController = nil
         remoteSource = nil

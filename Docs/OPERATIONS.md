@@ -97,6 +97,18 @@ dist/Aviv.app/Contents/MacOS/Aviv \
   --evidence-dir dist/search-toolbar
 ```
 
+The header verifier opens both local and URL-backed documents, clicks the live-document indicator, proves the exact
+opened URL is selectable and copied, and rejects any popover-induced editor or toolbar shift. It also verifies the
+centered title's bounded native window-drag surface against traffic lights and toolbar controls at 720, 840, 1080,
+and 1440 points, then writes native header and popover PNG evidence:
+
+```sh
+dist/Aviv.app/Contents/MacOS/Aviv \
+  --verify-header-ui https://pitchai.net/aviv-live/seth-live-demo.md \
+  --local-file Samples/styled-marker-reveal.md \
+  --evidence-dir dist/header-ui
+```
+
 For the real macOS Accessibility tree of a running build, grant Accessibility permission to the terminal or automation
 host once, then capture the bounded tab-separated audit. The script fails loudly if the process, window, permission, or
 child traversal is unavailable:

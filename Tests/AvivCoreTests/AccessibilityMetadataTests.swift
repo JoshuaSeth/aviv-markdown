@@ -7,7 +7,7 @@ final class AccessibilityMetadataTests: XCTestCase {
     @MainActor
     func testWorkspaceExposesRichDocumentAndOutlineMetadata() throws {
         let workspace = EditorWorkspaceView(
-            frame: NSRect(x: 0, y: 0, width: 1_080, height: 760)
+            frame: NSRect(x: 0, y: 0, width: 1080, height: 760)
         )
         let window = NSWindow(
             contentRect: workspace.bounds,
@@ -84,11 +84,12 @@ final class AccessibilityMetadataTests: XCTestCase {
         )
 
         XCTAssertEqual(indicator.accessibilityIdentifier(), "remote-source-badge")
-        XCTAssertEqual(indicator.accessibilityRole(), .group)
+        XCTAssertEqual(indicator.accessibilityRole(), .button)
         XCTAssertEqual(indicator.accessibilityLabel(), "Live document")
         XCTAssertTrue((indicator.accessibilityValue() as? String)?.contains("conflict") == true)
         XCTAssertTrue((indicator.accessibilityValue() as? String)?.contains("writable") == true)
         XCTAssertTrue(indicator.accessibilityHelp()?.contains("pitchai.net") == true)
+        XCTAssertTrue(indicator.accessibilityHelp()?.contains("Shows the link") == true)
         XCTAssertFalse(indicator.isAccessibilityHidden())
     }
 
