@@ -52,6 +52,26 @@ Live Documents deliberately separates read and write authority:
    stores it in macOS Keychain under service `net.pitchai.aviv.remote-write`. Never substitute the bearer token into
    the URL.
 
+### macOS Keychain lookup contract
+
+Aviv 1.1.1 and newer stores the write token as a generic-password item in the active macOS login Keychain. The exact
+lookup tuple is:
+
+- service: `net.pitchai.aviv.remote-write`
+- account: `<X-Aviv-Source-ID>|<write-URL-origin>`
+- password: the separate Live Documents bearer token
+
+The origin is only `scheme://host[:port]` from `X-Aviv-Write-URL`; its path and query are deliberately excluded. For
+Live Documents, the account therefore ends in `|https://livedocuments.pitchai.net`. An item whose account is only the
+raw source ID is not used by the current implementation and will cause Aviv to ask for a credential again.
+Treat the full write-URL header as secret-bearing because its query may repeat the read credential; never print or log
+the unredacted header while deriving the origin.
+
+For an unattended Mac setup, transfer the bearer value directly from the protected server file into Aviv's secure
+save prompt over the approved SSH path so Aviv itself creates the Keychain item. Do not place the value in shell
+arguments, a clipboard, a temporary file, logs, or chat. Verify the next `Cmd-S` completes with no Aviv credential
+dialog or macOS Keychain authorization window, returns a current ETag, and reads back the expected bytes.
+
 Nginx logs the path without query arguments or referrers, its vhost error log is disabled, and Uvicorn access logging
 is disabled. These settings are part of the security boundary for the read-token URL and must not be relaxed.
 
